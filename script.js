@@ -4980,6 +4980,21 @@ function getEnhanceLevel(itemId) {
   return Number(EQUIPMENT_DATA[itemId]?.enhanceLevel || 0);
 }
 
+function getEnhanceMaxLevel(itemId) {
+  const eq = EQUIPMENT_DATA[itemId];
+  if (!eq) {
+    return Number.POSITIVE_INFINITY;
+  }
+  if (eq.category === "weapon") {
+    return Math.max(1, Math.floor(state.player.level || 1));
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+function isEnhanceCapReached(itemId) {
+  return getEnhanceLevel(itemId) >= getEnhanceMaxLevel(itemId);
+}
+
 function syncEquipmentEnhancementCache() {
   Object.keys(EQUIPMENT_DATA).forEach((itemId) => {
     EQUIPMENT_DATA[itemId].enhanceLevel = getEnhanceLevel(itemId);
@@ -6384,7 +6399,9 @@ function renderWorkshopView() {
     equipIds.length > 0
       ? equipIds
           .map((itemId) => {
-            const lv = state.player.equipmentEnhancements[itemId] || 0;
+            const lv = getEnhanceLevel(itemId);
+            const cap = getEnhanceMaxLevel(itemId);
+            const capReached = isEnhanceCapReached(itemId);
             const cost = getEnhanceCost(itemId);
             const rate = Math.floor(getEnhanceSuccessRate(itemId) * 100);
             const current = getEnhancedEquipmentStats(createEquipmentInstanceFromItemId(itemId));
@@ -6397,7 +6414,8 @@ function renderWorkshopView() {
                 return `${key.toUpperCase()} ${before}→${after}`;
               })
               .join(" / ");
-            return `<div class="shop-card"><h4>${getEquipmentDisplayName(itemId)}</h4><p class="tiny">費用: ${cost} / 成功率: ${rate}%</p><p class="tiny">${changedKeys || "強化で変化なし"}</p><button class="btn enhance-btn" data-item-id="${itemId}" ${state.player.gold >= cost ? "" : "disabled"}>強化</button></div>`;
+            const capText = Number.isFinite(cap) ? `${lv}/${cap}` : `${lv}/∞`;
+            return `<div class="shop-card"><h4>${getEquipmentDisplayName(itemId)}</h4><p class="tiny">強化段階: ${capText}</p><p class="tiny">費用: ${cost} / 成功率: ${rate}%</p><p class="tiny">${changedKeys || "強化で変化なし"}</p><button class="btn enhance-btn" data-item-id="${itemId}" ${state.player.gold >= cost && !capReached ? "" : "disabled"}>${capReached ? "上限到達" : "強化"}</button></div>`;
           })
           .join("")
       : "<p class='tiny'>強化できる装備がありません。</p>";
@@ -6750,6 +6768,12 @@ function enhanceItem(itemId) {
   if (getInventoryCount(itemId) <= 0) {
     return;
   }
+  if (isEnhanceCapReached(itemId)) {
+    const cap = getEnhanceMaxLevel(itemId);
+    const capText = Number.isFinite(cap) ? cap : "∞";
+    addLog(`強化不可: ${ITEM_DATA[itemId]?.name || itemId} は現在の強化上限(+${capText})に到達しています。`);
+    return;
+  }
   const cost = getEnhanceCost(itemId);
   if (state.player.gold < cost) {
     addLog("強化失敗: GOLD不足。");
@@ -6804,13 +6828,16 @@ function canCraftRecipe(recipe) {
 }
 
 function getEnhanceCost(itemId) {
-  const lv = state.player.equipmentEnhancements[itemId] || 0;
+  const lv = getEnhanceLevel(itemId);
   const base = 20 + lv * 15;
   return Math.max(1, Math.floor(base * (1 - state.titleEffects.enhanceCostReduction - state.titleEffects.workshopCostReduction)));
 }
 
 function getEnhanceSuccessRate(itemId) {
-  const lv = state.player.equipmentEnhancements[itemId] || 0;
+  const lv = getEnhanceLevel(itemId);
+  if (isEnhanceCapReached(itemId)) {
+    return 0;
+  }
   return clamp(0.35, 0.98, 0.85 - lv * 0.08 + state.titleEffects.enhanceSuccessBonus + state.titleEffects.smithEnhanceBonus);
 }
 
