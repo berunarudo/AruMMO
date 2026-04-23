@@ -531,8 +531,116 @@ Object.assign(ITEM_DATA, {
   regenPotion: { id: "regenPotion", name: "継続回復薬", category: "consumable", description: "一定時間回復", buyPrice: 0, sellPrice: 35 },
   vegeSoup: { id: "vegeSoup", name: "野菜スープ", category: "crafted", description: "体に優しい料理", buyPrice: 0, sellPrice: 24 },
   gourmetMeat: { id: "gourmetMeat", name: "豪華肉料理", category: "crafted", description: "高級なバフ料理", buyPrice: 0, sellPrice: 48 },
-  failedDish: { id: "failedDish", name: "焦げた料理", category: "crafted", description: "失敗した料理", buyPrice: 0, sellPrice: 3 }
+  failedDish: { id: "failedDish", name: "焦げた料理", category: "crafted", description: "失敗した料理", buyPrice: 0, sellPrice: 3 },
+  hydraScale: { id: "hydraScale", name: "ヒドラ鱗", category: "material", description: "砂海ヒドラの鱗片", buyPrice: 0, sellPrice: 140 },
+  leviathanFin: { id: "leviathanFin", name: "リヴァイア鰭", category: "material", description: "蒼海王の巨大な鰭", buyPrice: 0, sellPrice: 220 },
+  volkaCore: { id: "volkaCore", name: "ヴォルカ核", category: "material", description: "炎獄竜の灼熱核", buyPrice: 0, sellPrice: 340 }
 });
+
+const REGIONAL_EQUIPMENT_DEFS = [
+  { id: "sandbladeLongsword", name: "砂刃の長剣", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 24, defense: 2, speed: 1, intelligence: 0, luck: 2, hp: 0, mp: 0, weight: 16, price: 980, sellPrice: 392, specialTags: ["melee", "desert", "accuracy"], description: "砂漠戦向けに命中性を調整した長剣。" },
+  { id: "quicksandTwinblades", name: "流砂の双刃", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 20, defense: 0, speed: 7, intelligence: 0, luck: 4, hp: 0, mp: 0, weight: 11, price: 1040, sellPrice: 416, specialTags: ["dual_wield", "desert", "speed"], description: "流砂のように連撃を刻む二刀向け双刃。" },
+  { id: "ruinbreakerGreatsword", name: "遺跡破りの大剣", category: "weapon", unlockTown: "dustria", rarity: "epic", attack: 34, defense: 5, speed: -5, intelligence: 0, luck: 0, hp: 8, mp: 0, weight: 28, price: 1320, sellPrice: 528, specialTags: ["heavy", "crusher", "desert"], description: "遺跡守護種を割るために鍛えられた重剣。" },
+  { id: "sandrunnerKunai", name: "砂走りの苦無", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 18, defense: 0, speed: 8, intelligence: 0, luck: 3, hp: 0, mp: 0, weight: 7, price: 920, sellPrice: 368, specialTags: ["speed", "desert", "ninja"], description: "砂上でも失速しにくい軽量苦無。" },
+  { id: "banditBaneDagger", name: "盗賊喰らいの短刀", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 21, defense: 0, speed: 5, intelligence: 0, luck: 6, hp: 0, mp: 0, weight: 8, price: 980, sellPrice: 392, specialTags: ["lucky", "desert", "critical"], description: "奇襲対策を意識した会心寄り短刀。" },
+  { id: "drywindStaff", name: "乾風の杖", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 8, defense: 1, speed: 1, intelligence: 20, luck: 2, hp: 0, mp: 16, weight: 10, price: 1180, sellPrice: 472, specialTags: ["magic", "desert", "mp_efficiency"], description: "乾いた風で詠唱を補助する砂漠向け杖。" },
+  { id: "mirageRod", name: "陽炎のロッド", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 9, defense: 0, speed: 4, intelligence: 17, luck: 3, hp: 0, mp: 12, weight: 8, price: 1120, sellPrice: 448, specialTags: ["magic", "speed", "desert"], description: "陽炎を纏い、単体魔法の回転を高めるロッド。" },
+  { id: "pilgrimHolyStaff", name: "巡礼者の聖杖", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 10, defense: 3, speed: 1, intelligence: 18, luck: 4, hp: 16, mp: 18, weight: 12, price: 1240, sellPrice: 496, specialTags: ["support", "desert", "cleric"], description: "毒地帯の巡礼で使われる継戦型の聖杖。" },
+  { id: "sandprayerMace", name: "砂祈のメイス", category: "weapon", unlockTown: "dustria", rarity: "rare", attack: 15, defense: 9, speed: -1, intelligence: 11, luck: 2, hp: 20, mp: 10, weight: 18, price: 1260, sellPrice: 504, specialTags: ["support", "defense_build", "desert"], description: "防御を重視した僧侶向けメイス。" },
+  { id: "sandScarf", name: "サンドスカーフ", category: "armor", unlockTown: "dustria", rarity: "uncommon", attack: 0, defense: 10, speed: 2, intelligence: 0, luck: 2, hp: 14, mp: 0, weight: 8, price: 740, sellPrice: 296, specialTags: ["light_armor", "desert", "accuracy"], description: "砂嵐を防ぎ命中を補助する防具。" },
+  { id: "wanderingDuneMantle", name: "遊砂の外套", category: "armor", unlockTown: "dustria", rarity: "rare", attack: 0, defense: 7, speed: 5, intelligence: 2, luck: 2, hp: 8, mp: 6, weight: 7, price: 860, sellPrice: 344, specialTags: ["speed_build", "desert"], description: "回避を重視した軽装外套。" },
+  { id: "ruinwardenArmor", name: "遺跡守りの鎧", category: "armor", unlockTown: "dustria", rarity: "epic", attack: 1, defense: 22, speed: -4, intelligence: 0, luck: 0, hp: 34, mp: 0, weight: 30, price: 1380, sellPrice: 552, specialTags: ["heavy_armor", "defense_build", "desert"], description: "重装と耐性を両立した遺跡護衛鎧。" },
+  { id: "dryboneGauntlet", name: "乾骨の護手", category: "armor", unlockTown: "dustria", rarity: "rare", attack: 1, defense: 12, speed: 0, intelligence: 0, luck: 1, hp: 18, mp: 0, weight: 12, price: 930, sellPrice: 372, specialTags: ["mid_armor", "desert", "anti_crit"], description: "会心事故を抑える砂漠護手。" },
+  { id: "scorpionCharm", name: "スコーピオンチャーム", category: "accessory", unlockTown: "dustria", rarity: "rare", attack: 0, defense: 4, speed: 1, intelligence: 0, luck: 2, hp: 14, mp: 0, weight: 2, price: 820, sellPrice: 328, specialTags: ["support", "desert", "poison_resist"], description: "毒耐性を大きく高める護符。" },
+  { id: "antiBanditTalisman", name: "盗賊除けの護符", category: "accessory", unlockTown: "dustria", rarity: "rare", attack: 0, defense: 3, speed: 1, intelligence: 0, luck: 4, hp: 10, mp: 0, weight: 2, price: 840, sellPrice: 336, specialTags: ["gold_boost", "desert", "anti_thief"], description: "奇襲と金銭被害を抑える守り札。" },
+  { id: "mirageRing", name: "陽炎の指輪", category: "accessory", unlockTown: "dustria", rarity: "rare", attack: 0, defense: 0, speed: 3, intelligence: 1, luck: 4, hp: 0, mp: 6, weight: 1, price: 860, sellPrice: 344, specialTags: ["speed", "lucky", "desert"], description: "回避と会心を底上げする砂漠リング。" },
+  { id: "quicksandAnklet", name: "流砂の足輪", category: "accessory", unlockTown: "dustria", rarity: "rare", attack: 0, defense: -2, speed: 6, intelligence: 0, luck: 1, hp: 0, mp: 0, weight: 1, price: 780, sellPrice: 312, specialTags: ["speed_build", "desert"], description: "防御を捨てて機動力を得る足輪。" },
+
+  { id: "tideslashSaber", name: "潮斬りのサーベル", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 40, defense: 4, speed: 3, intelligence: 0, luck: 3, hp: 0, mp: 0, weight: 20, price: 2200, sellPrice: 880, specialTags: ["melee", "sea", "balanced"], description: "海棲種との戦闘に合わせた均衡型サーベル。" },
+  { id: "abyssbreakerGreatsword", name: "深海砕きの大剣", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 56, defense: 8, speed: -6, intelligence: 0, luck: 0, hp: 14, mp: 0, weight: 34, price: 2560, sellPrice: 1024, specialTags: ["heavy", "crusher", "sea"], description: "甲殻種を砕くことに特化した深海大剣。" },
+  { id: "tideKnightTwinSwords", name: "潮騎士の双剣", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 42, defense: 1, speed: 8, intelligence: 0, luck: 5, hp: 0, mp: 0, weight: 16, price: 2380, sellPrice: 952, specialTags: ["dual_wield", "speed", "sea"], description: "多段向けの潮騎士流双剣。" },
+  { id: "searoarDagger", name: "海鳴りの短刀", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 38, defense: 1, speed: 10, intelligence: 0, luck: 4, hp: 0, mp: 0, weight: 13, price: 2240, sellPrice: 896, specialTags: ["speed", "sea", "shock_resist"], description: "海鳴りの衝撃をまとった高速短刀。" },
+  { id: "waveShadowShuriken", name: "波影の手裏剣", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 36, defense: 0, speed: 9, intelligence: 2, luck: 5, hp: 0, mp: 4, weight: 11, price: 2180, sellPrice: 872, specialTags: ["speed", "sea", "multi_hit"], description: "回避敵への命中を重視した投擲武器。" },
+  { id: "abyssTreasureStaff", name: "深海の宝杖", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 14, defense: 2, speed: 1, intelligence: 36, luck: 3, hp: 0, mp: 30, weight: 14, price: 2680, sellPrice: 1072, specialTags: ["magic", "sea", "mp_boost"], description: "氷雷系の術式に適した高知性杖。" },
+  { id: "tidalWand", name: "潮流のワンド", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 12, defense: 1, speed: 6, intelligence: 30, luck: 4, hp: 0, mp: 22, weight: 12, price: 2520, sellPrice: 1008, specialTags: ["magic", "speed", "sea"], description: "詠唱回転を重視した潮流ワンド。" },
+  { id: "seaprayerHolyStaff", name: "海祈の聖杖", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 15, defense: 5, speed: 2, intelligence: 31, luck: 4, hp: 24, mp: 28, weight: 16, price: 2760, sellPrice: 1104, specialTags: ["support", "sea", "cleric"], description: "全体回復運用向けの海域聖杖。" },
+  { id: "pearlPriestStaff", name: "真珠の司祭杖", category: "weapon", unlockTown: "akamatsu", rarity: "epic", attack: 13, defense: 7, speed: 1, intelligence: 28, luck: 5, hp: 28, mp: 26, weight: 17, price: 2720, sellPrice: 1088, specialTags: ["support", "defense_build", "sea"], description: "過剰回復シナジー向けの司祭杖。" },
+  { id: "seashellArmor", name: "シーシェルアーマー", category: "armor", unlockTown: "akamatsu", rarity: "epic", attack: 0, defense: 24, speed: -1, intelligence: 1, luck: 0, hp: 36, mp: 8, weight: 26, price: 2100, sellPrice: 840, specialTags: ["mid_armor", "sea"], description: "高防御と水域適性を持つ甲殻鎧。" },
+  { id: "marineRobe", name: "マリンローブ", category: "armor", unlockTown: "akamatsu", rarity: "epic", attack: 0, defense: 17, speed: 1, intelligence: 8, luck: 1, hp: 24, mp: 24, weight: 17, price: 2020, sellPrice: 808, specialTags: ["magic_armor", "sea"], description: "魔防重視の海域法衣。" },
+  { id: "seabreezeCoat", name: "潮風のコート", category: "armor", unlockTown: "akamatsu", rarity: "epic", attack: 1, defense: 13, speed: 6, intelligence: 3, luck: 2, hp: 18, mp: 10, weight: 13, price: 1980, sellPrice: 792, specialTags: ["speed_build", "sea"], description: "速度と回避を両立する軽量コート。" },
+  { id: "abyssKnightArmor", name: "深海騎士の鎧", category: "armor", unlockTown: "akamatsu", rarity: "legend", attack: 2, defense: 32, speed: -5, intelligence: 2, luck: 0, hp: 52, mp: 16, weight: 38, price: 2920, sellPrice: 1168, specialTags: ["heavy_armor", "defense_build", "sea"], description: "深海ボスを想定した重装鎧。" },
+  { id: "pearlNecklaceSea", name: "真珠の首飾り", category: "accessory", unlockTown: "akamatsu", rarity: "epic", attack: 0, defense: 2, speed: 1, intelligence: 4, luck: 2, hp: 10, mp: 24, weight: 2, price: 1680, sellPrice: 672, specialTags: ["support", "sea", "mp_boost"], description: "MPと回復効率を補助する真珠飾り。" },
+  { id: "jellyWardCharm", name: "クラゲ除けの護符", category: "accessory", unlockTown: "akamatsu", rarity: "epic", attack: 0, defense: 4, speed: 1, intelligence: 0, luck: 1, hp: 16, mp: 8, weight: 2, price: 1620, sellPrice: 648, specialTags: ["support", "sea", "shock_resist"], description: "麻痺・感電事故を抑える護符。" },
+  { id: "tidalBracelet", name: "潮流の腕輪", category: "accessory", unlockTown: "akamatsu", rarity: "epic", attack: 2, defense: 1, speed: 4, intelligence: 3, luck: 1, hp: 8, mp: 12, weight: 2, price: 1640, sellPrice: 656, specialTags: ["speed", "sea", "skill_cycle"], description: "スキル回転率を意識した腕輪。" },
+  { id: "seaSnakeFangOrnament", name: "海蛇の牙飾り", category: "accessory", unlockTown: "akamatsu", rarity: "epic", attack: 4, defense: 0, speed: 3, intelligence: 0, luck: 4, hp: 0, mp: 0, weight: 2, price: 1700, sellPrice: 680, specialTags: ["lucky", "sea", "ailment_offense"], description: "毒・出血付与寄りの尖った牙飾り。" },
+
+  { id: "scorchsteelGreatsword", name: "灼鋼の大剣", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 76, defense: 10, speed: -6, intelligence: 0, luck: 3, hp: 22, mp: 0, weight: 44, price: 4200, sellPrice: 1680, specialTags: ["heavy", "crusher", "volcano"], description: "終盤の殴り合いを制する高火力大剣。" },
+  { id: "flamebreakerAxe", name: "炎砕きの戦斧", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 92, defense: 14, speed: -10, intelligence: 0, luck: 1, hp: 30, mp: 0, weight: 52, price: 4680, sellPrice: 1872, specialTags: ["heavy", "boss_damage", "volcano"], description: "速度を捨てた超火力ボス狩り戦斧。" },
+  { id: "crimsonTwinblades", name: "紅蓮双刃", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 68, defense: 2, speed: 12, intelligence: 0, luck: 6, hp: 0, mp: 0, weight: 22, price: 4360, sellPrice: 1744, specialTags: ["dual_wield", "speed", "volcano"], description: "多段運用に特化した高回転双刃。" },
+  { id: "fireShadowKunai", name: "火影の苦無", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 62, defense: 1, speed: 14, intelligence: 0, luck: 5, hp: 0, mp: 0, weight: 16, price: 4080, sellPrice: 1632, specialTags: ["speed", "lucky", "volcano"], description: "火山地帯でも機動力を保つ忍具。" },
+  { id: "scorchingDarkBlade", name: "灼熱の暗刃", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 74, defense: 1, speed: 8, intelligence: 0, luck: 6, hp: 0, mp: 0, weight: 20, price: 4320, sellPrice: 1728, specialTags: ["lucky", "volcano", "single_target"], description: "単体処理能力に寄せた灼熱暗刃。" },
+  { id: "volcanicCoreStaff", name: "火山核の杖", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 20, defense: 3, speed: 0, intelligence: 56, luck: 4, hp: 0, mp: 42, weight: 20, price: 4820, sellPrice: 1928, specialTags: ["magic", "volcano", "fire_magic"], description: "火属性火力を引き上げる終盤術杖。" },
+  { id: "seraphicRod", name: "熾天のロッド", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 18, defense: 2, speed: 8, intelligence: 50, luck: 5, hp: 0, mp: 34, weight: 17, price: 4700, sellPrice: 1880, specialTags: ["magic", "speed", "volcano"], description: "全体魔法運用向けの高火力ロッド。" },
+  { id: "holyflameStaff", name: "聖火の司杖", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 20, defense: 9, speed: 2, intelligence: 46, luck: 5, hp: 38, mp: 42, weight: 24, price: 4960, sellPrice: 1984, specialTags: ["support", "cleric", "volcano"], description: "回復と過剰回復シナジーを伸ばす司杖。" },
+  { id: "radiantMace", name: "熾光のメイス", category: "weapon", unlockTown: "rulacia", rarity: "legend", attack: 34, defense: 18, speed: -1, intelligence: 24, luck: 2, hp: 44, mp: 20, weight: 30, price: 4880, sellPrice: 1952, specialTags: ["support", "defense_build", "volcano"], description: "被ダメ軽減寄りの殴れる聖職メイス。" },
+  { id: "fireproofHeavyArmor", name: "耐火の重鎧", category: "armor", unlockTown: "rulacia", rarity: "legend", attack: 1, defense: 40, speed: -6, intelligence: 0, luck: 0, hp: 64, mp: 4, weight: 48, price: 4200, sellPrice: 1680, specialTags: ["heavy_armor", "defense_build", "volcano"], description: "火山前線の物理戦を支える耐火重鎧。" },
+  { id: "scorchbaneRobe", name: "灼熱断ちの法衣", category: "armor", unlockTown: "rulacia", rarity: "legend", attack: 0, defense: 28, speed: 0, intelligence: 10, luck: 1, hp: 34, mp: 36, weight: 24, price: 3960, sellPrice: 1584, specialTags: ["magic_armor", "volcano"], description: "魔防とMPを重視した火山法衣。" },
+  { id: "crimsonMantle", name: "紅蓮外套", category: "armor", unlockTown: "rulacia", rarity: "legend", attack: 8, defense: 20, speed: 4, intelligence: 2, luck: 2, hp: 26, mp: 10, weight: 20, price: 3880, sellPrice: 1552, specialTags: ["speed_build", "volcano"], description: "攻撃寄りの終盤軽装外套。" },
+  { id: "infernoKnightArmor", name: "炎獄騎士の鎧", category: "armor", unlockTown: "rulacia", rarity: "mythic", attack: 3, defense: 48, speed: -7, intelligence: 4, luck: 0, hp: 82, mp: 24, weight: 58, price: 5600, sellPrice: 2240, specialTags: ["heavy_armor", "defense_build", "volcano"], description: "防御・魔防・HPを兼ねる終盤最上位鎧。" },
+  { id: "fireDragonRing", name: "火竜の指輪", category: "accessory", unlockTown: "rulacia", rarity: "legend", attack: 8, defense: 3, speed: 1, intelligence: 4, luck: 2, hp: 14, mp: 12, weight: 3, price: 3180, sellPrice: 1272, specialTags: ["magic", "volcano", "fire_magic"], description: "火属性火力と火山耐性を同時に伸ばす指輪。" },
+  { id: "lavaCoreNecklace", name: "熔岩核の首飾り", category: "accessory", unlockTown: "rulacia", rarity: "legend", attack: 2, defense: 10, speed: -2, intelligence: 1, luck: 1, hp: 40, mp: 10, weight: 4, price: 3060, sellPrice: 1224, specialTags: ["defense_build", "volcano"], description: "HPと防御を稼ぐ重厚な首飾り。" },
+  { id: "ashenBracelet", name: "灰燼の腕輪", category: "accessory", unlockTown: "rulacia", rarity: "legend", attack: 12, defense: 1, speed: 2, intelligence: 0, luck: 2, hp: 0, mp: -4, weight: 3, price: 3120, sellPrice: 1248, specialTags: ["volcano", "aggressive"], description: "攻撃を伸ばす代わりに扱いづらい尖り腕輪。" },
+  { id: "indomitableTalisman", name: "不屈の護符", category: "accessory", unlockTown: "rulacia", rarity: "legend", attack: 1, defense: 9, speed: 0, intelligence: 2, luck: 2, hp: 24, mp: 8, weight: 3, price: 3240, sellPrice: 1296, specialTags: ["support", "defense_build", "volcano"], description: "低HP時の耐久を支えるボス戦向け護符。" },
+
+  { id: "hydraScaleBlade", name: "ヒドラスケイルブレード", category: "weapon", unlockTown: "dustria", rarity: "legend", attack: 48, defense: 8, speed: 2, intelligence: 0, luck: 4, hp: 18, mp: 0, weight: 24, price: 3200, sellPrice: 1280, specialTags: ["desert", "boss_series", "poison_resist"], description: "ヒドラ鱗を鍛えた砂漠終盤向け大剣。" },
+  { id: "hydraScaleMail", name: "ヒドラスケイルメイル", category: "armor", unlockTown: "dustria", rarity: "legend", attack: 1, defense: 30, speed: -2, intelligence: 0, luck: 0, hp: 46, mp: 6, weight: 34, price: 3080, sellPrice: 1232, specialTags: ["desert", "boss_series", "defense_build"], description: "毒耐性に優れたヒドラ鱗防具。" },
+  { id: "hydraScaleCharm", name: "ヒドラスケイルチャーム", category: "accessory", unlockTown: "dustria", rarity: "legend", attack: 2, defense: 7, speed: 1, intelligence: 1, luck: 3, hp: 18, mp: 8, weight: 3, price: 2640, sellPrice: 1056, specialTags: ["desert", "boss_series", "poison_resist"], description: "多段被弾の事故を抑えるヒドラ護符。" },
+  { id: "leviathiaTrident", name: "リヴァイアトライデント", category: "weapon", unlockTown: "akamatsu", rarity: "mythic", attack: 66, defense: 10, speed: 3, intelligence: 12, luck: 3, hp: 20, mp: 20, weight: 30, price: 5200, sellPrice: 2080, specialTags: ["sea", "boss_series", "magic"], description: "リヴァイア素材で作る魔法適性の高い槍杖。" },
+  { id: "leviathiaVestment", name: "リヴァイアヴェストメント", category: "armor", unlockTown: "akamatsu", rarity: "mythic", attack: 0, defense: 36, speed: -1, intelligence: 12, luck: 2, hp: 48, mp: 34, weight: 30, price: 4980, sellPrice: 1992, specialTags: ["sea", "boss_series", "magic_armor"], description: "MP/知性/防御を高水準で備える上位防具。" },
+  { id: "leviathiaSigil", name: "リヴァイアシジル", category: "accessory", unlockTown: "akamatsu", rarity: "mythic", attack: 3, defense: 7, speed: 2, intelligence: 8, luck: 3, hp: 14, mp: 24, weight: 3, price: 4360, sellPrice: 1744, specialTags: ["sea", "boss_series", "support"], description: "海域上位ビルド向けの封印紋章。" },
+  { id: "volcaDestroyer", name: "ヴォルカデストロイヤー", category: "weapon", unlockTown: "rulacia", rarity: "mythic", attack: 108, defense: 18, speed: -9, intelligence: 0, luck: 4, hp: 40, mp: 0, weight: 64, price: 7600, sellPrice: 3040, specialTags: ["volcano", "boss_series", "heavy"], description: "高攻撃高防御を両立したヴォルカ武器。" },
+  { id: "volcaBulwark", name: "ヴォルカブルワーク", category: "armor", unlockTown: "rulacia", rarity: "mythic", attack: 2, defense: 60, speed: -8, intelligence: 2, luck: 0, hp: 96, mp: 20, weight: 70, price: 7800, sellPrice: 3120, specialTags: ["volcano", "boss_series", "defense_build", "heavy_armor"], description: "超重量だが圧倒的耐久を誇る最上位防具。" },
+  { id: "volcaCrest", name: "ヴォルカクレスト", category: "accessory", unlockTown: "rulacia", rarity: "mythic", attack: 10, defense: 10, speed: -1, intelligence: 4, luck: 4, hp: 32, mp: 16, weight: 4, price: 5980, sellPrice: 2392, specialTags: ["volcano", "boss_series", "boss_damage"], description: "火耐性と殴り合い性能を伸ばす頂点護章。" }
+];
+
+function registerRegionalEquipment(defs) {
+  defs.forEach((eq) => {
+    EQUIPMENT_DATA[eq.id] = {
+      id: eq.id,
+      name: eq.name,
+      category: eq.category,
+      rarity: eq.rarity || "rare",
+      attack: eq.attack || 0,
+      defense: eq.defense || 0,
+      speed: eq.speed || 0,
+      intelligence: eq.intelligence || 0,
+      luck: eq.luck || 0,
+      hp: eq.hp || 0,
+      mp: eq.mp || 0,
+      weight: eq.weight || 0,
+      specialTags: eq.specialTags || [],
+      enhanceLevel: 0,
+      price: eq.price || 0,
+      sellPrice: eq.sellPrice || 0,
+      description: eq.description || "",
+      unlockTown: eq.unlockTown || null
+    };
+    ITEM_DATA[eq.id] = {
+      id: eq.id,
+      name: eq.name,
+      category: eq.category,
+      description: eq.description || "",
+      buyPrice: eq.price || 0,
+      sellPrice: eq.sellPrice || 0,
+      unlockTown: eq.unlockTown || null
+    };
+    if (!SHOP_ITEM_IDS.includes(eq.id)) {
+      SHOP_ITEM_IDS.push(eq.id);
+    }
+  });
+}
+
+registerRegionalEquipment(REGIONAL_EQUIPMENT_DEFS);
 
 function normalizeItemData() {
   Object.keys(ITEM_DATA).forEach((itemId) => {
@@ -1594,6 +1702,106 @@ const RECIPE_DATA = [
   }
 ];
 
+const DESERT_RECIPE_ITEM_IDS = [
+  "sandbladeLongsword", "quicksandTwinblades", "ruinbreakerGreatsword", "sandrunnerKunai", "banditBaneDagger",
+  "drywindStaff", "mirageRod", "pilgrimHolyStaff", "sandprayerMace",
+  "sandScarf", "wanderingDuneMantle", "ruinwardenArmor", "dryboneGauntlet",
+  "scorpionCharm", "antiBanditTalisman", "mirageRing", "quicksandAnklet"
+];
+const SEA_RECIPE_ITEM_IDS = [
+  "tideslashSaber", "abyssbreakerGreatsword", "tideKnightTwinSwords", "searoarDagger", "waveShadowShuriken",
+  "abyssTreasureStaff", "tidalWand", "seaprayerHolyStaff", "pearlPriestStaff",
+  "seashellArmor", "marineRobe", "seabreezeCoat", "abyssKnightArmor",
+  "pearlNecklaceSea", "jellyWardCharm", "tidalBracelet", "seaSnakeFangOrnament"
+];
+const VOLCANO_RECIPE_ITEM_IDS = [
+  "scorchsteelGreatsword", "flamebreakerAxe", "crimsonTwinblades", "fireShadowKunai", "scorchingDarkBlade",
+  "volcanicCoreStaff", "seraphicRod", "holyflameStaff", "radiantMace",
+  "fireproofHeavyArmor", "scorchbaneRobe", "crimsonMantle", "infernoKnightArmor",
+  "fireDragonRing", "lavaCoreNecklace", "ashenBracelet", "indomitableTalisman"
+];
+
+const BOSS_RECIPE_DEFS = [
+  { id: "hydraScaleBlade", requiredTown: "dustria", requiredBossStage: "2-10", material: "hydraScale" },
+  { id: "hydraScaleMail", requiredTown: "dustria", requiredBossStage: "2-10", material: "hydraScale" },
+  { id: "hydraScaleCharm", requiredTown: "dustria", requiredBossStage: "2-10", material: "hydraScale" },
+  { id: "leviathiaTrident", requiredTown: "akamatsu", requiredBossStage: "3-10", material: "leviathanFin" },
+  { id: "leviathiaVestment", requiredTown: "akamatsu", requiredBossStage: "3-10", material: "leviathanFin" },
+  { id: "leviathiaSigil", requiredTown: "akamatsu", requiredBossStage: "3-10", material: "leviathanFin" },
+  { id: "volcaDestroyer", requiredTown: "rulacia", requiredBossStage: "4-10", material: "volkaCore" },
+  { id: "volcaBulwark", requiredTown: "rulacia", requiredBossStage: "4-10", material: "volkaCore" },
+  { id: "volcaCrest", requiredTown: "rulacia", requiredBossStage: "4-10", material: "volkaCore" }
+];
+
+function buildRegionalEquipmentRecipe(itemId, requiredTown) {
+  const eq = EQUIPMENT_DATA[itemId];
+  if (!eq) {
+    return null;
+  }
+  const regionStage = requiredTown === "dustria" ? 2 : requiredTown === "akamatsu" ? 3 : 4;
+  const baseMaterialsByRegion = {
+    dustria: [{ itemId: "ironOre", qty: 2 }, { itemId: "manaStone", qty: 1 }, { itemId: "poisonSting", qty: 1 }],
+    akamatsu: [{ itemId: "waterShard", qty: 2 }, { itemId: "crystalShard", qty: 1 }, { itemId: "fineMeat", qty: 1 }],
+    rulacia: [{ itemId: "fireCrystal", qty: 2 }, { itemId: "ironOre", qty: 2 }, { itemId: "manaStone", qty: 1 }]
+  };
+  const mats = [...(baseMaterialsByRegion[requiredTown] || [{ itemId: "ironOre", qty: 1 }])];
+  if (eq.category === "weapon") mats.push({ itemId: "wood", qty: 1 });
+  if (eq.category === "armor") mats.push({ itemId: "ironOre", qty: 1 });
+  if (eq.category === "accessory") mats.push({ itemId: "manaStone", qty: 1 });
+  return {
+    id: `rx_${itemId}`,
+    name: eq.name,
+    productionType: "smith",
+    requiredStage: regionStage,
+    requiredTown,
+    materials: mats,
+    goldCost: Math.max(80, Math.floor((eq.price || 0) * 0.38)),
+    resultItemId: itemId,
+    baseSuccessRate: requiredTown === "rulacia" ? 0.52 : requiredTown === "akamatsu" ? 0.6 : 0.68,
+    greatSuccessRate: 0.1,
+    highQualityRate: 0.14,
+    godQualityRate: requiredTown === "rulacia" ? 0.025 : 0.018,
+    expGain: requiredTown === "rulacia" ? 88 : requiredTown === "akamatsu" ? 62 : 44,
+    tags: [eq.category, "regional", requiredTown],
+    description: `${requiredTown === "dustria" ? "砂漠" : requiredTown === "akamatsu" ? "海域" : "火山"}装備`
+  };
+}
+
+function buildBossEquipmentRecipe(def) {
+  const eq = EQUIPMENT_DATA[def.id];
+  if (!eq) {
+    return null;
+  }
+  return {
+    id: `rx_${def.id}`,
+    name: eq.name,
+    productionType: "smith",
+    requiredStage: 4,
+    requiredTown: def.requiredTown,
+    requiredBossStage: def.requiredBossStage,
+    unlockMaterial: def.material,
+    materials: [{ itemId: def.material, qty: 2 }, { itemId: "fireCrystal", qty: 2 }, { itemId: "manaStone", qty: 2 }, { itemId: "crystalShard", qty: 2 }],
+    goldCost: Math.max(220, Math.floor((eq.price || 0) * 0.45)),
+    resultItemId: def.id,
+    baseSuccessRate: 0.48,
+    greatSuccessRate: 0.11,
+    highQualityRate: 0.18,
+    godQualityRate: 0.04,
+    expGain: 110,
+    tags: [eq.category, "boss_series", def.requiredTown],
+    description: "地域ボス素材装備"
+  };
+}
+
+const REGIONAL_SMITH_RECIPES = [
+  ...DESERT_RECIPE_ITEM_IDS.map((id) => buildRegionalEquipmentRecipe(id, "dustria")),
+  ...SEA_RECIPE_ITEM_IDS.map((id) => buildRegionalEquipmentRecipe(id, "akamatsu")),
+  ...VOLCANO_RECIPE_ITEM_IDS.map((id) => buildRegionalEquipmentRecipe(id, "rulacia")),
+  ...BOSS_RECIPE_DEFS.map((def) => buildBossEquipmentRecipe(def))
+].filter(Boolean);
+
+RECIPE_DATA.push(...REGIONAL_SMITH_RECIPES);
+
 const REGION_GATHER_TABLE = {
   grassland: [
     { itemId: "herb", weight: 42 },
@@ -1923,6 +2131,10 @@ const BOARD_RESPONSE_SETS = {
     { author: "草原在住", body: "ベヒモスは突進予兆が出たら防御寄りに切り替えると生存率が上がる。", tone: "hint", isHint: true, important: true },
     { author: "毒蜂アンチ", body: "初見は轢かれて当然。2回目から勝てばいい。", tone: "chat" }
   ],
+  bison_loss_streak: [
+    { author: "守り神 しめ鯖", body: "1-10で沼ったら、称号は「連戦覇者」と「異常耐性の怪物」がいい。継戦力が目に見えて変わる。", tone: "hint", isHint: true, important: true },
+    { author: "不遇職警察", body: "敗北回数が増えるなら、火力一点より耐性と安定を優先した方が勝率が上がる。", tone: "guide" }
+  ],
   boss_leviathan: [
     { author: "影歩き", body: "ブレス前のログは見逃すな。強攻撃前に軽減を合わせる。", tone: "hint", isHint: true, important: true },
     { author: "無課金仙人", body: "海ボスは速度より継戦力。", tone: "guide" }
@@ -1998,6 +2210,7 @@ const BOARD_THREAD_DEFS = [
   { id: "th_sea", category: "strategy", title: "海マップのクラゲ許せん", visibleIf: { unlockedTown: "akamatsu" }, responseSetId: "sea_jelly" },
   { id: "th_volcano", category: "strategy", title: "火山のゴーレム硬すぎる", visibleIf: { unlockedTown: "rulacia" }, responseSetId: "volcano_wall" },
   { id: "th_bison", category: "boss", title: "ベヒモスバイソン初見で轢かれた", visibleIf: { minStage: "1-10" }, responseSetId: "boss_bison" },
+  { id: "th_bison_loss10", category: "boss", title: "【1-10】10連敗したんだが、何を直せばいい？", visibleIf: { all: [{ minStage: "1-10" }, { stageDefeatsAtLeast: { stageId: "1-10", count: 10 } }] }, responseSetId: "bison_loss_streak" },
   { id: "th_leviathan", category: "boss", title: "リヴァイアサンのブレスどうすんの？", visibleIf: { minStage: "3-10" }, responseSetId: "boss_leviathan" },
   { id: "th_volcazard", category: "boss", title: "ヴォルカザード怒り入ってから別ゲーじゃね？", visibleIf: { minStage: "4-10" }, responseSetId: "boss_volcazard" },
   { id: "th_firsttrap", category: "boss", title: "初見殺し突破者って本当に取れるの？", visibleIf: { minStage: "2-10" }, responseSetId: "boss_bison", variantSelector: "firsttrap_meta" },
@@ -2261,6 +2474,7 @@ const state = {
     returnButtonCount: 0,
     bgmOffBattleCount: 0,
     stageRepeatCounts: {},
+    defeatsByStage: {},
     firstTryBossWins: 0,
     bossCritFinishCount: 0,
     defenseBuildBossKills: 0,
@@ -4009,10 +4223,16 @@ function handleFieldBossClear(stageId) {
   if (stageId === "1-10") {
     unlockTown("dustria");
   } else if (stageId === "2-10") {
+    addItem("hydraScale", 2);
+    addLog("ボス素材獲得: ヒドラ鱗 x2");
     unlockTown("akamatsu");
   } else if (stageId === "3-10") {
+    addItem("leviathanFin", 2);
+    addLog("ボス素材獲得: リヴァイア鰭 x2");
     unlockTown("rulacia");
   } else if (stageId === "4-10") {
+    addItem("volkaCore", 2);
+    addLog("ボス素材獲得: ヴォルカ核 x2");
     addLog("火山4-10をクリア。現段階の到達点です。");
     state.loop.clearedGame = true;
     if (!state.unlockedEndings.includes("normal_end")) {
@@ -4099,7 +4319,12 @@ function handleDefeat() {
     recordBossFirstTryResult(stage.id, false);
   }
 
+  const defeatStageId = state.battle.stageId;
   state.stats.totalDeaths += 1;
+  if (defeatStageId) {
+    state.stats.defeatsByStage = state.stats.defeatsByStage || {};
+    state.stats.defeatsByStage[defeatStageId] = (state.stats.defeatsByStage[defeatStageId] || 0) + 1;
+  }
   state.stats.currentWinStreak = 0;
   state.titleRuntime.reviveBuffPending = true;
   state.battle.isActive = false;
@@ -6263,15 +6488,42 @@ function checkQuestCompletion() {
   state.guild.activeGuildQuests = [...state.guild.activeQuestIds];
 }
 
+function isTownUnlockedForContent(requiredTownId) {
+  if (!requiredTownId || requiredTownId === "balladore") {
+    return true;
+  }
+  return state.unlockedTowns.includes(requiredTownId);
+}
+
+function getItemRequiredTown(itemId) {
+  const eq = EQUIPMENT_DATA[itemId];
+  if (eq?.unlockTown) {
+    return eq.unlockTown;
+  }
+  const item = ITEM_DATA[itemId];
+  if (item?.unlockTown) {
+    return item.unlockTown;
+  }
+  return null;
+}
+
+function isItemShopUnlocked(itemId) {
+  return isTownUnlockedForContent(getItemRequiredTown(itemId));
+}
+
 function renderShopView() {
-  const cards = [...new Set(SHOP_ITEM_IDS)].map((itemId) => {
+  const cards = [...new Set(SHOP_ITEM_IDS)]
+    .filter((itemId) => isItemShopUnlocked(itemId))
+    .map((itemId) => {
     const item = ITEM_DATA[itemId];
     const own = getInventoryCount(itemId);
+    const reqTown = getItemRequiredTown(itemId);
+    const reqText = reqTown ? ` / 解放: ${TOWN_DATA[reqTown]?.name || reqTown}` : "";
     return `
       <div class="shop-card">
         <h4>${item.name}</h4>
         <p class="tiny">${item.description}</p>
-        <p class="tiny">カテゴリ: ${item.category}</p>
+        <p class="tiny">カテゴリ: ${item.category}${reqText}</p>
         <p class="tiny">買値: ${item.buyPrice} / 売値: ${Math.floor(getSellPrice(item))} / 所持: ${own}</p>
         <div class="title-row">
           <button class="btn shop-buy-btn" data-item-id="${item.id}">購入</button>
@@ -6286,6 +6538,10 @@ function renderShopView() {
 function buyItem(itemId) {
   const item = ITEM_DATA[itemId];
   if (!item || item.buyPrice <= 0) {
+    return;
+  }
+  if (!isItemShopUnlocked(itemId)) {
+    addLog("この商品はまだ解放されていません。");
     return;
   }
   if (state.player.gold < item.buyPrice) {
@@ -6447,7 +6703,12 @@ function renderRecipeList(showAll = false) {
   const list = RECIPE_DATA.filter((recipe) => (showAll ? true : recipe.productionType === pType));
   const cards = list
     .map((recipe) => {
-      const unlocked = stage >= recipe.requiredStage;
+      const unlockTownOk = isTownUnlockedForContent(recipe.requiredTown);
+      const unlockBossOk =
+        !recipe.requiredBossStage ||
+        state.fieldBossCleared.includes(recipe.requiredBossStage) ||
+        (recipe.unlockMaterial && getInventoryCount(recipe.unlockMaterial) > 0);
+      const unlocked = stage >= recipe.requiredStage && unlockTownOk && unlockBossOk;
       const materialText = recipe.materials
         .map((m) => {
           const owned = getInventoryCount(m.itemId);
@@ -6461,7 +6722,7 @@ function renderRecipeList(showAll = false) {
         <div class="shop-card">
           <h4>${recipe.name}</h4>
           <p class="tiny">${recipe.description}</p>
-          <p class="tiny">必要段階: ${recipe.requiredStage + 1} / 素材: ${materialText || "なし"} / 費用: ${cost}</p>
+          <p class="tiny">必要段階: ${recipe.requiredStage + 1}${recipe.requiredTown ? ` / 必要地域: ${TOWN_DATA[recipe.requiredTown]?.name || recipe.requiredTown}` : ""}${recipe.requiredBossStage ? ` / 必要撃破: ${recipe.requiredBossStage}` : ""}${recipe.unlockMaterial ? ` / 解放素材: ${ITEM_DATA[recipe.unlockMaterial]?.name || recipe.unlockMaterial}` : ""} / 素材: ${materialText || "なし"} / 費用: ${cost}</p>
           <p class="tiny">成功 ${Math.floor(rates.success * 100)}% / 大成功 ${Math.floor(rates.great * 100)}% / 高品質 ${Math.floor(rates.high * 100)}% / 神品質 ${Math.floor(rates.god * 100)}%</p>
           ${
             unlocked
@@ -6505,6 +6766,18 @@ function craftRecipe(recipeId, quantity = 1) {
   }
   if (state.player.productionJobStage < recipe.requiredStage) {
     addLog("生産職段階が不足しています。");
+    return;
+  }
+  if (!isTownUnlockedForContent(recipe.requiredTown)) {
+    addLog("必要地域に到達していないため作成できません。");
+    return;
+  }
+  if (
+    recipe.requiredBossStage &&
+    !state.fieldBossCleared.includes(recipe.requiredBossStage) &&
+    !(recipe.unlockMaterial && getInventoryCount(recipe.unlockMaterial) > 0)
+  ) {
+    addLog("必要な地域ボスを撃破していないため作成できません。");
     return;
   }
   for (let i = 0; i < quantity; i += 1) {
@@ -6930,6 +7203,14 @@ function evaluateBoardCondition(condition) {
   }
   if (condition.unlockedEnding && !state.unlockedEndings.includes(condition.unlockedEnding)) {
     return false;
+  }
+  if (condition.stageDefeatsAtLeast) {
+    const rule = condition.stageDefeatsAtLeast;
+    const stageId = typeof rule === "string" ? rule : rule.stageId;
+    const minDefeats = Math.max(1, Number(typeof rule === "number" ? rule : rule.count) || 1);
+    if (!stageId || (state.stats.defeatsByStage?.[stageId] || 0) < minDefeats) {
+      return false;
+    }
   }
   if (condition.boardReadAtLeast && (state.stats.boardThreadReadCount || 0) < condition.boardReadAtLeast) {
     return false;
@@ -7998,6 +8279,7 @@ function applyLoadedState(payload) {
   state.guild = { ...state.guild, ...(run.guild || {}) };
   state.player = { ...state.player, ...(run.player || {}) };
   state.stats = { ...state.stats, ...(run.stats || {}) };
+  state.stats.defeatsByStage = state.stats.defeatsByStage || {};
   state.guild.activeQuestIds = run.quests?.active || state.guild.activeQuestIds;
   state.guild.completedQuestIds = run.quests?.completed || state.guild.completedQuestIds;
   state.guild.claimedQuestIds = run.quests?.claimed || state.guild.claimedQuestIds;
@@ -9501,6 +9783,7 @@ function resetForNewLoop() {
   state.stats.noItemStageClearCount = 0;
   state.stats.noRestStageClearStreak = 0;
   state.stats.stageRepeatCounts = {};
+  state.stats.defeatsByStage = {};
   state.stats.firstTryBossWins = 0;
   state.stats.bossCritFinishCount = 0;
   state.stats.defenseBuildBossKills = 0;
@@ -9704,4 +9987,3 @@ updateUnlockedBattleSpeeds();
 updateBoardThreadsFromProgress();
 refreshGuildQuests(false);
 render();
-
