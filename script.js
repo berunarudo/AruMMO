@@ -4985,7 +4985,7 @@ function getEnhanceMaxLevel(itemId) {
   if (!eq) {
     return Number.POSITIVE_INFINITY;
   }
-  if (eq.category === "weapon") {
+  if (["weapon", "armor", "accessory"].includes(eq.category)) {
     return Math.max(1, Math.floor(state.player.level || 1));
   }
   return Number.POSITIVE_INFINITY;
