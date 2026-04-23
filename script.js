@@ -2268,6 +2268,10 @@ const MAIN_TABS = [
 ];
 
 const LOW_TIER_MAIN_JOBS = ["cleric"];
+const JOB_SYSTEM_RULES = {
+  subJobUnlockLevel: 20,
+  freeJobChangeLevel: 100
+};
 
 const LOG_CATEGORIES = ["battle", "title", "craft", "board", "loop", "important", "system"];
 const LOG_CATEGORY_LABELS = {
@@ -4403,14 +4407,21 @@ function checkLevelUp() {
   }
 }
 
-function unlockSubJob() {
-  if (state.player.subJobUnlocked || state.player.level < 100) {
+function canFreeJobChange() {
+  return (state.player.level || 0) >= JOB_SYSTEM_RULES.freeJobChangeLevel;
+}
+
+function unlockSubJob(options = {}) {
+  const silent = !!options.silent;
+  if (state.player.subJobUnlocked || state.player.level < JOB_SYSTEM_RULES.subJobUnlockLevel) {
     return;
   }
   state.player.subJobUnlocked = true;
   state.stats.subJobUnlockedAt = state.player.level;
-  addLog("サブジョブが解放されました。神殿で設定できます。");
-  showBattleSpecialPopup("サブジョブ解放");
+  if (!silent) {
+    addLog("サブジョブが解放されました。神殿で設定できます。");
+    showBattleSpecialPopup("サブジョブ解放");
+  }
 }
 
 const TITLE_CUSTOM_CHECKERS = {
@@ -6585,19 +6596,65 @@ function renderTempleView() {
   const productionButtons = Object.keys(productionLabels)
     .map((job) => `<button class="btn production-select-btn ${state.player.productionJob === job ? "active" : ""}" data-production-job="${job}">${productionLabels[job]}</button>`)
     .join("");
-  const subButtons = Object.values(JOB_DATA.main)
-    .map((job) => `<button class="btn subjob-select-btn ${state.player.subJobId === job.id ? "active" : ""}" data-sub-job-id="${job.id}" ${state.player.subJobUnlocked ? "" : "disabled"}>${job.name}</button>`)
+  const mainChangeUnlocked = canFreeJobChange();
+  const mainButtons = Object.values(JOB_DATA.main)
+    .map((job) => `<button class="btn mainjob-select-btn ${state.player.mainJobId === job.id ? "active" : ""}" data-main-job-id="${job.id}" ${mainChangeUnlocked ? "" : "disabled"}>${job.name}</button>`)
     .join("");
+  const subChangeUnlocked = canFreeJobChange();
+  const subButtons = Object.values(JOB_DATA.main)
+    .map((job) => {
+      const lockedByLevel = !state.player.subJobUnlocked;
+      const lockedByRule = !subChangeUnlocked && !!state.player.subJobId && state.player.subJobId !== job.id;
+      const disabled = lockedByLevel || lockedByRule;
+      return `<button class="btn subjob-select-btn ${state.player.subJobId === job.id ? "active" : ""}" data-sub-job-id="${job.id}" ${disabled ? "disabled" : ""}>${job.name}</button>`;
+    })
+    .join("");
+  const subJobGuide = !state.player.subJobUnlocked
+    ? `サブジョブはレベル${JOB_SYSTEM_RULES.subJobUnlockLevel}で解放されます。`
+    : !subChangeUnlocked
+      ? `サブジョブはレベル${JOB_SYSTEM_RULES.subJobUnlockLevel}で解放済みです。変更はレベル${JOB_SYSTEM_RULES.freeJobChangeLevel}で解放されます。`
+      : `レベル${JOB_SYSTEM_RULES.freeJobChangeLevel}到達: メイン/サブジョブを自由変更できます。`;
   return `
     <h3>神殿</h3>
     <p>メインジョブ: <strong>${state.player.mainJob || "未設定"}</strong></p>
     <p>サブジョブ: <strong>${state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放")}</strong></p>
     <p>生産ジョブ: <strong>${state.player.productionJob}</strong> / 段階 <strong>${PRODUCTION_JOB_PATHS[state.player.productionJob].stages[state.player.productionJobStage]}</strong></p>
     <p class="tiny">生産Lv ${state.player.productionJobLevel} / EXP ${state.player.productionJobExp}</p>
+    <p class="tiny">メインジョブ変更: レベル${JOB_SYSTEM_RULES.freeJobChangeLevel}で解放</p>
+    <div class="guild-facility-grid">${mainButtons}</div>
     <div class="guild-facility-grid">${productionButtons}</div>
-    <p class="tiny">サブジョブはレベル100で解放されます。</p>
+    <p class="tiny">${subJobGuide}</p>
     <div class="guild-facility-grid">${subButtons}</div>
   `;
+}
+
+function selectMainJobFromTemple(jobId) {
+  if (!canFreeJobChange()) {
+    addLog(`メインジョブ変更はレベル${JOB_SYSTEM_RULES.freeJobChangeLevel}で解放されます。`);
+    return;
+  }
+  const job = JOB_DATA.main[jobId];
+  if (!job) {
+    return;
+  }
+  state.player.mainJobId = job.id;
+  state.player.mainJob = job.name;
+  Object.assign(state.player, {
+    maxHp: job.baseStats.hp,
+    hp: job.baseStats.hp,
+    maxMp: job.baseStats.mp,
+    mp: job.baseStats.mp,
+    attack: job.baseStats.attack,
+    defense: job.baseStats.defense,
+    speed: job.baseStats.speed,
+    intelligence: job.baseStats.intelligence,
+    luck: job.baseStats.luck
+  });
+  state.player.equippedSkills = (state.world.skills[job.id] || []).slice(0, 4).map((s) => s.id);
+  recalculateTitleEffects();
+  refreshPlayerDerivedStats();
+  addLog(`神殿: メインジョブを ${job.name} に変更しました。`);
+  render();
 }
 
 function selectProductionJob(jobName) {
@@ -6623,7 +6680,11 @@ function selectProductionJob(jobName) {
 
 function selectSubJob(jobId) {
   if (!state.player.subJobUnlocked) {
-    addLog("サブジョブはまだ解放されていません。");
+    addLog(`サブジョブはレベル${JOB_SYSTEM_RULES.subJobUnlockLevel}で解放されます。`);
+    return;
+  }
+  if (!canFreeJobChange() && state.player.subJobId && state.player.subJobId !== jobId) {
+    addLog(`サブジョブ変更はレベル${JOB_SYSTEM_RULES.freeJobChangeLevel}で解放されます。`);
     return;
   }
   const job = JOB_DATA.main[jobId];
@@ -8340,6 +8401,7 @@ function applyLoadedState(payload) {
   applyLoopTitleLimitUpgrades();
   updateBoardThreadsFromProgress();
   recalculateTitleEffects();
+  unlockSubJob({ silent: true });
   refreshPlayerDerivedStats();
   updateUnlockedBattleSpeeds();
   return true;
@@ -8900,6 +8962,7 @@ function bindGameEvents() {
     );
     document.querySelectorAll(".shop-buy-btn").forEach((btn) => btn.addEventListener("click", () => buyItem(btn.dataset.itemId)));
     document.querySelectorAll(".shop-sell-btn").forEach((btn) => btn.addEventListener("click", () => sellItem(btn.dataset.itemId)));
+    document.querySelectorAll(".mainjob-select-btn").forEach((btn) => btn.addEventListener("click", () => selectMainJobFromTemple(btn.dataset.mainJobId)));
     document.querySelectorAll(".production-select-btn").forEach((btn) => btn.addEventListener("click", () => selectProductionJob(btn.dataset.productionJob)));
     document.querySelectorAll(".subjob-select-btn").forEach((btn) => btn.addEventListener("click", () => selectSubJob(btn.dataset.subJobId)));
     document.querySelectorAll(".workshop-tab-btn").forEach((btn) =>
