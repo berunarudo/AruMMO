@@ -2798,6 +2798,7 @@ function chooseMainJob(jobId) {
   });
   state.player.equippedSkills = (state.world.skills[job.id] || []).slice(0, 4).map((s) => s.id);
   recalculateTitleEffects();
+  refreshPlayerDerivedStats();
   applyLoopUnlocks();
   applyLoopTitleLimitUpgrades();
   state.screen = "game";
@@ -4292,6 +4293,7 @@ function toggleTitle(titleId) {
     state.stats.titleToggleCount += 1;
     addLog(`称号OFF: ${title.name}`);
     recalculateTitleEffects();
+    refreshPlayerDerivedStats();
     checkTitleUnlocks("afterToggleTitle");
     render();
     return;
@@ -4304,6 +4306,7 @@ function toggleTitle(titleId) {
   state.stats.titleToggleCount += 1;
   addLog(`称号ON: ${title.name}`);
   recalculateTitleEffects();
+  refreshPlayerDerivedStats();
   checkTitleUnlocks("afterToggleTitle");
   render();
 }
@@ -4970,7 +4973,168 @@ function getEquippedItem(slotId) {
 }
 
 function getEnhanceLevel(itemId) {
-  return state.player.equipmentEnhancements[itemId] || 0;
+  const fromPlayer = state.player.equipmentEnhancements[itemId];
+  if (typeof fromPlayer === "number") {
+    return fromPlayer;
+  }
+  return Number(EQUIPMENT_DATA[itemId]?.enhanceLevel || 0);
+}
+
+function syncEquipmentEnhancementCache() {
+  Object.keys(EQUIPMENT_DATA).forEach((itemId) => {
+    EQUIPMENT_DATA[itemId].enhanceLevel = getEnhanceLevel(itemId);
+  });
+}
+
+function getEquipmentBaseStats(itemId) {
+  const eq = EQUIPMENT_DATA[itemId];
+  if (!eq) {
+    return null;
+  }
+  return {
+    attack: eq.attack || 0,
+    defense: eq.defense || 0,
+    speed: eq.speed || 0,
+    intelligence: eq.intelligence || 0,
+    luck: eq.luck || 0,
+    hp: eq.hp || 0,
+    mp: eq.mp || 0,
+    weight: eq.weight || 0
+  };
+}
+
+function getEquipmentQualityMultiplier(quality) {
+  if (quality === "great") return 1.08;
+  if (quality === "high") return 1.18;
+  if (quality === "god") return 1.35;
+  return 1;
+}
+
+function applyQualityBonus(baseStats, quality) {
+  const mul = getEquipmentQualityMultiplier(quality);
+  if (mul <= 1) {
+    return {
+      bonus: { attack: 0, defense: 0, speed: 0, intelligence: 0, luck: 0, hp: 0, mp: 0, weight: 0 },
+      stats: { ...baseStats }
+    };
+  }
+  const stats = { ...baseStats };
+  ["attack", "defense", "speed", "intelligence", "luck", "hp", "mp"].forEach((key) => {
+    stats[key] = Math.floor(stats[key] * mul);
+  });
+  if (quality === "god") {
+    stats.weight += 1;
+  }
+  return {
+    bonus: {
+      attack: stats.attack - baseStats.attack,
+      defense: stats.defense - baseStats.defense,
+      speed: stats.speed - baseStats.speed,
+      intelligence: stats.intelligence - baseStats.intelligence,
+      luck: stats.luck - baseStats.luck,
+      hp: stats.hp - baseStats.hp,
+      mp: stats.mp - baseStats.mp,
+      weight: stats.weight - baseStats.weight
+    },
+    stats
+  };
+}
+
+function applyEnhancementBonus(baseStats, enhanceLevel, category) {
+  const lv = Math.max(0, Number(enhanceLevel) || 0);
+  const bonus = { attack: 0, defense: 0, speed: 0, intelligence: 0, luck: 0, hp: 0, mp: 0, weight: 0 };
+  if (lv <= 0) {
+    return bonus;
+  }
+
+  if (category === "weapon") {
+    const atkPerLv = Math.max(1, Math.ceil(Math.max(1, baseStats.attack) * 0.12));
+    bonus.attack += atkPerLv * lv;
+    if (baseStats.speed > 0) bonus.speed += Math.floor((lv + 1) / 2);
+    if (baseStats.intelligence > 0) bonus.intelligence += Math.floor((lv + 1) / 2);
+    if (baseStats.luck > 0) bonus.luck += Math.floor((lv + 2) / 3);
+  } else if (category === "armor") {
+    const defPerLv = Math.max(1, Math.ceil(Math.max(1, baseStats.defense) * 0.1));
+    bonus.defense += defPerLv * lv;
+    const hpPerLv = Math.max(1, Math.ceil(Math.max(baseStats.hp, baseStats.defense * 2, 10) * 0.04));
+    bonus.hp += hpPerLv * lv;
+    if (baseStats.mp > 0) bonus.mp += Math.floor((lv + 1) / 2);
+  } else if (category === "accessory") {
+    ["attack", "defense", "speed", "intelligence", "luck", "hp", "mp"].forEach((key) => {
+      if (baseStats[key] > 0) {
+        bonus[key] += Math.max(1, Math.ceil(baseStats[key] * 0.08)) * lv;
+      }
+    });
+  } else {
+    ["attack", "defense", "speed", "intelligence", "luck", "hp", "mp"].forEach((key) => {
+      if (baseStats[key] > 0) {
+        bonus[key] += Math.max(1, Math.ceil(baseStats[key] * 0.06)) * lv;
+      }
+    });
+  }
+
+  bonus.weight = Number((lv * 0.2).toFixed(2));
+  return bonus;
+}
+
+function createEquipmentInstanceFromItemId(itemId) {
+  if (!itemId || !EQUIPMENT_DATA[itemId]) {
+    return null;
+  }
+  const parsed = parseQualityItemId(itemId);
+  const runtimeEq = EQUIPMENT_DATA[itemId];
+  const baseEq = EQUIPMENT_DATA[parsed.baseId] || runtimeEq;
+  return {
+    itemId,
+    baseItemId: baseEq.id,
+    quality: parsed.quality || "normal",
+    category: runtimeEq.category || baseEq.category,
+    enhanceLevel: getEnhanceLevel(itemId),
+    specialTags: [...new Set([...(baseEq.specialTags || []), ...(runtimeEq.specialTags || [])])]
+  };
+}
+
+function getEnhancedEquipmentStats(equipmentInstance) {
+  if (!equipmentInstance) {
+    return null;
+  }
+  const baseStats = getEquipmentBaseStats(equipmentInstance.baseItemId) || getEquipmentBaseStats(equipmentInstance.itemId);
+  if (!baseStats) {
+    return null;
+  }
+  const qualityStep = applyQualityBonus(baseStats, equipmentInstance.quality);
+  const enhancementBonus = applyEnhancementBonus(qualityStep.stats, equipmentInstance.enhanceLevel, equipmentInstance.category);
+  const finalStats = {
+    attack: qualityStep.stats.attack + enhancementBonus.attack,
+    defense: qualityStep.stats.defense + enhancementBonus.defense,
+    speed: qualityStep.stats.speed + enhancementBonus.speed,
+    intelligence: qualityStep.stats.intelligence + enhancementBonus.intelligence,
+    luck: qualityStep.stats.luck + enhancementBonus.luck,
+    hp: qualityStep.stats.hp + enhancementBonus.hp,
+    mp: qualityStep.stats.mp + enhancementBonus.mp,
+    weight: qualityStep.stats.weight + enhancementBonus.weight
+  };
+
+  const specialTagBonus = { evasionBonus: 0, critBonus: 0 };
+  if ((equipmentInstance.specialTags || []).includes("speed")) {
+    specialTagBonus.evasionBonus += 0.01;
+  }
+  if ((equipmentInstance.specialTags || []).includes("lucky")) {
+    specialTagBonus.critBonus += 0.01;
+  }
+
+  return {
+    baseStats,
+    qualityBonus: qualityStep.bonus,
+    qualityStats: qualityStep.stats,
+    enhancementBonus,
+    specialTagBonus,
+    finalStats: {
+      ...finalStats,
+      evasionBonus: specialTagBonus.evasionBonus,
+      critBonus: specialTagBonus.critBonus
+    }
+  };
 }
 
 function calculateEquipmentStats() {
@@ -4984,34 +5148,43 @@ function calculateEquipmentStats() {
     mp: 0,
     evasionBonus: 0,
     critBonus: 0,
-    totalWeight: 0
+    totalWeight: 0,
+    breakdownBySlot: {}
   };
   EQUIPMENT_SLOTS.forEach((slot) => {
-    const eq = getEquippedItem(slot.id);
-    if (!eq) {
+    const instance = createEquipmentInstanceFromItemId(state.player.equipmentSlots?.[slot.id]);
+    if (!instance) {
       return;
     }
-    const enhanceLv = getEnhanceLevel(eq.id);
-    const enhanceMul = 1 + enhanceLv * 0.05;
+    const calc = getEnhancedEquipmentStats(instance);
+    if (!calc) {
+      return;
+    }
     const craftedMul =
-      (eq.specialTags || []).some((tag) => ["crafted_bonus", "god_quality", "alchemy_masterpiece", "smith_masterpiece", "culinary_masterpiece"].includes(tag))
+      (instance.specialTags || []).some((tag) => ["crafted_bonus", "god_quality", "alchemy_masterpiece", "smith_masterpiece", "culinary_masterpiece"].includes(tag))
         ? 1 + (state.titleEffects.craftedGearBonus || 0)
         : 1;
     const slotMul = slot.id === "weapon2" ? 0.6 : 1;
-    total.attack += (eq.attack || 0) * enhanceMul * craftedMul * slotMul;
-    total.defense += (eq.defense || 0) * enhanceMul * craftedMul * slotMul;
-    total.speed += (eq.speed || 0) * enhanceMul * craftedMul * slotMul;
-    total.intelligence += (eq.intelligence || 0) * enhanceMul * craftedMul * slotMul;
-    total.luck += (eq.luck || 0) * enhanceMul * craftedMul * slotMul;
-    total.hp += (eq.hp || 0) * enhanceMul * craftedMul * slotMul;
-    total.mp += (eq.mp || 0) * enhanceMul * craftedMul * slotMul;
-    total.totalWeight += (eq.weight || 0) + enhanceLv * 0.2;
-    if ((eq.specialTags || []).includes("speed")) {
-      total.evasionBonus += 0.01 * slotMul;
-    }
-    if ((eq.specialTags || []).includes("lucky")) {
-      total.critBonus += 0.01 * slotMul;
-    }
+    const final = calc.finalStats;
+    total.attack += final.attack * craftedMul * slotMul;
+    total.defense += final.defense * craftedMul * slotMul;
+    total.speed += final.speed * craftedMul * slotMul;
+    total.intelligence += final.intelligence * craftedMul * slotMul;
+    total.luck += final.luck * craftedMul * slotMul;
+    total.hp += final.hp * craftedMul * slotMul;
+    total.mp += final.mp * craftedMul * slotMul;
+    total.totalWeight += final.weight;
+    total.evasionBonus += (final.evasionBonus || 0) * slotMul;
+    total.critBonus += (final.critBonus || 0) * slotMul;
+    total.breakdownBySlot[slot.id] = {
+      itemId: instance.itemId,
+      baseItemId: instance.baseItemId,
+      quality: instance.quality,
+      enhanceLevel: instance.enhanceLevel,
+      craftedMul,
+      slotMul,
+      ...calc
+    };
   });
   return total;
 }
@@ -5318,6 +5491,17 @@ function getEffectivePlayerStats() {
 
 function getEffectivePlayerStat(stat) {
   return getEffectivePlayerStats()[stat] ?? 0;
+}
+
+function refreshPlayerDerivedStats() {
+  const effective = getEffectivePlayerStats();
+  state.player.hp = Math.max(0, Math.min(state.player.hp, effective.maxHp));
+  state.player.mp = Math.max(0, Math.min(state.player.mp, effective.maxMp));
+  if (state.battle.isActive) {
+    state.battle.playerCurrentHp = Math.max(0, Math.min(state.battle.playerCurrentHp, effective.maxHp));
+    state.battle.playerCurrentMp = Math.max(0, Math.min(state.battle.playerCurrentMp, effective.maxMp));
+  }
+  return effective;
 }
 
 function applyPlayerDamageBonuses(baseDamage, enemy) {
@@ -6177,6 +6361,7 @@ function selectSubJob(jobId) {
   }
   state.player.subJobId = job.id;
   state.player.subJob = job.name;
+  refreshPlayerDerivedStats();
   addLog(`神殿: サブジョブを ${job.name} に設定しました。`);
   render();
 }
@@ -6202,7 +6387,17 @@ function renderWorkshopView() {
             const lv = state.player.equipmentEnhancements[itemId] || 0;
             const cost = getEnhanceCost(itemId);
             const rate = Math.floor(getEnhanceSuccessRate(itemId) * 100);
-            return `<div class="shop-card"><h4>${ITEM_DATA[itemId].name} +${lv}</h4><p class="tiny">費用: ${cost} / 成功率: ${rate}%</p><button class="btn enhance-btn" data-item-id="${itemId}" ${state.player.gold >= cost ? "" : "disabled"}>強化</button></div>`;
+            const current = getEnhancedEquipmentStats(createEquipmentInstanceFromItemId(itemId));
+            const next = getEnhancedEquipmentStats({ ...(createEquipmentInstanceFromItemId(itemId) || {}), enhanceLevel: lv + 1 });
+            const changedKeys = ["attack", "defense", "hp", "mp", "speed", "intelligence", "luck"]
+              .filter((key) => Math.floor(next?.finalStats?.[key] || 0) !== Math.floor(current?.finalStats?.[key] || 0))
+              .map((key) => {
+                const before = Math.floor(current?.finalStats?.[key] || 0);
+                const after = Math.floor(next?.finalStats?.[key] || 0);
+                return `${key.toUpperCase()} ${before}→${after}`;
+              })
+              .join(" / ");
+            return `<div class="shop-card"><h4>${getEquipmentDisplayName(itemId)}</h4><p class="tiny">費用: ${cost} / 成功率: ${rate}%</p><p class="tiny">${changedKeys || "強化で変化なし"}</p><button class="btn enhance-btn" data-item-id="${itemId}" ${state.player.gold >= cost ? "" : "disabled"}>強化</button></div>`;
           })
           .join("")
       : "<p class='tiny'>強化できる装備がありません。</p>";
@@ -6308,6 +6503,7 @@ function craftRecipe(recipeId, quantity = 1) {
     applyCraftQuality(result, recipe);
   }
   checkProductionRelatedTitles();
+  refreshPlayerDerivedStats();
   render();
 }
 
@@ -6570,15 +6766,28 @@ function enhanceItem(itemId) {
   state.stats.equipmentBuildHistory[buildKey] = (state.stats.equipmentBuildHistory[buildKey] || 0) + 1;
   if (success) {
     state.player.equipmentEnhancements[itemId] = (state.player.equipmentEnhancements[itemId] || 0) + 1;
+    if (EQUIPMENT_DATA[itemId]) {
+      EQUIPMENT_DATA[itemId].enhanceLevel = state.player.equipmentEnhancements[itemId];
+    }
     state.stats.enhanceSuccessCount += 1;
-    addLog(`強化成功: ${ITEM_DATA[itemId].name} +${state.player.equipmentEnhancements[itemId]}`);
+    const detail = getEnhancedEquipmentStats(createEquipmentInstanceFromItemId(itemId));
+    addLog(`強化成功: ${getEquipmentDisplayName(itemId)}`);
+    if (detail) {
+      console.log("[enhance-debug]", itemId, {
+        baseStats: detail.baseStats,
+        qualityBonus: detail.qualityBonus,
+        enhancementBonus: detail.enhancementBonus,
+        finalStats: detail.finalStats
+      });
+    }
   } else {
-    addLog(`強化失敗: ${ITEM_DATA[itemId].name} は強化対象外です。`);
+    addLog(`強化失敗: ${ITEM_DATA[itemId]?.name || itemId} の強化に失敗しました。`);
   }
   if (isSmith) {
     gainProductionExp(6);
   }
   checkProductionRelatedTitles();
+  refreshPlayerDerivedStats();
   render();
 }
 
@@ -7276,6 +7485,64 @@ function renderEquipmentLayout() {
   `;
 }
 
+function getEquipmentDisplayName(itemId) {
+  const eq = EQUIPMENT_DATA[itemId];
+  if (!eq) {
+    return itemId || "不明装備";
+  }
+  const lv = getEnhanceLevel(itemId);
+  return `${eq.name}${lv > 0 ? ` +${lv}` : ""}`;
+}
+
+function formatEquipmentStatSummary(stats) {
+  return `ATK ${Math.floor(stats.attack)} / DEF ${Math.floor(stats.defense)} / SPD ${Math.floor(stats.speed)} / INT ${Math.floor(stats.intelligence)} / LUK ${Math.floor(stats.luck)} / HP ${Math.floor(stats.hp)} / MP ${Math.floor(stats.mp)}`;
+}
+
+function getEquipmentSlotContribution(itemId, slotId) {
+  const detail = getEnhancedEquipmentStats(createEquipmentInstanceFromItemId(itemId));
+  if (!detail) {
+    return null;
+  }
+  const tags = createEquipmentInstanceFromItemId(itemId)?.specialTags || [];
+  const craftedMul = tags.some((tag) => ["crafted_bonus", "god_quality", "alchemy_masterpiece", "smith_masterpiece", "culinary_masterpiece"].includes(tag))
+    ? 1 + (state.titleEffects.craftedGearBonus || 0)
+    : 1;
+  const slotMul = slotId === "weapon2" ? 0.6 : 1;
+  return {
+    attack: detail.finalStats.attack * craftedMul * slotMul,
+    defense: detail.finalStats.defense * craftedMul * slotMul,
+    speed: detail.finalStats.speed * craftedMul * slotMul,
+    intelligence: detail.finalStats.intelligence * craftedMul * slotMul,
+    luck: detail.finalStats.luck * craftedMul * slotMul,
+    hp: detail.finalStats.hp * craftedMul * slotMul,
+    mp: detail.finalStats.mp * craftedMul * slotMul,
+    weight: detail.finalStats.weight
+  };
+}
+
+function buildEquipmentComparisonText(candidateItemId, currentItemId, slotId) {
+  const cand = getEquipmentSlotContribution(candidateItemId, slotId);
+  if (!cand || !slotId) {
+    return "比較不可";
+  }
+  const current = currentItemId ? getEquipmentSlotContribution(currentItemId, slotId) : null;
+  const keys = ["attack", "defense", "speed", "intelligence", "luck", "hp", "mp", "weight"];
+  const diffText = keys
+    .map((key) => {
+      const a = cand[key] || 0;
+      const b = current?.[key] || 0;
+      const diff = a - b;
+      if (Math.abs(diff) < 0.0001) {
+        return null;
+      }
+      const shown = Number.isInteger(diff) ? diff : Number(diff.toFixed(1));
+      return `${key.toUpperCase()} ${shown > 0 ? "+" : ""}${shown}`;
+    })
+    .filter(Boolean)
+    .join(" / ");
+  return diffText || "変化なし";
+}
+
 function renderEquipmentView() {
   const effective = getEffectivePlayerStats();
   const weightInfo = effective.weightInfo || calculateWeightInfo(effective.attack);
@@ -7290,12 +7557,18 @@ function renderEquipmentView() {
       const equippedCount = getEquippedCountByItem(entry.itemId);
       const canEquip = entry.quantity > equippedCount;
       const preview = renderEquipmentComparison(eq.id, selectedSlot.id);
+      const detail = getEnhancedEquipmentStats(createEquipmentInstanceFromItemId(eq.id));
+      const base = detail?.baseStats || { attack: 0, defense: 0, speed: 0, intelligence: 0, luck: 0, hp: 0, mp: 0 };
+      const enh = detail?.enhancementBonus || { attack: 0, defense: 0, speed: 0, intelligence: 0, luck: 0, hp: 0, mp: 0 };
+      const fin = detail?.finalStats || { attack: 0, defense: 0, speed: 0, intelligence: 0, luck: 0, hp: 0, mp: 0, weight: eq.weight || 0 };
       return `
         <div class="shop-card">
-          <h4>${eq.name} x${entry.quantity}</h4>
+          <h4>${getEquipmentDisplayName(eq.id)} x${entry.quantity}</h4>
           <p class="tiny">${eq.description}</p>
-          <p class="tiny">ATK ${eq.attack} / DEF ${eq.defense} / SPD ${eq.speed} / INT ${eq.intelligence} / LUK ${eq.luck} / HP ${eq.hp} / MP ${eq.mp}</p>
-          <p class="tiny">重量 ${eq.weight} / レア ${eq.rarity}</p>
+          <p class="tiny">${formatEquipmentStatSummary(fin)}</p>
+          <p class="tiny">基礎値: ATK ${base.attack}${enh.attack ? ` (+${enh.attack})` : ""} / DEF ${base.defense}${enh.defense ? ` (+${enh.defense})` : ""} / SPD ${base.speed}${enh.speed ? ` (+${enh.speed})` : ""}</p>
+          <p class="tiny">INT ${base.intelligence}${enh.intelligence ? ` (+${enh.intelligence})` : ""} / LUK ${base.luck}${enh.luck ? ` (+${enh.luck})` : ""} / HP ${base.hp}${enh.hp ? ` (+${enh.hp})` : ""} / MP ${base.mp}${enh.mp ? ` (+${enh.mp})` : ""}</p>
+          <p class="tiny">重量 ${Number(fin.weight.toFixed(1))} / レア ${eq.rarity}</p>
           <p class="tiny">${preview}</p>
           <div class="title-row">
             <button class="btn equip-item-btn" data-equip-item-id="${eq.id}" data-equip-slot-id="${selectedSlot.id}" ${canEquip ? "" : "disabled"}>装備</button>
@@ -7308,11 +7581,13 @@ function renderEquipmentView() {
 
   const slotCards = EQUIPMENT_SLOTS.map((slot) => {
     const item = getEquippedItem(slot.id);
-    const lv = item ? getEnhanceLevel(item.id) : 0;
+    const displayName = item ? getEquipmentDisplayName(item.id) : "未装備";
+    const calc = item ? getEnhancedEquipmentStats(createEquipmentInstanceFromItemId(item.id)) : null;
     return `
       <div class="card ${state.ui.selectedEquipmentSlotId === slot.id ? "active-title" : ""}">
         <h4>${slot.label}</h4>
-        <p class="tiny">${item ? `${item.name} +${lv}` : "未装備"}</p>
+        <p class="tiny">${displayName}</p>
+        <p class="tiny">${calc ? formatEquipmentStatSummary(calc.finalStats) : "ステータス補正なし"}</p>
         <div class="title-row">
           <button class="btn equipment-slot-btn" data-slot-id="${slot.id}">候補表示</button>
           <button class="btn unequip-btn" data-slot-id="${slot.id}" ${item ? "" : "disabled"}>解除</button>
@@ -7338,24 +7613,11 @@ function renderEquipmentView() {
 
 function renderEquipmentComparison(itemId, slotId) {
   const item = EQUIPMENT_DATA[itemId];
-  const current = getEquippedItem(slotId);
   if (!item) {
     return "";
   }
-  const keys = ["attack", "defense", "speed", "intelligence", "luck", "hp", "mp", "weight"];
-  const diffText = keys
-    .map((key) => {
-      const a = item[key] || 0;
-      const b = current?.[key] || 0;
-      const diff = a - b;
-      if (diff === 0) {
-        return null;
-      }
-      return `${key.toUpperCase()} ${diff > 0 ? "+" : ""}${diff}`;
-    })
-    .filter(Boolean)
-    .join(" / ");
-  return diffText || "変化なし";
+  const currentItemId = state.player.equipmentSlots?.[slotId] || null;
+  return buildEquipmentComparisonText(itemId, currentItemId, slotId);
 }
 
 function equipItem(itemId, slotId) {
@@ -7378,7 +7640,8 @@ function equipItem(itemId, slotId) {
   state.stats.totalEquipChanges += 1;
   state.stats.equipmentSlotUsageCounts[slotId] = (state.stats.equipmentSlotUsageCounts[slotId] || 0) + 1;
   state.ui.selectedEquipmentSlotId = slotId;
-  addLog(`装備変更: ${slot.label} に ${item.name} を装備。`);
+  refreshPlayerDerivedStats();
+  addLog(`装備変更: ${slot.label} に ${getEquipmentDisplayName(item.id)} を装備。`);
   checkEquipmentRelatedTitles();
   render();
 }
@@ -7394,6 +7657,7 @@ function unequipItem(slotId) {
   state.player.equippedArmorId = state.player.equipmentSlots.armor1 || null;
   state.player.equippedHeadId = state.player.equipmentSlots.armor2 || null;
   state.stats.totalEquipChanges += 1;
+  refreshPlayerDerivedStats();
   addLog(`装備解除: ${slot.label} (${item?.name || "装備"})`);
   checkEquipmentRelatedTitles();
   render();
@@ -7755,6 +8019,7 @@ function applyLoadedState(payload) {
   state.ui.topHudCollapsed = settings.ui?.topHudCollapsed ?? state.ui.topHudCollapsed;
   state.ui.lastMainTab = settings.ui?.lastMainTab || state.ui.lastMainTab;
   state.ui.systemSubTab = settings.ui?.systemSubTab || state.ui.systemSubTab;
+  syncEquipmentEnhancementCache();
 
   stopBattleLoop();
   state.battle.isActive = false;
@@ -7766,6 +8031,7 @@ function applyLoadedState(payload) {
   applyLoopTitleLimitUpgrades();
   updateBoardThreadsFromProgress();
   recalculateTitleEffects();
+  refreshPlayerDerivedStats();
   updateUnlockedBattleSpeeds();
   return true;
 }
@@ -8469,7 +8735,14 @@ function bindGameEvents() {
         if (!slotId || !itemId) {
           return;
         }
-        addLog(`装備比較: ${renderEquipmentComparison(itemId, slotId)}`);
+        const currentItemId = state.player.equipmentSlots?.[slotId] || null;
+        const currentName = currentItemId ? getEquipmentDisplayName(currentItemId) : "未装備";
+        const candName = getEquipmentDisplayName(itemId);
+        const currentStats = currentItemId ? getEquipmentSlotContribution(currentItemId, slotId) : null;
+        const candStats = getEquipmentSlotContribution(itemId, slotId);
+        const currentAtk = Math.floor(currentStats?.attack || 0);
+        const candAtk = Math.floor(candStats?.attack || 0);
+        addLog(`装備比較[${slotId}] 現在: ${currentName} 攻撃${currentAtk} / 候補: ${candName} 攻撃${candAtk} / 差分: ${renderEquipmentComparison(itemId, slotId)}`);
       })
     );
     document.querySelectorAll(".skill-slot-select-btn").forEach((btn) =>
@@ -9017,6 +9290,7 @@ function applyCarryOverSelections() {
   state.unlockedTitles = [...new Set([...selected, ...timerTitles])];
   state.activeTitles = [];
   recalculateTitleEffects();
+  refreshPlayerDerivedStats();
   updateUnlockedBattleSpeeds();
 }
 
@@ -9105,6 +9379,7 @@ function resetForNewLoop() {
   state.player.subJob = null;
   state.player.subJobUnlocked = false;
   state.player.equipmentEnhancements = {};
+  syncEquipmentEnhancementCache();
   state.player.equipmentSlots = {
     weapon1: "woodSword",
     weapon2: null,
