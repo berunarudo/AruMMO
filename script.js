@@ -1,7 +1,7 @@
 ﻿const MAX_LOG_LINES = 140;
 const BATTLE_TICK_MS = 180;
 
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 const AUTO_SAVE_INTERVAL_MS = 120000;
 const STORAGE_KEYS = {
   MAIN: "mmorpg_save_main",
@@ -110,6 +110,109 @@ const SKILL_DESC_BY_ID = {
   holy: "聖属性の魔法攻撃"
 };
 
+const JOB_EVOLUTION_SKILL_DATA = {
+  swordmaster: [
+    { id: "hien_slash", nameJa: "飛燕斬り", descriptionJa: "鋭い斬り上げで単体を攻撃", type: "attack", mpCost: 8, cooldownMs: 3600, power: 1.55 },
+    { id: "triple_slash", nameJa: "三連斬", descriptionJa: "3連続で斬りつける", type: "multiAttack", mpCost: 12, cooldownMs: 6200, power: 0.9, hits: 3 },
+    { id: "mikiri", nameJa: "見切り", descriptionJa: "回避を高める集中", type: "buff", mpCost: 9, cooldownMs: 9400, effect: { stat: "speed", multiplier: 1.18, durationMs: 6000 } },
+    { id: "touki_release", nameJa: "闘気解放", descriptionJa: "攻撃力を大きく引き上げる", type: "buff", mpCost: 11, cooldownMs: 9800, effect: { stat: "attack", multiplier: 1.24, durationMs: 6000 } }
+  ],
+  swordking: [
+    { id: "ouga_slash", nameJa: "王牙斬", descriptionJa: "王者の一撃で敵を断つ", type: "attack", mpCost: 12, cooldownMs: 4200, power: 1.8 },
+    { id: "sword_pressure", nameJa: "剣圧", descriptionJa: "剣圧で連撃する", type: "multiAttack", mpCost: 14, cooldownMs: 7000, power: 0.98, hits: 3 },
+    { id: "ironwall", nameJa: "鉄壁", descriptionJa: "防御を厚くする", type: "buff", mpCost: 12, cooldownMs: 10000, effect: { stat: "defense", multiplier: 1.3, durationMs: 6500 } },
+    { id: "kings_aura", nameJa: "王の覇気", descriptionJa: "攻防を同時に引き上げる", type: "buff", mpCost: 14, cooldownMs: 11000, effect: { stat: "attack", multiplier: 1.28, durationMs: 6500 } }
+  ],
+  swordsaint: [
+    { id: "muku_issen", nameJa: "無空一閃", descriptionJa: "空を裂く一閃", type: "attack", mpCost: 16, cooldownMs: 4600, power: 2.05 },
+    { id: "senjin_ranbu", nameJa: "千刃乱舞", descriptionJa: "高速多段の乱舞", type: "multiAttack", mpCost: 18, cooldownMs: 7600, power: 1.02, hits: 4 },
+    { id: "shingan", nameJa: "心眼", descriptionJa: "攻撃を見切り被害を抑える", type: "buff", mpCost: 14, cooldownMs: 11000, effect: { stat: "damageReduction", multiplier: 0.72, durationMs: 7000 } },
+    { id: "seikenki", nameJa: "聖剣気", descriptionJa: "攻撃速度を高める", type: "buff", mpCost: 15, cooldownMs: 11500, effect: { stat: "speed", multiplier: 1.24, durationMs: 7000 } }
+  ],
+  swordgod: [
+    { id: "shinmetsu_zan", nameJa: "神滅斬", descriptionJa: "神速の極大斬撃", type: "attack", mpCost: 20, cooldownMs: 5000, power: 2.35 },
+    { id: "tendant_kenbu", nameJa: "天断剣舞", descriptionJa: "連続剣舞で敵を断つ", type: "multiAttack", mpCost: 22, cooldownMs: 8200, power: 1.08, hits: 4 },
+    { id: "shinsai", nameJa: "神域", descriptionJa: "被ダメージを大きく軽減", type: "buff", mpCost: 18, cooldownMs: 12000, effect: { stat: "damageReduction", multiplier: 0.64, durationMs: 7500 } },
+    { id: "kengod_descend", nameJa: "剣神降臨", descriptionJa: "攻撃を極限まで高める", type: "buff", mpCost: 20, cooldownMs: 13000, effect: { stat: "attack", multiplier: 1.36, durationMs: 7500 } }
+  ],
+
+  chunin: [
+    { id: "shuriken_barrage", nameJa: "手裏剣乱射", descriptionJa: "手裏剣を連続投擲する", type: "multiAttack", mpCost: 10, cooldownMs: 6000, power: 0.88, hits: 3 },
+    { id: "paralyze_venom_blade", nameJa: "麻痺毒刃", descriptionJa: "攻撃しつつ敵攻撃を弱体化", type: "attackDebuff", mpCost: 11, cooldownMs: 6800, power: 1.35, effect: { stat: "enemyAttack", multiplier: 0.82, durationMs: 6000 } },
+    { id: "shadow_run", nameJa: "影走り", descriptionJa: "速度を高める", type: "buff", mpCost: 9, cooldownMs: 9000, effect: { stat: "speed", multiplier: 1.25, durationMs: 6500 } },
+    { id: "clone_art", nameJa: "分身", descriptionJa: "回避用の分身を作る", type: "buff", mpCost: 10, cooldownMs: 9200, effect: { stat: "damageReduction", multiplier: 0.78, durationMs: 6500 } }
+  ],
+  jonin: [
+    { id: "shadow_bind", nameJa: "影縫い", descriptionJa: "高精度の刺突攻撃", type: "attack", mpCost: 12, cooldownMs: 4200, power: 1.72 },
+    { id: "ninja_ranreikage", nameJa: "忍法・乱れ影", descriptionJa: "影の連撃を浴びせる", type: "multiAttack", mpCost: 14, cooldownMs: 7000, power: 0.96, hits: 3 },
+    { id: "utsusemi", nameJa: "空蝉", descriptionJa: "被ダメージを軽減する", type: "buff", mpCost: 12, cooldownMs: 10000, effect: { stat: "damageReduction", multiplier: 0.7, durationMs: 7000 } },
+    { id: "ninki_boost", nameJa: "忍気活性", descriptionJa: "攻撃を底上げする", type: "buff", mpCost: 12, cooldownMs: 9800, effect: { stat: "attack", multiplier: 1.2, durationMs: 7000 } }
+  ],
+  oboro: [
+    { id: "oboro_moon", nameJa: "朧月", descriptionJa: "朧の太刀で一閃", type: "attack", mpCost: 15, cooldownMs: 4600, power: 1.98 },
+    { id: "phantom_combo", nameJa: "幻影連殺", descriptionJa: "幻影の多段連撃", type: "multiAttack", mpCost: 17, cooldownMs: 7600, power: 1.02, hits: 4 },
+    { id: "oboro_hide", nameJa: "朧隠れ", descriptionJa: "敵命中率を大きく下げる", type: "debuff", mpCost: 14, cooldownMs: 11000, effect: { stat: "enemyAccuracy", multiplier: 0.62, durationMs: 7000 } },
+    { id: "night_fog", nameJa: "夜霧", descriptionJa: "夜霧で自らを守る", type: "buff", mpCost: 14, cooldownMs: 11000, effect: { stat: "damageReduction", multiplier: 0.66, durationMs: 7000 } }
+  ],
+  shadowgod: [
+    { id: "final_shadow", nameJa: "終影", descriptionJa: "影神の終撃", type: "attack", mpCost: 19, cooldownMs: 5000, power: 2.28 },
+    { id: "manei_shuriken", nameJa: "万影手裏剣", descriptionJa: "膨大な手裏剣を放つ", type: "multiAttack", mpCost: 21, cooldownMs: 8200, power: 1.06, hits: 4 },
+    { id: "kamikakushi", nameJa: "神隠し", descriptionJa: "敵命中を著しく低下", type: "debuff", mpCost: 17, cooldownMs: 12000, effect: { stat: "enemyAccuracy", multiplier: 0.55, durationMs: 7500 } },
+    { id: "shadowgod_form", nameJa: "影神化", descriptionJa: "攻速と攻撃を同時強化", type: "buff", mpCost: 18, cooldownMs: 12400, effect: { stat: "speed", multiplier: 1.32, durationMs: 7500 } }
+  ],
+
+  archmage: [
+    { id: "flame_burst", nameJa: "フレイムバースト", descriptionJa: "高火力の炎魔法", type: "magicAttack", mpCost: 12, cooldownMs: 3600, power: 1.72 },
+    { id: "ice_lance", nameJa: "アイスランス", descriptionJa: "鋭い氷槍を放つ", type: "magicAttack", mpCost: 12, cooldownMs: 3600, power: 1.68 },
+    { id: "lightning_chain", nameJa: "ライトニングチェイン", descriptionJa: "連鎖雷撃を放つ", type: "multiAttack", mpCost: 15, cooldownMs: 6800, power: 0.94, hits: 3 },
+    { id: "mana_focus", nameJa: "魔力集中", descriptionJa: "知性を大きく強化", type: "buff", mpCost: 11, cooldownMs: 9800, effect: { stat: "intelligence", multiplier: 1.28, durationMs: 6500 } }
+  ],
+  sage: [
+    { id: "meteor_flare", nameJa: "メテオフレア", descriptionJa: "隕火で焼き払う", type: "magicAttack", mpCost: 16, cooldownMs: 4200, power: 2.02 },
+    { id: "absolute_zero", nameJa: "アブソリュートゼロ", descriptionJa: "絶対零度の魔法", type: "magicAttack", mpCost: 16, cooldownMs: 4200, power: 1.98 },
+    { id: "raitei_geki", nameJa: "雷帝撃", descriptionJa: "雷帝の連撃", type: "multiAttack", mpCost: 18, cooldownMs: 7400, power: 1, hits: 3 },
+    { id: "sages_wisdom", nameJa: "賢者の叡智", descriptionJa: "知性とMP効率を高める", type: "buff", mpCost: 14, cooldownMs: 10600, effect: { stat: "intelligence", multiplier: 1.34, durationMs: 7000 } }
+  ],
+  grandsage: [
+    { id: "element_nova", nameJa: "エレメントノヴァ", descriptionJa: "属性爆発を起こす", type: "magicAttack", mpCost: 20, cooldownMs: 4700, power: 2.25 },
+    { id: "dimension_spear", nameJa: "次元槍", descriptionJa: "次元を穿つ魔槍", type: "magicAttack", mpCost: 20, cooldownMs: 4700, power: 2.18 },
+    { id: "mana_barrier", nameJa: "魔力障壁", descriptionJa: "被ダメージを軽減する障壁", type: "buff", mpCost: 16, cooldownMs: 11200, effect: { stat: "damageReduction", multiplier: 0.7, durationMs: 7200 } },
+    { id: "grandsage_cast", nameJa: "大賢者の詠唱", descriptionJa: "詠唱加速の集中", type: "buff", mpCost: 16, cooldownMs: 11200, effect: { stat: "speed", multiplier: 1.2, durationMs: 7200 } }
+  ],
+  demonmage: [
+    { id: "end_flame", nameJa: "終焉の業火", descriptionJa: "終焉級の炎撃", type: "magicAttack", mpCost: 24, cooldownMs: 5200, power: 2.52 },
+    { id: "absolute_frozen_world", nameJa: "絶対凍界", descriptionJa: "凍界を展開する", type: "magicAttack", mpCost: 24, cooldownMs: 5200, power: 2.46 },
+    { id: "judgement_thunder", nameJa: "神雷審判", descriptionJa: "神雷の連鎖裁き", type: "multiAttack", mpCost: 25, cooldownMs: 8600, power: 1.1, hits: 4 },
+    { id: "demonmanifest", nameJa: "魔神顕現", descriptionJa: "魔力を限界まで解放", type: "buff", mpCost: 20, cooldownMs: 12400, effect: { stat: "intelligence", multiplier: 1.42, durationMs: 7600 } }
+  ],
+
+  priest: [
+    { id: "high_heal", nameJa: "ハイヒール", descriptionJa: "大きくHPを回復", type: "heal", mpCost: 11, cooldownMs: 3600, healRatio: 0.3 },
+    { id: "refresh", nameJa: "リフレッシュ", descriptionJa: "小回復で立て直す", type: "heal", mpCost: 8, cooldownMs: 3100, healRatio: 0.18 },
+    { id: "bless", nameJa: "ブレス", descriptionJa: "守りを高める祝福", type: "buff", mpCost: 10, cooldownMs: 9800, effect: { stat: "defense", multiplier: 1.26, durationMs: 6500 } },
+    { id: "holy_ray", nameJa: "ホーリーレイ", descriptionJa: "聖光の魔法攻撃", type: "magicAttack", mpCost: 13, cooldownMs: 3800, power: 1.64 }
+  ],
+  highpriest: [
+    { id: "heal_rain", nameJa: "ヒールレイン", descriptionJa: "大回復を降らせる", type: "heal", mpCost: 14, cooldownMs: 4000, healRatio: 0.36 },
+    { id: "recover", nameJa: "リカバー", descriptionJa: "連続回復で安定化", type: "heal", mpCost: 10, cooldownMs: 3400, healRatio: 0.22 },
+    { id: "saint_guard", nameJa: "セイントガード", descriptionJa: "高倍率防御バフ", type: "buff", mpCost: 12, cooldownMs: 10400, effect: { stat: "defense", multiplier: 1.34, durationMs: 7000 } },
+    { id: "judgement", nameJa: "ジャッジメント", descriptionJa: "裁きの聖光", type: "magicAttack", mpCost: 15, cooldownMs: 4200, power: 1.88 }
+  ],
+  cardinal: [
+    { id: "grand_heal", nameJa: "グランドヒール", descriptionJa: "強力な回復術", type: "heal", mpCost: 17, cooldownMs: 4400, healRatio: 0.43 },
+    { id: "resurrect", nameJa: "リザレクト", descriptionJa: "戦線再生の奇跡回復", type: "heal", mpCost: 20, cooldownMs: 9000, healRatio: 0.55 },
+    { id: "sanctuary", nameJa: "聖域", descriptionJa: "被ダメージを大幅軽減", type: "buff", mpCost: 15, cooldownMs: 11200, effect: { stat: "damageReduction", multiplier: 0.68, durationMs: 7200 } },
+    { id: "holy_punish", nameJa: "神罰の光", descriptionJa: "高威力聖属性攻撃", type: "magicAttack", mpCost: 18, cooldownMs: 4600, power: 2.05 }
+  ],
+  saint: [
+    { id: "miracle", nameJa: "奇跡", descriptionJa: "超高効率の回復術", type: "heal", mpCost: 22, cooldownMs: 4600, healRatio: 0.52 },
+    { id: "full_resurrect", nameJa: "完全蘇生", descriptionJa: "圧倒的再生回復", type: "heal", mpCost: 24, cooldownMs: 9800, healRatio: 0.66 },
+    { id: "saints_blessing", nameJa: "聖者の加護", descriptionJa: "聖なる護りで被害を抑える", type: "buff", mpCost: 17, cooldownMs: 11800, effect: { stat: "damageReduction", multiplier: 0.6, durationMs: 7600 } },
+    { id: "last_holy_light", nameJa: "終末の聖光", descriptionJa: "聖なる終撃", type: "magicAttack", mpCost: 21, cooldownMs: 5200, power: 2.3 }
+  ]
+};
+Object.assign(SKILL_DATA, JOB_EVOLUTION_SKILL_DATA);
+
 function normalizeSkillData() {
   Object.keys(SKILL_DATA).forEach((jobId) => {
     SKILL_DATA[jobId] = SKILL_DATA[jobId].map((skill) => ({
@@ -124,6 +227,15 @@ function normalizeSkillData() {
 }
 
 normalizeSkillData();
+
+const SKILL_INDEX_BY_ID = {};
+Object.values(SKILL_DATA).forEach((list) => {
+  (list || []).forEach((skill) => {
+    if (skill?.id) {
+      SKILL_INDEX_BY_ID[skill.id] = skill;
+    }
+  });
+});
 
 const EQUIPMENT_DATA = {
   woodSword: {
@@ -2272,6 +2384,160 @@ const JOB_SYSTEM_RULES = {
   subJobUnlockLevel: 20,
   freeJobChangeLevel: 100
 };
+const JOB_EVOLUTION_LEVELS = [1, 50, 100, 150, 200];
+
+const JOB_LINE_DATA = {
+  swordsman_line: ["swordman", "swordmaster", "swordking", "swordsaint", "swordgod"],
+  ninja_line: ["ninja", "chunin", "jonin", "oboro", "shadowgod"],
+  mage_line: ["mage", "archmage", "sage", "grandsage", "demonmage"],
+  priest_line: ["cleric", "priest", "highpriest", "cardinal", "saint"],
+  alchemist_line: ["apothecary", "alchemist", "great_alchemist", "alchemy_king", "alchemy_god"],
+  blacksmith_line: ["blacksmith", "smith_artisan", "veteran_blacksmith", "smith_king", "smith_god"],
+  cook_line: ["cook", "chef", "sous_chef", "grand_chef", "master_chef"]
+};
+
+const BATTLE_JOB_EVOLUTION_DATA = {
+  swordman: { id: "swordman", nameJa: "剣士", baseLineId: "swordsman_line", tier: 1, requiredLevel: 1, requiredProductionLevel: null, statGrowthBonus: { hp: 1.02, mp: 1, attack: 1.04, defense: 1.02, speed: 1.01, intelligence: 1, luck: 1 }, passiveBonus: { critRate: 0.005 }, skillList: ["slash", "double_slash", "iron_stance", "fighting_spirit"], descriptionJa: "近接戦闘の基本職。", jobType: "battle" },
+  swordmaster: { id: "swordmaster", nameJa: "剣豪", baseLineId: "swordsman_line", tier: 2, requiredLevel: 50, requiredProductionLevel: null, statGrowthBonus: { hp: 1.04, mp: 1.01, attack: 1.09, defense: 1.04, speed: 1.03, intelligence: 1, luck: 1.01 }, passiveBonus: { critRate: 0.015, accuracyBonus: 0.02 }, skillList: ["hien_slash", "triple_slash", "mikiri", "touki_release"], descriptionJa: "剣士の上位職。手数と鋭さに優れる。", jobType: "battle" },
+  swordking: { id: "swordking", nameJa: "剣王", baseLineId: "swordsman_line", tier: 3, requiredLevel: 100, requiredProductionLevel: null, statGrowthBonus: { hp: 1.07, mp: 1.02, attack: 1.14, defense: 1.08, speed: 1.05, intelligence: 1.01, luck: 1.02 }, passiveBonus: { critRate: 0.025, accuracyBonus: 0.04, damageReduction: 0.03 }, skillList: ["ouga_slash", "sword_pressure", "ironwall", "kings_aura"], descriptionJa: "王者の剣圧で戦場を制圧する。", jobType: "battle" },
+  swordsaint: { id: "swordsaint", nameJa: "剣聖", baseLineId: "swordsman_line", tier: 4, requiredLevel: 150, requiredProductionLevel: null, statGrowthBonus: { hp: 1.1, mp: 1.03, attack: 1.19, defense: 1.11, speed: 1.08, intelligence: 1.02, luck: 1.03 }, passiveBonus: { critRate: 0.04, accuracyBonus: 0.06, damageReduction: 0.05 }, skillList: ["muku_issen", "senjin_ranbu", "shingan", "seikenki"], descriptionJa: "極致の剣技で攻防を兼ねる聖域職。", jobType: "battle" },
+  swordgod: { id: "swordgod", nameJa: "剣神", baseLineId: "swordsman_line", tier: 5, requiredLevel: 200, requiredProductionLevel: null, statGrowthBonus: { hp: 1.14, mp: 1.05, attack: 1.24, defense: 1.15, speed: 1.1, intelligence: 1.03, luck: 1.05 }, passiveBonus: { critRate: 0.06, accuracyBonus: 0.08, damageReduction: 0.08 }, skillList: ["shinmetsu_zan", "tendant_kenbu", "shinsai", "kengod_descend"], descriptionJa: "剣そのものと化した最上位職。", jobType: "battle" },
+
+  ninja: { id: "ninja", nameJa: "忍者", baseLineId: "ninja_line", tier: 1, requiredLevel: 1, requiredProductionLevel: null, statGrowthBonus: { hp: 1, mp: 1, attack: 1.02, defense: 1, speed: 1.05, intelligence: 1, luck: 1.02 }, passiveBonus: { critRate: 0.01, evasionBonus: 0.01 }, skillList: ["kunai_throw", "venom_blade", "stealth", "smoke_bomb"], descriptionJa: "高機動と奇襲を得意とする。", jobType: "battle" },
+  chunin: { id: "chunin", nameJa: "中忍", baseLineId: "ninja_line", tier: 2, requiredLevel: 50, requiredProductionLevel: null, statGrowthBonus: { hp: 1.01, mp: 1.01, attack: 1.05, defense: 1.01, speed: 1.1, intelligence: 1, luck: 1.04 }, passiveBonus: { critRate: 0.02, evasionBonus: 0.02 }, skillList: ["shuriken_barrage", "paralyze_venom_blade", "shadow_run", "clone_art"], descriptionJa: "機動戦を極めた中堅忍。", jobType: "battle" },
+  jonin: { id: "jonin", nameJa: "上忍", baseLineId: "ninja_line", tier: 3, requiredLevel: 100, requiredProductionLevel: null, statGrowthBonus: { hp: 1.03, mp: 1.02, attack: 1.08, defense: 1.03, speed: 1.15, intelligence: 1.01, luck: 1.06 }, passiveBonus: { critRate: 0.03, evasionBonus: 0.03, accuracyBonus: 0.03 }, skillList: ["shadow_bind", "ninja_ranreikage", "utsusemi", "ninki_boost"], descriptionJa: "影術と生存術を両立する上忍。", jobType: "battle" },
+  oboro: { id: "oboro", nameJa: "朧", baseLineId: "ninja_line", tier: 4, requiredLevel: 150, requiredProductionLevel: null, statGrowthBonus: { hp: 1.05, mp: 1.03, attack: 1.11, defense: 1.05, speed: 1.19, intelligence: 1.03, luck: 1.08 }, passiveBonus: { critRate: 0.045, evasionBonus: 0.045, accuracyBonus: 0.04 }, skillList: ["oboro_moon", "phantom_combo", "oboro_hide", "night_fog"], descriptionJa: "幻惑と連殺で敵陣を崩す。", jobType: "battle" },
+  shadowgod: { id: "shadowgod", nameJa: "影神", baseLineId: "ninja_line", tier: 5, requiredLevel: 200, requiredProductionLevel: null, statGrowthBonus: { hp: 1.08, mp: 1.05, attack: 1.15, defense: 1.07, speed: 1.24, intelligence: 1.04, luck: 1.1 }, passiveBonus: { critRate: 0.06, evasionBonus: 0.06, accuracyBonus: 0.05 }, skillList: ["final_shadow", "manei_shuriken", "kamikakushi", "shadowgod_form"], descriptionJa: "影を支配する神域の忍。", jobType: "battle" },
+
+  mage: { id: "mage", nameJa: "魔術師", baseLineId: "mage_line", tier: 1, requiredLevel: 1, requiredProductionLevel: null, statGrowthBonus: { hp: 1, mp: 1.04, attack: 1, defense: 1, speed: 1, intelligence: 1.06, luck: 1 }, passiveBonus: { spellPower: 0.04, mpCostReduction: 0.02 }, skillList: ["fire", "ice", "thunder", "magic_boost"], descriptionJa: "属性魔法の基礎を扱う術者。", jobType: "battle" },
+  archmage: { id: "archmage", nameJa: "大魔術師", baseLineId: "mage_line", tier: 2, requiredLevel: 50, requiredProductionLevel: null, statGrowthBonus: { hp: 1.01, mp: 1.08, attack: 1, defense: 1.01, speed: 1.01, intelligence: 1.11, luck: 1.01 }, passiveBonus: { spellPower: 0.08, mpCostReduction: 0.03 }, skillList: ["flame_burst", "ice_lance", "lightning_chain", "mana_focus"], descriptionJa: "高位詠唱に到達した魔導職。", jobType: "battle" },
+  sage: { id: "sage", nameJa: "賢者", baseLineId: "mage_line", tier: 3, requiredLevel: 100, requiredProductionLevel: null, statGrowthBonus: { hp: 1.03, mp: 1.12, attack: 1.01, defense: 1.03, speed: 1.02, intelligence: 1.16, luck: 1.03 }, passiveBonus: { spellPower: 0.12, mpCostReduction: 0.04 }, skillList: ["meteor_flare", "absolute_zero", "raitei_geki", "sages_wisdom"], descriptionJa: "大魔法を安定運用できる知の到達点。", jobType: "battle" },
+  grandsage: { id: "grandsage", nameJa: "大賢者", baseLineId: "mage_line", tier: 4, requiredLevel: 150, requiredProductionLevel: null, statGrowthBonus: { hp: 1.05, mp: 1.16, attack: 1.02, defense: 1.05, speed: 1.03, intelligence: 1.21, luck: 1.05 }, passiveBonus: { spellPower: 0.17, mpCostReduction: 0.06 }, skillList: ["element_nova", "dimension_spear", "mana_barrier", "grandsage_cast"], descriptionJa: "多属性と障壁を自在に扱う極術者。", jobType: "battle" },
+  demonmage: { id: "demonmage", nameJa: "魔神", baseLineId: "mage_line", tier: 5, requiredLevel: 200, requiredProductionLevel: null, statGrowthBonus: { hp: 1.08, mp: 1.22, attack: 1.03, defense: 1.07, speed: 1.05, intelligence: 1.26, luck: 1.07 }, passiveBonus: { spellPower: 0.24, mpCostReduction: 0.08 }, skillList: ["end_flame", "absolute_frozen_world", "judgement_thunder", "demonmanifest"], descriptionJa: "終焉級術式を扱う最終魔導職。", jobType: "battle" },
+
+  cleric: { id: "cleric", nameJa: "僧侶", baseLineId: "priest_line", tier: 1, requiredLevel: 1, requiredProductionLevel: null, statGrowthBonus: { hp: 1.02, mp: 1.05, attack: 1, defense: 1.03, speed: 1, intelligence: 1.03, luck: 1.01 }, passiveBonus: { healPower: 0.05, damageReduction: 0.02 }, skillList: ["heal", "cure", "protect", "holy"], descriptionJa: "回復と支援を担う聖職。", jobType: "battle" },
+  priest: { id: "priest", nameJa: "司祭", baseLineId: "priest_line", tier: 2, requiredLevel: 50, requiredProductionLevel: null, statGrowthBonus: { hp: 1.04, mp: 1.09, attack: 1, defense: 1.06, speed: 1.01, intelligence: 1.06, luck: 1.02 }, passiveBonus: { healPower: 0.1, damageReduction: 0.03 }, skillList: ["high_heal", "refresh", "bless", "holy_ray"], descriptionJa: "回復循環を強化した上位聖職。", jobType: "battle" },
+  highpriest: { id: "highpriest", nameJa: "大司祭", baseLineId: "priest_line", tier: 3, requiredLevel: 100, requiredProductionLevel: null, statGrowthBonus: { hp: 1.07, mp: 1.13, attack: 1.01, defense: 1.09, speed: 1.02, intelligence: 1.09, luck: 1.03 }, passiveBonus: { healPower: 0.15, damageReduction: 0.04 }, skillList: ["heal_rain", "recover", "saint_guard", "judgement"], descriptionJa: "広域支援に優れる聖堂の主力。", jobType: "battle" },
+  cardinal: { id: "cardinal", nameJa: "枢機卿", baseLineId: "priest_line", tier: 4, requiredLevel: 150, requiredProductionLevel: null, statGrowthBonus: { hp: 1.1, mp: 1.18, attack: 1.02, defense: 1.12, speed: 1.03, intelligence: 1.12, luck: 1.05 }, passiveBonus: { healPower: 0.21, damageReduction: 0.06 }, skillList: ["grand_heal", "resurrect", "sanctuary", "holy_punish"], descriptionJa: "蘇生と聖域で前線を維持する高位聖職。", jobType: "battle" },
+  saint: { id: "saint", nameJa: "聖人", baseLineId: "priest_line", tier: 5, requiredLevel: 200, requiredProductionLevel: null, statGrowthBonus: { hp: 1.14, mp: 1.24, attack: 1.03, defense: 1.16, speed: 1.04, intelligence: 1.16, luck: 1.07 }, passiveBonus: { healPower: 0.28, damageReduction: 0.08 }, skillList: ["miracle", "full_resurrect", "saints_blessing", "last_holy_light"], descriptionJa: "奇跡級支援を実現する最終聖職。", jobType: "battle" }
+};
+
+const PRODUCTION_JOB_EVOLUTION_DATA = {
+  apothecary: { id: "apothecary", nameJa: "薬師", baseLineId: "alchemist_line", tier: 1, requiredLevel: null, requiredProductionLevel: 1, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "基礎薬学を扱う生産職。", jobType: "production", productionBonus: { craftSuccessRate: 0.01, highQualityRate: 0.005, divineQualityRate: 0.001, productionExpRate: 0.03 } },
+  alchemist: { id: "alchemist", nameJa: "錬金術師", baseLineId: "alchemist_line", tier: 2, requiredLevel: null, requiredProductionLevel: 50, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "調合成功率が高い上位薬師。", jobType: "production", productionBonus: { craftSuccessRate: 0.03, highQualityRate: 0.015, divineQualityRate: 0.003, productionExpRate: 0.08 } },
+  great_alchemist: { id: "great_alchemist", nameJa: "大錬金術師", baseLineId: "alchemist_line", tier: 3, requiredLevel: null, requiredProductionLevel: 100, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "高品質生成を安定させる。", jobType: "production", productionBonus: { craftSuccessRate: 0.05, highQualityRate: 0.025, divineQualityRate: 0.006, productionExpRate: 0.12 } },
+  alchemy_king: { id: "alchemy_king", nameJa: "錬金王", baseLineId: "alchemist_line", tier: 4, requiredLevel: null, requiredProductionLevel: 150, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "神品質の到達率を引き上げる。", jobType: "production", productionBonus: { craftSuccessRate: 0.07, highQualityRate: 0.035, divineQualityRate: 0.01, productionExpRate: 0.16 } },
+  alchemy_god: { id: "alchemy_god", nameJa: "錬金神", baseLineId: "alchemist_line", tier: 5, requiredLevel: null, requiredProductionLevel: 200, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "錬金術を極めた神域職。", jobType: "production", productionBonus: { craftSuccessRate: 0.1, highQualityRate: 0.05, divineQualityRate: 0.015, productionExpRate: 0.22 } },
+
+  blacksmith: { id: "blacksmith", nameJa: "鍛冶師", baseLineId: "blacksmith_line", tier: 1, requiredLevel: null, requiredProductionLevel: 1, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "装備生産の基本を担う。", jobType: "production", productionBonus: { craftSuccessRate: 0.01, highQualityRate: 0.01, divineQualityRate: 0.0015, productionExpRate: 0.03 } },
+  smith_artisan: { id: "smith_artisan", nameJa: "鍛冶職人", baseLineId: "blacksmith_line", tier: 2, requiredLevel: null, requiredProductionLevel: 50, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "品質管理に優れる鍛冶職。", jobType: "production", productionBonus: { craftSuccessRate: 0.03, highQualityRate: 0.02, divineQualityRate: 0.004, productionExpRate: 0.08 } },
+  veteran_blacksmith: { id: "veteran_blacksmith", nameJa: "ベテラン鍛冶師", baseLineId: "blacksmith_line", tier: 3, requiredLevel: null, requiredProductionLevel: 100, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "高品質鍛造を量産できる。", jobType: "production", productionBonus: { craftSuccessRate: 0.05, highQualityRate: 0.03, divineQualityRate: 0.007, productionExpRate: 0.12 } },
+  smith_king: { id: "smith_king", nameJa: "鍛冶王", baseLineId: "blacksmith_line", tier: 4, requiredLevel: null, requiredProductionLevel: 150, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "神品質鍛造の名手。", jobType: "production", productionBonus: { craftSuccessRate: 0.07, highQualityRate: 0.04, divineQualityRate: 0.012, productionExpRate: 0.16 } },
+  smith_god: { id: "smith_god", nameJa: "鍛冶神", baseLineId: "blacksmith_line", tier: 5, requiredLevel: null, requiredProductionLevel: 200, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "鍛冶を極めた神域職。", jobType: "production", productionBonus: { craftSuccessRate: 0.1, highQualityRate: 0.055, divineQualityRate: 0.018, productionExpRate: 0.22 } },
+
+  cook: { id: "cook", nameJa: "調理人", baseLineId: "cook_line", tier: 1, requiredLevel: null, requiredProductionLevel: 1, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "調理の基本職。", jobType: "production", productionBonus: { craftSuccessRate: 0.01, highQualityRate: 0.008, divineQualityRate: 0.001, productionExpRate: 0.03 } },
+  chef: { id: "chef", nameJa: "シェフ", baseLineId: "cook_line", tier: 2, requiredLevel: null, requiredProductionLevel: 50, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "料理品質を安定させる。", jobType: "production", productionBonus: { craftSuccessRate: 0.03, highQualityRate: 0.018, divineQualityRate: 0.003, productionExpRate: 0.08 } },
+  sous_chef: { id: "sous_chef", nameJa: "スーシェフ", baseLineId: "cook_line", tier: 3, requiredLevel: null, requiredProductionLevel: 100, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "高品質料理を量産できる。", jobType: "production", productionBonus: { craftSuccessRate: 0.05, highQualityRate: 0.028, divineQualityRate: 0.006, productionExpRate: 0.12 } },
+  grand_chef: { id: "grand_chef", nameJa: "グランシェフ", baseLineId: "cook_line", tier: 4, requiredLevel: null, requiredProductionLevel: 150, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "極上料理で戦況を支える。", jobType: "production", productionBonus: { craftSuccessRate: 0.07, highQualityRate: 0.04, divineQualityRate: 0.01, productionExpRate: 0.16 } },
+  master_chef: { id: "master_chef", nameJa: "マスターシェフ", baseLineId: "cook_line", tier: 5, requiredLevel: null, requiredProductionLevel: 200, statGrowthBonus: {}, passiveBonus: {}, skillList: [], descriptionJa: "究極の料理を生み出す神域職。", jobType: "production", productionBonus: { craftSuccessRate: 0.1, highQualityRate: 0.052, divineQualityRate: 0.016, productionExpRate: 0.22 } }
+};
+
+const JOB_EVOLUTION_DATA = { ...BATTLE_JOB_EVOLUTION_DATA, ...PRODUCTION_JOB_EVOLUTION_DATA };
+
+const PRODUCTION_JOB_LABELS = {
+  apothecary: "薬師",
+  blacksmith: "鍛冶師",
+  cook: "調理人"
+};
+
+function getJobDataById(jobId) {
+  if (!jobId) return null;
+  if (JOB_EVOLUTION_DATA[jobId]) {
+    return JOB_EVOLUTION_DATA[jobId];
+  }
+  const base = JOB_DATA.main[jobId];
+  if (!base) {
+    return null;
+  }
+  const lineMap = {
+    swordman: "swordsman_line",
+    ninja: "ninja_line",
+    mage: "mage_line",
+    cleric: "priest_line"
+  };
+  return {
+    id: base.id,
+    nameJa: base.name,
+    baseLineId: lineMap[base.id] || `${base.id}_line`,
+    tier: 1,
+    requiredLevel: 1,
+    requiredProductionLevel: null,
+    statGrowthBonus: { hp: 1, mp: 1, attack: 1, defense: 1, speed: 1, intelligence: 1, luck: 1 },
+    passiveBonus: {},
+    skillList: (SKILL_DATA[base.id] || []).map((s) => s.id),
+    descriptionJa: base.description || "",
+    jobType: "battle"
+  };
+}
+
+function getJobLineById(lineId) {
+  return JOB_LINE_DATA[lineId] || [];
+}
+
+function getCurrentJobTierByLineAndId(lineId, jobId) {
+  const line = getJobLineById(lineId);
+  const idx = line.indexOf(jobId);
+  return idx >= 0 ? idx + 1 : 1;
+}
+
+function getJobIdByTier(lineId, tier) {
+  const line = getJobLineById(lineId);
+  return line[Math.max(0, Math.min(line.length - 1, tier - 1))] || null;
+}
+
+function getNextJobId(lineId, currentTier) {
+  const line = getJobLineById(lineId);
+  return line[currentTier] || null;
+}
+
+function ensureUnlockedSkillsState() {
+  if (!state.unlockedSkills || typeof state.unlockedSkills !== "object") {
+    state.unlockedSkills = { battle: {} };
+  }
+  if (!state.unlockedSkills.battle || typeof state.unlockedSkills.battle !== "object") {
+    state.unlockedSkills.battle = {};
+  }
+  return state.unlockedSkills;
+}
+
+function unlockSkillIdsForLine(lineId, skillIds) {
+  if (!lineId || !Array.isArray(skillIds)) {
+    return [];
+  }
+  ensureUnlockedSkillsState();
+  const prev = state.unlockedSkills.battle[lineId] || [];
+  const merged = [...new Set([...prev, ...skillIds.filter(Boolean)])];
+  state.unlockedSkills.battle[lineId] = merged;
+  return merged.filter((id) => !prev.includes(id));
+}
+
+function getUnlockedSkillIdsForLine(lineId) {
+  ensureUnlockedSkillsState();
+  return [...(state.unlockedSkills.battle[lineId] || [])];
+}
+
+function getUnlockedSkillNamesForLine(lineId) {
+  return getUnlockedSkillIdsForLine(lineId).map((id) => SKILL_INDEX_BY_ID[id]?.nameJa || id);
+}
+
+function ensureJobEvolutionFlags() {
+  if (!state.jobEvolutionFlags || typeof state.jobEvolutionFlags !== "object") {
+    state.jobEvolutionFlags = {};
+  }
+  if (!state.jobEvolutionFlags.main) state.jobEvolutionFlags.main = {};
+  if (!state.jobEvolutionFlags.sub) state.jobEvolutionFlags.sub = {};
+  if (!state.jobEvolutionFlags.production) state.jobEvolutionFlags.production = {};
+}
 
 const LOG_CATEGORIES = ["battle", "title", "craft", "board", "loop", "important", "system"];
 const LOG_CATEGORY_LABELS = {
@@ -2391,6 +2657,12 @@ const state = {
   finalContentUnlocked: false,
   finalBossFlags: {},
   worldStateFlags: {},
+  jobEvolutionFlags: {
+    main: { canEvolve: false, hasUnread: false, targetJobId: null, manualWaiting: false, autoEvolved: false },
+    sub: { canEvolve: false, hasUnread: false, targetJobId: null, manualWaiting: false, autoEvolved: false },
+    production: { canEvolve: false, hasUnread: false, targetJobId: null, manualWaiting: false, autoEvolved: false }
+  },
+  unlockedSkills: { battle: {} },
   ui: {
     titlePopupTimeoutId: null,
     battleSpecialPopupTimeoutId: null,
@@ -2598,10 +2870,19 @@ const state = {
     gold: 100,
     mainJobId: null,
     mainJob: null,
+    mainJobBaseId: null,
+    mainJobTier: 1,
+    mainJobCurrentId: null,
     subJobId: null,
     subJob: null,
+    subJobBaseId: null,
+    subJobTier: 1,
+    subJobCurrentId: null,
     subJobUnlocked: false,
     productionJob: "apothecary",
+    productionJobBaseId: "apothecary",
+    productionJobTier: 1,
+    productionJobCurrentId: "apothecary",
     productionJobLevel: 1,
     productionJobExp: 0,
     productionJobStage: 0,
@@ -2654,6 +2935,8 @@ const state = {
     enemies: ENEMY_DATA,
     uniqueEnemies: UNIQUE_ENEMY_DATA,
     jobs: JOB_DATA,
+    jobLines: JOB_LINE_DATA,
+    jobEvolution: JOB_EVOLUTION_DATA,
     subJobBonus: SUB_JOB_BONUS_DATA,
     items: ITEM_DATA,
     skills: SKILL_DATA,
@@ -2677,6 +2960,7 @@ state.autoUseItems = normalizeAutoUseItems(state.autoUseItems);
 Object.keys(STAGE_DATA).forEach((stageId) => {
   state.stageProgressById[stageId] = { kills: 0, target: STAGE_DATA[stageId].targetKills, cleared: false };
 });
+initializeJobEvolutionState({ silent: true });
 
 function createDefaultTitleEffects() {
   return {
@@ -3001,20 +3285,9 @@ function chooseMainJob(jobId) {
   if (!job) {
     return;
   }
-  state.player.mainJobId = job.id;
-  state.player.mainJob = job.name;
-  Object.assign(state.player, {
-    maxHp: job.baseStats.hp,
-    hp: job.baseStats.hp,
-    maxMp: job.baseStats.mp,
-    mp: job.baseStats.mp,
-    attack: job.baseStats.attack,
-    defense: job.baseStats.defense,
-    speed: job.baseStats.speed,
-    intelligence: job.baseStats.intelligence,
-    luck: job.baseStats.luck
-  });
-  state.player.equippedSkills = (state.world.skills[job.id] || []).slice(0, 4).map((s) => s.id);
+  syncMainJobState(job.id, 1, job.id, true);
+  initializeJobEvolutionState({ silent: true });
+  state.player.equippedSkills = getUnlockedSkillIdsForLine(getJobDataById(job.id)?.baseLineId).slice(0, 4);
   recalculateTitleEffects();
   refreshPlayerDerivedStats();
   applyLoopUnlocks();
@@ -3088,7 +3361,7 @@ function renderTopBar() {
         <div class="hud-item">MAP/STAGE: <strong>${escapeHtml(state.currentMap)}</strong> / <strong>${escapeHtml(stageLabel)}</strong></div>
         <div class="hud-item">GOLD: <strong>${state.player.gold}</strong></div>
         <div class="hud-item">ループ: <strong>${state.loop.loopCount}</strong> / titleLimit <strong>${getCurrentTitleLimit()}</strong></div>
-        <div class="hud-item">職: ${escapeHtml(state.player.mainJob || "未設定")} / サブ: ${escapeHtml(state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放"))} / 生産: ${escapeHtml(PRODUCTION_JOB_PATHS[state.player.productionJob]?.stages?.[state.player.productionJobStage] || state.player.productionJob || "未設定")}</div>
+        <div class="hud-item">職: ${escapeHtml(state.player.mainJob || "未設定")} / サブ: ${escapeHtml(state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放"))} / 生産: ${escapeHtml(getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob)?.nameJa || PRODUCTION_JOB_PATHS[state.player.productionJob]?.stages?.[state.player.productionJobStage] || state.player.productionJob || "未設定")}</div>
         <div class="hud-item">HP/MP: <strong>${Math.floor(state.player.hp)}/${Math.floor(getEffectivePlayerStat("maxHp"))}</strong> / <strong>${Math.floor(state.player.mp)}/${Math.floor(getEffectivePlayerStat("maxMp"))}</strong></div>
         <div class="hud-item">重量: <strong>${weightInfo.totalWeight}/${weightInfo.capacity}</strong> (${weightInfo.rankLabel}) / TAG: ${escapeHtml((effective.buildTags || []).join(", ") || "なし")}</div>
         <div class="hud-item">ON称号: <strong>${state.activeTitles.length}/${getCurrentTitleLimit()}</strong> ${activeNames.length ? escapeHtml(activeNames.join(" / ")) : "なし"}</div>
@@ -3916,7 +4189,7 @@ function playerAction() {
     return;
   }
 
-  let hitChance = 0.88 + state.titleEffects.accuracyBonus - state.battle.enemy.speed * 0.0012;
+  let hitChance = 0.88 + state.titleEffects.accuracyBonus + (getActiveBattleJobBonuses().combat.accuracyBonus || 0) - state.battle.enemy.speed * 0.0012;
   if (uniqueProfile?.playerHitPenalty) {
     hitChance -= uniqueProfile.playerHitPenalty;
   }
@@ -3954,6 +4227,7 @@ function enemyAction() {
     return;
   }
   let reduction = getDamageReductionMultiplier();
+  reduction *= stats.damageReductionMultiplier || 1;
   if (state.titleEffects.lowHpDamageReduction > 0 && state.battle.playerCurrentHp <= effective.maxHp * 0.2) {
     reduction *= 1 - state.titleEffects.lowHpDamageReduction;
   }
@@ -3982,7 +4256,7 @@ function enemyAction() {
 function useSkill(skill) {
   const display = getSkillDisplayData(skill.id);
   const skillName = display?.nameJa || skill.nameJa || skill.name || skill.id;
-  const mpCost = Math.max(0, Math.floor(skill.mpCost * (1 - state.titleEffects.mpCostReduction)));
+  const mpCost = Math.max(0, Math.floor(skill.mpCost * (1 - getTotalMpCostReduction())));
   if (state.battle.playerCurrentMp < mpCost) {
     return;
   }
@@ -4014,7 +4288,7 @@ function useSkill(skill) {
     return;
   }
   if (skill.type === "heal") {
-    const healMul = 1 + state.titleEffects.healMultiplier;
+    const healMul = (1 + state.titleEffects.healMultiplier) * (getEffectivePlayerStats().healPowerMultiplier || 1);
     const heal = Math.max(8, Math.floor((getEffectivePlayerStat("maxHp") * skill.healRatio + getEffectivePlayerStat("intelligence") * 0.4) * healMul));
     state.battle.playerCurrentHp = Math.min(getEffectivePlayerStat("maxHp"), state.battle.playerCurrentHp + heal);
     addLog(`回復: ${skillName} で ${heal}`);
@@ -4243,7 +4517,7 @@ function handleFieldBossClear(stageId) {
       state.unlockedEndings.push("normal_end");
       addLog("エンディング解放: normal_end");
     }
-    if (LOW_TIER_MAIN_JOBS.includes(state.player.mainJobId)) {
+    if (LOW_TIER_MAIN_JOBS.includes(state.player.mainJobBaseId || state.player.mainJobId)) {
       state.stats.loopClearWithLowTierJob += 1;
     }
     if (state.player.productionJobStage >= 3 || state.stats.totalCrafts >= 300) {
@@ -4403,6 +4677,11 @@ function checkLevelUp() {
     addLog(`レベルアップ: Lv.${state.player.level}`);
     showCenterPopup({ text: `Level Up! Lv.${state.player.level}`, type: "event" });
     unlockSubJob();
+    refreshJobEvolutionFlags();
+    if (state.jobEvolutionFlags.main.canEvolve || state.jobEvolutionFlags.sub.canEvolve) {
+      addLog("神殿で戦闘ジョブ進化が可能です。");
+      showBattleSpecialPopup("ジョブ進化可能");
+    }
     checkTitleUnlocks("afterLevelUp");
   }
 }
@@ -4422,6 +4701,242 @@ function unlockSubJob(options = {}) {
     addLog("サブジョブが解放されました。神殿で設定できます。");
     showBattleSpecialPopup("サブジョブ解放");
   }
+}
+
+function getBattleJobTierScaling(value, isSubJob = false) {
+  if (!Number.isFinite(value)) {
+    return isSubJob ? 0 : 1;
+  }
+  if (!isSubJob) {
+    return value;
+  }
+  if (value >= 1) {
+    return 1 + (value - 1) * 0.45;
+  }
+  return value;
+}
+
+function getBattleJobEvolutionInfo(slotKey = "main") {
+  const baseId = slotKey === "sub" ? state.player.subJobBaseId : state.player.mainJobBaseId;
+  const tier = Number(slotKey === "sub" ? state.player.subJobTier : state.player.mainJobTier) || 1;
+  if (!baseId) {
+    return { canEvolve: false, nextJob: null };
+  }
+  const baseData = getJobDataById(baseId);
+  const lineId = baseData?.baseLineId;
+  const nextJobId = getNextJobId(lineId, tier);
+  const nextJob = nextJobId ? getJobDataById(nextJobId) : null;
+  if (!nextJob || nextJob.jobType !== "battle") {
+    return { canEvolve: false, nextJob: null };
+  }
+  const canEvolve = (state.player.level || 1) >= (nextJob.requiredLevel || 9999);
+  return { canEvolve, nextJob, lineId };
+}
+
+function getProductionJobEvolutionInfo() {
+  const baseId = state.player.productionJobBaseId || state.player.productionJob || "apothecary";
+  const tier = Number(state.player.productionJobTier || 1);
+  const baseData = getJobDataById(baseId);
+  const lineId = baseData?.baseLineId;
+  const nextJobId = getNextJobId(lineId, tier);
+  const nextJob = nextJobId ? getJobDataById(nextJobId) : null;
+  if (!nextJob || nextJob.jobType !== "production") {
+    return { canEvolve: false, nextJob: null };
+  }
+  const canEvolve = (state.player.productionJobLevel || 1) >= (nextJob.requiredProductionLevel || 9999);
+  return { canEvolve, nextJob, lineId };
+}
+
+function unlockBattleSkillsThroughTier(lineId, tier) {
+  const line = getJobLineById(lineId);
+  const newlyUnlocked = [];
+  for (let i = 0; i < Math.min(line.length, tier); i += 1) {
+    const jobId = line[i];
+    const job = getJobDataById(jobId);
+    if (!job) continue;
+    const added = unlockSkillIdsForLine(lineId, job.skillList || []);
+    newlyUnlocked.push(...added);
+  }
+  return [...new Set(newlyUnlocked)];
+}
+
+function syncMainJobState(baseId, tier = 1, currentId = null, resetBaseStats = false) {
+  const baseData = getJobDataById(baseId);
+  if (!baseData) {
+    return;
+  }
+  const lineId = baseData.baseLineId;
+  const safeTier = Math.max(1, Number(tier) || 1);
+  const resolvedCurrentId = currentId || getJobIdByTier(lineId, safeTier) || baseId;
+  const currentJob = getJobDataById(resolvedCurrentId) || baseData;
+  state.player.mainJobBaseId = baseId;
+  state.player.mainJobTier = safeTier;
+  state.player.mainJobCurrentId = currentJob.id;
+  state.player.mainJobId = currentJob.id;
+  state.player.mainJob = currentJob.nameJa || currentJob.name || currentJob.id;
+  unlockBattleSkillsThroughTier(lineId, safeTier);
+  if (resetBaseStats) {
+    const baseStats = JOB_DATA.main[baseId]?.baseStats;
+    if (baseStats) {
+      Object.assign(state.player, {
+        maxHp: baseStats.hp,
+        hp: baseStats.hp,
+        maxMp: baseStats.mp,
+        mp: baseStats.mp,
+        attack: baseStats.attack,
+        defense: baseStats.defense,
+        speed: baseStats.speed,
+        intelligence: baseStats.intelligence,
+        luck: baseStats.luck
+      });
+    }
+  }
+}
+
+function syncSubJobState(baseId, tier = 1, currentId = null) {
+  if (!baseId) {
+    state.player.subJobBaseId = null;
+    state.player.subJobTier = 1;
+    state.player.subJobCurrentId = null;
+    state.player.subJobId = null;
+    state.player.subJob = null;
+    return;
+  }
+  const baseData = getJobDataById(baseId);
+  if (!baseData) {
+    return;
+  }
+  const lineId = baseData.baseLineId;
+  const safeTier = Math.max(1, Number(tier) || 1);
+  const resolvedCurrentId = currentId || getJobIdByTier(lineId, safeTier) || baseId;
+  const currentJob = getJobDataById(resolvedCurrentId) || baseData;
+  state.player.subJobBaseId = baseId;
+  state.player.subJobTier = safeTier;
+  state.player.subJobCurrentId = currentJob.id;
+  state.player.subJobId = currentJob.id;
+  state.player.subJob = currentJob.nameJa || currentJob.name || currentJob.id;
+  unlockBattleSkillsThroughTier(lineId, safeTier);
+}
+
+function syncProductionJobEvolutionState(baseId, tier = 1, currentId = null) {
+  const safeBaseId = baseId || state.player.productionJob || "apothecary";
+  const baseData = getJobDataById(safeBaseId);
+  if (!baseData) {
+    return;
+  }
+  const lineId = baseData.baseLineId;
+  const safeTier = Math.max(1, Number(tier) || 1);
+  const resolvedCurrentId = currentId || getJobIdByTier(lineId, safeTier) || safeBaseId;
+  const currentJob = getJobDataById(resolvedCurrentId) || baseData;
+  state.player.productionJobBaseId = safeBaseId;
+  state.player.productionJobTier = safeTier;
+  state.player.productionJobCurrentId = currentJob.id;
+  state.player.productionJob = safeBaseId;
+}
+
+function refreshJobEvolutionFlags() {
+  ensureJobEvolutionFlags();
+  const main = getBattleJobEvolutionInfo("main");
+  const sub = getBattleJobEvolutionInfo("sub");
+  const prod = getProductionJobEvolutionInfo();
+  state.jobEvolutionFlags.main = {
+    canEvolve: !!main.canEvolve,
+    hasUnread: !!main.canEvolve,
+    targetJobId: main.nextJob?.id || null,
+    manualWaiting: !!main.canEvolve,
+    autoEvolved: false
+  };
+  state.jobEvolutionFlags.sub = {
+    canEvolve: !!sub.canEvolve,
+    hasUnread: !!sub.canEvolve,
+    targetJobId: sub.nextJob?.id || null,
+    manualWaiting: !!sub.canEvolve,
+    autoEvolved: false
+  };
+  state.jobEvolutionFlags.production = {
+    canEvolve: !!prod.canEvolve,
+    hasUnread: !!prod.canEvolve,
+    targetJobId: prod.nextJob?.id || null,
+    manualWaiting: !!prod.canEvolve,
+    autoEvolved: false
+  };
+}
+
+function initializeJobEvolutionState(options = {}) {
+  const silent = !!options.silent;
+  ensureUnlockedSkillsState();
+  ensureJobEvolutionFlags();
+
+  if (state.player.mainJobId) {
+    const currentMain = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId) || getJobDataById(state.player.mainJobId);
+    const lineId = currentMain?.baseLineId;
+    const baseId = state.player.mainJobBaseId || getJobLineById(lineId)[0] || state.player.mainJobId;
+    const tier = state.player.mainJobTier || getCurrentJobTierByLineAndId(lineId, currentMain?.id || state.player.mainJobId);
+    syncMainJobState(baseId, tier, currentMain?.id || state.player.mainJobId, false);
+  }
+  if (state.player.subJobId) {
+    const currentSub = getJobDataById(state.player.subJobCurrentId || state.player.subJobId) || getJobDataById(state.player.subJobId);
+    const lineId = currentSub?.baseLineId;
+    const baseId = state.player.subJobBaseId || getJobLineById(lineId)[0] || state.player.subJobId;
+    const tier = state.player.subJobTier || getCurrentJobTierByLineAndId(lineId, currentSub?.id || state.player.subJobId);
+    syncSubJobState(baseId, tier, currentSub?.id || state.player.subJobId);
+  }
+
+  syncProductionJobEvolutionState(
+    state.player.productionJobBaseId || state.player.productionJob || "apothecary",
+    state.player.productionJobTier || 1,
+    state.player.productionJobCurrentId || null
+  );
+  unlockSubJob({ silent: true });
+  refreshJobEvolutionFlags();
+  if (!silent && (state.jobEvolutionFlags.main.canEvolve || state.jobEvolutionFlags.sub.canEvolve || state.jobEvolutionFlags.production.canEvolve)) {
+    addLog("神殿でジョブ進化が可能です。");
+  }
+}
+
+function evolveBattleJob(slotKey = "main") {
+  const info = getBattleJobEvolutionInfo(slotKey);
+  if (!info.nextJob || !info.canEvolve) {
+    addLog("進化条件を満たしていません。");
+    return;
+  }
+  const nextJob = info.nextJob;
+  const beforeName = slotKey === "sub" ? (state.player.subJob || "未設定") : (state.player.mainJob || "未設定");
+  const nextTier = nextJob.tier || 1;
+  const newlyUnlocked = unlockBattleSkillsThroughTier(info.lineId, nextTier);
+
+  if (slotKey === "sub") {
+    syncSubJobState(state.player.subJobBaseId, nextTier, nextJob.id);
+  } else {
+    syncMainJobState(state.player.mainJobBaseId, nextTier, nextJob.id, false);
+  }
+  refreshPlayerDerivedStats();
+  refreshJobEvolutionFlags();
+
+  const unlockedNames = newlyUnlocked.map((id) => SKILL_INDEX_BY_ID[id]?.nameJa || id);
+  addLog(`${beforeName}は${nextJob.nameJa}へ進化した！`);
+  if (unlockedNames.length > 0) {
+    addLog(`新スキル解放: ${unlockedNames.join(" / ")}`);
+  }
+  showCenterPopup({ text: `${beforeName} -> ${nextJob.nameJa}`, type: "important" });
+  showBattleSpecialPopup(`進化: ${nextJob.nameJa}`);
+  render();
+}
+
+function evolveProductionJob() {
+  const info = getProductionJobEvolutionInfo();
+  if (!info.nextJob || !info.canEvolve) {
+    addLog("生産ジョブの進化条件を満たしていません。");
+    return;
+  }
+  const before = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
+  const beforeName = before?.nameJa || PRODUCTION_JOB_LABELS[state.player.productionJob] || state.player.productionJob;
+  syncProductionJobEvolutionState(state.player.productionJobBaseId || state.player.productionJob, info.nextJob.tier || 1, info.nextJob.id);
+  refreshJobEvolutionFlags();
+  addLog(`${beforeName}は${info.nextJob.nameJa}へ進化した！`);
+  showCenterPopup({ text: `${beforeName} -> ${info.nextJob.nameJa}`, type: "important" });
+  showBattleSpecialPopup(`生産進化: ${info.nextJob.nameJa}`);
+  render();
 }
 
 const TITLE_CUSTOM_CHECKERS = {
@@ -5515,7 +6030,7 @@ function evaluateBuildTags(weightInfo = calculateWeightInfo(state.player.attack)
   }
 
   const phase7Tags = [];
-  if (LOW_TIER_MAIN_JOBS.includes(state.player.mainJobId) && state.loop.clearedGame) {
+  if (LOW_TIER_MAIN_JOBS.includes(state.player.mainJobBaseId || state.player.mainJobId) && state.loop.clearedGame) {
     phase7Tags.push("unfavored_main_clear");
     phase7Tags.push("low_tier_job_clear");
   }
@@ -5588,8 +6103,46 @@ function checkUnexpectedBuildConditions() {
   return false;
 }
 
+function getActiveBattleJobBonuses() {
+  const main = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId);
+  const sub = getJobDataById(state.player.subJobCurrentId || state.player.subJobId);
+  const statsMul = { hp: 1, mp: 1, attack: 1, defense: 1, speed: 1, intelligence: 1, luck: 1 };
+  const combat = { critRate: 0, evasionBonus: 0, spellPower: 0, healPower: 0, mpCostReduction: 0, damageReduction: 0, accuracyBonus: 0 };
+
+  const apply = (job, isSub = false) => {
+    if (!job) return;
+    const growth = job.statGrowthBonus || {};
+    statsMul.hp *= getBattleJobTierScaling(growth.hp || 1, isSub);
+    statsMul.mp *= getBattleJobTierScaling(growth.mp || 1, isSub);
+    statsMul.attack *= getBattleJobTierScaling(growth.attack || 1, isSub);
+    statsMul.defense *= getBattleJobTierScaling(growth.defense || 1, isSub);
+    statsMul.speed *= getBattleJobTierScaling(growth.speed || 1, isSub);
+    statsMul.intelligence *= getBattleJobTierScaling(growth.intelligence || 1, isSub);
+    statsMul.luck *= getBattleJobTierScaling(growth.luck || 1, isSub);
+    const passive = job.passiveBonus || {};
+    const scale = isSub ? 0.45 : 1;
+    combat.critRate += (passive.critRate || 0) * scale;
+    combat.evasionBonus += (passive.evasionBonus || 0) * scale;
+    combat.spellPower += (passive.spellPower || 0) * scale;
+    combat.healPower += (passive.healPower || 0) * scale;
+    combat.mpCostReduction += (passive.mpCostReduction || 0) * scale;
+    combat.damageReduction += (passive.damageReduction || 0) * scale;
+    combat.accuracyBonus += (passive.accuracyBonus || 0) * scale;
+  };
+
+  apply(main, false);
+  apply(sub, true);
+  return { statsMul, combat };
+}
+
+function getTotalMpCostReduction() {
+  const jobBonus = getActiveBattleJobBonuses().combat.mpCostReduction || 0;
+  return clamp(0, 0.8, (state.titleEffects.mpCostReduction || 0) + jobBonus);
+}
+
 function getEffectivePlayerStats() {
-  const sub = state.player.subJobId ? SUB_JOB_BONUS_DATA[state.player.subJobId] || {} : {};
+  const sub = state.player.subJobId ? SUB_JOB_BONUS_DATA[state.player.subJobBaseId || state.player.subJobId] || {} : {};
+  const jobBonus = getActiveBattleJobBonuses();
   const base = {
     maxHp: state.player.maxHp,
     maxMp: state.player.maxMp,
@@ -5608,6 +6161,15 @@ function getEffectivePlayerStats() {
   base.speed += sub.speed || 0;
   base.intelligence += sub.intelligence || 0;
   base.luck += sub.luck || 0;
+  base.maxHp *= jobBonus.statsMul.hp;
+  base.maxMp *= jobBonus.statsMul.mp;
+  base.attack *= jobBonus.statsMul.attack;
+  base.defense *= jobBonus.statsMul.defense;
+  base.speed *= jobBonus.statsMul.speed;
+  base.intelligence *= jobBonus.statsMul.intelligence;
+  base.luck *= jobBonus.statsMul.luck;
+  base.evasion += jobBonus.combat.evasionBonus || 0;
+  base.critRate += jobBonus.combat.critRate || 0;
 
   const equipStats = calculateEquipmentStats();
   const afterEquip = {
@@ -5670,7 +6232,7 @@ function getEffectivePlayerStats() {
     stats.intelligence *= mul;
     stats.luck *= mul;
   }
-  if (state.titleEffects.lowTierJobBonus > 0 && LOW_TIER_MAIN_JOBS.includes(state.player.mainJobId)) {
+  if (state.titleEffects.lowTierJobBonus > 0 && LOW_TIER_MAIN_JOBS.includes(state.player.mainJobBaseId || state.player.mainJobId)) {
     const mul = 1 + state.titleEffects.lowTierJobBonus;
     stats.maxHp *= mul;
     stats.maxMp *= mul;
@@ -5732,6 +6294,10 @@ function getEffectivePlayerStats() {
 
   stats.evasion = clamp(0.01, 0.75, stats.evasion);
   stats.critRate = clamp(0.01, 0.95, stats.critRate);
+  stats.magicPowerMultiplier = 1 + (jobBonus.combat.spellPower || 0);
+  stats.healPowerMultiplier = 1 + (jobBonus.combat.healPower || 0);
+  stats.damageReductionMultiplier = 1 - (jobBonus.combat.damageReduction || 0);
+  stats.accuracyBonus = (stats.accuracyBonus || 0) + (jobBonus.combat.accuracyBonus || 0);
   stats.weightInfo = weightInfo;
   stats.weightModifiers = weightMods;
   stats.equipmentStats = equipStats;
@@ -5838,10 +6404,22 @@ function getEnemyActionInterval() {
 
 function getAvailableSkillPool() {
   const list = [];
-  if (state.player.mainJobId && state.world.skills[state.player.mainJobId]) {
+  const mainData = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId);
+  const subData = getJobDataById(state.player.subJobCurrentId || state.player.subJobId);
+  if (mainData?.baseLineId) {
+    getUnlockedSkillIdsForLine(mainData.baseLineId).forEach((id) => {
+      const skill = SKILL_INDEX_BY_ID[id];
+      if (skill) list.push(skill);
+    });
+  } else if (state.player.mainJobId && state.world.skills[state.player.mainJobId]) {
     list.push(...state.world.skills[state.player.mainJobId]);
   }
-  if (state.player.subJobId && state.world.skills[state.player.subJobId]) {
+  if (subData?.baseLineId) {
+    getUnlockedSkillIdsForLine(subData.baseLineId).forEach((id) => {
+      const skill = SKILL_INDEX_BY_ID[id];
+      if (skill) list.push(skill);
+    });
+  } else if (state.player.subJobId && state.world.skills[state.player.subJobId]) {
     list.push(...state.world.skills[state.player.subJobId]);
   }
   const map = new Map();
@@ -5862,6 +6440,10 @@ function getSkillDisplayData(skillId) {
   if (!skill) {
     return null;
   }
+  const mainData = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId);
+  const subData = getJobDataById(state.player.subJobCurrentId || state.player.subJobId);
+  const mainLineIds = mainData?.baseLineId ? getUnlockedSkillIdsForLine(mainData.baseLineId) : [];
+  const subLineIds = subData?.baseLineId ? getUnlockedSkillIdsForLine(subData.baseLineId) : [];
   return {
     id: skill.id,
     nameJa: skill.nameJa || skill.name || skill.id,
@@ -5871,12 +6453,7 @@ function getSkillDisplayData(skillId) {
     cooldownMs: skill.cooldownMs || (skill.cooldown || 0) * 1000,
     category: skill.category || SKILL_TYPE_LABEL_JA[skill.type] || "その他",
     effectType: skill.effectType || skill.type,
-    jobId:
-      state.player.mainJobId && (state.world.skills[state.player.mainJobId] || []).some((s) => s.id === skill.id)
-        ? state.player.mainJobId
-        : state.player.subJobId && (state.world.skills[state.player.subJobId] || []).some((s) => s.id === skill.id)
-          ? state.player.subJobId
-          : null,
+    jobId: mainLineIds.includes(skill.id) ? state.player.mainJobCurrentId || state.player.mainJobId : subLineIds.includes(skill.id) ? state.player.subJobCurrentId || state.player.subJobId : null,
     raw: skill
   };
 }
@@ -5886,7 +6463,8 @@ function getEquippedSkills() {
     state.player.equippedSkills = [null, null, null, null];
   }
   if (state.player.mainJobId && state.player.equippedSkills.every((id) => !id)) {
-    state.player.equippedSkills = (state.world.skills[state.player.mainJobId] || []).slice(0, 4).map((s) => s.id);
+    const lineId = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId)?.baseLineId;
+    state.player.equippedSkills = (lineId ? getUnlockedSkillIdsForLine(lineId) : (state.world.skills[state.player.mainJobId] || []).map((s) => s.id)).slice(0, 4);
   }
   const result = state.player.equippedSkills
     .slice(0, 4)
@@ -5973,7 +6551,7 @@ function pickUsableSkill() {
     const index = (state.battle.skillRotationIndex + i) % skills.length;
     const skill = skills[index];
     const readyAt = state.skillCooldowns[skill.id] || 0;
-    const needMp = Math.max(0, Math.floor(skill.mpCost * (1 - (state.titleEffects.mpCostReduction || 0))));
+    const needMp = Math.max(0, Math.floor(skill.mpCost * (1 - getTotalMpCostReduction())));
     if (state.battle.playerCurrentMp >= needMp && now >= readyAt) {
       state.battle.skillRotationIndex = (index + 1) % skills.length;
       return skill;
@@ -5989,7 +6567,8 @@ function getCurrentSkillList() {
 function calculateSkillDamage(skill) {
   const enemyDef = state.battle.enemy ? state.battle.enemy.defense : 0;
   if (skill.type === "magicAttack") {
-    return Math.max(1, Math.floor(getEffectivePlayerStat("intelligence") * skill.power + state.player.level - enemyDef * 0.35));
+    const jobMul = getEffectivePlayerStats().magicPowerMultiplier || 1;
+    return Math.max(1, Math.floor((getEffectivePlayerStat("intelligence") * skill.power + state.player.level - enemyDef * 0.35) * jobMul));
   }
   return Math.max(1, Math.floor(getEffectivePlayerStat("attack") * skill.power - enemyDef * 0.6));
 }
@@ -6592,34 +7171,56 @@ function getSellPrice(item) {
 }
 
 function renderTempleView() {
-  const productionLabels = { apothecary: "薬師", blacksmith: "鍛冶師", cook: "調理人" };
-  const productionButtons = Object.keys(productionLabels)
-    .map((job) => `<button class="btn production-select-btn ${state.player.productionJob === job ? "active" : ""}" data-production-job="${job}">${productionLabels[job]}</button>`)
+  const productionButtons = Object.keys(PRODUCTION_JOB_LABELS)
+    .map((job) => `<button class="btn production-select-btn ${state.player.productionJob === job ? "active" : ""}" data-production-job="${job}">${PRODUCTION_JOB_LABELS[job]}</button>`)
     .join("");
   const mainChangeUnlocked = canFreeJobChange();
   const mainButtons = Object.values(JOB_DATA.main)
-    .map((job) => `<button class="btn mainjob-select-btn ${state.player.mainJobId === job.id ? "active" : ""}" data-main-job-id="${job.id}" ${mainChangeUnlocked ? "" : "disabled"}>${job.name}</button>`)
+    .map((job) => `<button class="btn mainjob-select-btn ${state.player.mainJobBaseId === job.id ? "active" : ""}" data-main-job-id="${job.id}" ${mainChangeUnlocked ? "" : "disabled"}>${job.name}</button>`)
     .join("");
   const subChangeUnlocked = canFreeJobChange();
   const subButtons = Object.values(JOB_DATA.main)
     .map((job) => {
       const lockedByLevel = !state.player.subJobUnlocked;
-      const lockedByRule = !subChangeUnlocked && !!state.player.subJobId && state.player.subJobId !== job.id;
+      const lockedByRule = !subChangeUnlocked && !!state.player.subJobBaseId && state.player.subJobBaseId !== job.id;
       const disabled = lockedByLevel || lockedByRule;
-      return `<button class="btn subjob-select-btn ${state.player.subJobId === job.id ? "active" : ""}" data-sub-job-id="${job.id}" ${disabled ? "disabled" : ""}>${job.name}</button>`;
+      return `<button class="btn subjob-select-btn ${state.player.subJobBaseId === job.id ? "active" : ""}" data-sub-job-id="${job.id}" ${disabled ? "disabled" : ""}>${job.name}</button>`;
     })
     .join("");
+  const mainInfo = getBattleJobEvolutionInfo("main");
+  const subInfo = getBattleJobEvolutionInfo("sub");
+  const prodInfo = getProductionJobEvolutionInfo();
+  const mainCurrent = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId);
+  const subCurrent = getJobDataById(state.player.subJobCurrentId || state.player.subJobId);
+  const prodCurrent = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
+  const mainLineId = mainCurrent?.baseLineId;
+  const subLineId = subCurrent?.baseLineId;
   const subJobGuide = !state.player.subJobUnlocked
     ? `サブジョブはレベル${JOB_SYSTEM_RULES.subJobUnlockLevel}で解放されます。`
     : !subChangeUnlocked
       ? `サブジョブはレベル${JOB_SYSTEM_RULES.subJobUnlockLevel}で解放済みです。変更はレベル${JOB_SYSTEM_RULES.freeJobChangeLevel}で解放されます。`
       : `レベル${JOB_SYSTEM_RULES.freeJobChangeLevel}到達: メイン/サブジョブを自由変更できます。`;
+  const mainUnlockedSkills = mainLineId ? getUnlockedSkillNamesForLine(mainLineId).join(" / ") : "なし";
+  const subUnlockedSkills = subLineId ? getUnlockedSkillNamesForLine(subLineId).join(" / ") : "なし";
+  const productionJobName = prodCurrent?.nameJa || PRODUCTION_JOB_LABELS[state.player.productionJob] || state.player.productionJob;
+
   return `
     <h3>神殿</h3>
-    <p>メインジョブ: <strong>${state.player.mainJob || "未設定"}</strong></p>
-    <p>サブジョブ: <strong>${state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放")}</strong></p>
-    <p>生産ジョブ: <strong>${state.player.productionJob}</strong> / 段階 <strong>${PRODUCTION_JOB_PATHS[state.player.productionJob].stages[state.player.productionJobStage]}</strong></p>
+    <p>メインジョブ: <strong>${state.player.mainJob || "未設定"}</strong> / 段階 <strong>${state.player.mainJobTier || 1}</strong></p>
+    <p class="tiny">${mainCurrent?.descriptionJa || ""}</p>
+    <p class="tiny">次進化: ${mainInfo.nextJob ? `${mainInfo.nextJob.nameJa} (Lv.${mainInfo.nextJob.requiredLevel})` : "なし"} / 状態: ${mainInfo.canEvolve ? "進化可能" : "未達成"}</p>
+    ${mainInfo.canEvolve ? '<button class="btn evolve-main-job-btn">メインジョブを進化する</button>' : ""}
+    <p class="tiny">解放済み上位スキル(メイン系統): ${mainUnlockedSkills || "なし"}</p>
+    <p>サブジョブ: <strong>${state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放")}</strong> / 段階 <strong>${state.player.subJobId ? state.player.subJobTier || 1 : "-"}</strong></p>
+    <p class="tiny">${subCurrent?.descriptionJa || ""}</p>
+    <p class="tiny">次進化: ${subInfo.nextJob ? `${subInfo.nextJob.nameJa} (Lv.${subInfo.nextJob.requiredLevel})` : "なし"} / 状態: ${subInfo.canEvolve ? "進化可能" : "未達成"}</p>
+    ${subInfo.canEvolve ? '<button class="btn evolve-sub-job-btn">サブジョブを進化する</button>' : ""}
+    <p class="tiny">解放済み上位スキル(サブ系統): ${subUnlockedSkills || "なし"}</p>
+    <p>生産ジョブ: <strong>${productionJobName}</strong> / 段階 <strong>${state.player.productionJobTier || 1}</strong> / 生産段階 <strong>${PRODUCTION_JOB_PATHS[state.player.productionJob].stages[state.player.productionJobStage]}</strong></p>
+    <p class="tiny">${prodCurrent?.descriptionJa || ""}</p>
     <p class="tiny">生産Lv ${state.player.productionJobLevel} / EXP ${state.player.productionJobExp}</p>
+    <p class="tiny">次進化: ${prodInfo.nextJob ? `${prodInfo.nextJob.nameJa} (生産Lv.${prodInfo.nextJob.requiredProductionLevel})` : "なし"} / 状態: ${prodInfo.canEvolve ? "進化可能" : "未達成"}</p>
+    ${prodInfo.canEvolve ? '<button class="btn evolve-production-job-btn">生産ジョブを進化する</button>' : ""}
     <p class="tiny">メインジョブ変更: レベル${JOB_SYSTEM_RULES.freeJobChangeLevel}で解放</p>
     <div class="guild-facility-grid">${mainButtons}</div>
     <div class="guild-facility-grid">${productionButtons}</div>
@@ -6637,23 +7238,13 @@ function selectMainJobFromTemple(jobId) {
   if (!job) {
     return;
   }
-  state.player.mainJobId = job.id;
-  state.player.mainJob = job.name;
-  Object.assign(state.player, {
-    maxHp: job.baseStats.hp,
-    hp: job.baseStats.hp,
-    maxMp: job.baseStats.mp,
-    mp: job.baseStats.mp,
-    attack: job.baseStats.attack,
-    defense: job.baseStats.defense,
-    speed: job.baseStats.speed,
-    intelligence: job.baseStats.intelligence,
-    luck: job.baseStats.luck
-  });
-  state.player.equippedSkills = (state.world.skills[job.id] || []).slice(0, 4).map((s) => s.id);
+  syncMainJobState(job.id, 1, job.id, true);
+  initializeJobEvolutionState({ silent: true });
+  const mainLineId = getJobDataById(job.id)?.baseLineId;
+  state.player.equippedSkills = getUnlockedSkillIdsForLine(mainLineId).slice(0, 4);
   recalculateTitleEffects();
   refreshPlayerDerivedStats();
-  addLog(`神殿: メインジョブを ${job.name} に変更しました。`);
+  addLog(`神殿: メインジョブを ${job.name} に変更しました。進化段階は1に初期化されます。`);
   render();
 }
 
@@ -6673,8 +7264,10 @@ function selectProductionJob(jobName) {
   state.player.productionJobLevel = progress.level;
   state.player.productionJobExp = progress.exp;
   state.player.productionJobStage = progress.stage;
+  syncProductionJobEvolutionState(jobName, 1, jobName);
+  refreshJobEvolutionFlags();
   state.stats.productionJobHistory[jobName] = (state.stats.productionJobHistory[jobName] || 0) + 1;
-  addLog(`神殿: 生産ジョブを ${jobName} に設定しました。`);
+  addLog(`神殿: 生産ジョブを ${PRODUCTION_JOB_LABELS[jobName] || jobName} に設定しました。進化段階は1に初期化されます。`);
   render();
 }
 
@@ -6691,10 +7284,10 @@ function selectSubJob(jobId) {
   if (!job) {
     return;
   }
-  state.player.subJobId = job.id;
-  state.player.subJob = job.name;
+  syncSubJobState(job.id, 1, job.id);
+  refreshJobEvolutionFlags();
   refreshPlayerDerivedStats();
-  addLog(`神殿: サブジョブを ${job.name} に設定しました。`);
+  addLog(`神殿: サブジョブを ${job.name} に設定しました。進化段階は1です。`);
   render();
 }
 
@@ -6799,12 +7392,14 @@ function renderRecipeList(showAll = false) {
 
 function renderProductionJobInfo() {
   const path = PRODUCTION_JOB_PATHS[state.player.productionJob];
+  const evo = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
   const stageName = path.stages[state.player.productionJobStage] || path.stages[0];
   const nextReq = PRODUCTION_STAGE_REQUIREMENTS[Math.min(path.stages.length - 1, state.player.productionJobStage + 1)];
   const currentCrafts = state.player.productionProgress[state.player.productionJob]?.crafts || 0;
   return `
     <div class="card">
-      <h4>${state.player.productionJob} (${path.type})</h4>
+      <h4>${evo?.nameJa || state.player.productionJob} (${path.type})</h4>
+      <p>進化段階: Tier ${state.player.productionJobTier || 1} / 次進化条件: 生産Lv ${getProductionJobEvolutionInfo().nextJob?.requiredProductionLevel || "-"}</p>
       <p>段階: ${stageName} (${state.player.productionJobStage + 1}/${path.stages.length})</p>
       <p>生産Lv: ${state.player.productionJobLevel} / EXP: ${state.player.productionJobExp} / 次Lv: ${productionExpToNextLevel()}</p>
       <p class="tiny">次段階条件: Lv${nextReq?.level ?? "-"} / 生産回数${nextReq?.crafts ?? "-"}回</p>
@@ -6956,12 +7551,19 @@ function applyCraftQuality(result, recipe) {
 }
 
 function gainProductionExp(amount) {
-  state.player.productionJobExp += amount;
-  state.stats.totalCraftExp += amount;
+  const pJob = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
+  const expMul = 1 + (pJob?.productionBonus?.productionExpRate || 0);
+  const gained = Math.max(1, Math.floor(amount * expMul));
+  state.player.productionJobExp += gained;
+  state.stats.totalCraftExp += gained;
   while (state.player.productionJobExp >= productionExpToNextLevel()) {
     state.player.productionJobExp -= productionExpToNextLevel();
     state.player.productionJobLevel += 1;
     addLog(`生産Lvアップ: ${state.player.productionJobLevel}`);
+  }
+  refreshJobEvolutionFlags();
+  if (state.jobEvolutionFlags.production.canEvolve) {
+    addLog("神殿で生産ジョブ進化が可能です。");
   }
   checkProductionStageUp();
   state.player.productionProgress[state.player.productionJob] = {
@@ -6997,18 +7599,21 @@ function checkProductionStageUp() {
 function getProductionBonuses(productionType) {
   const stage = state.player.productionJobStage || 0;
   const level = state.player.productionJobLevel || 1;
+  const pJob = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
+  const evo = pJob?.productionBonus || {};
   const bonus = {
     successRate:
       stage * 0.015 +
       Math.floor(level / 20) * 0.01 +
       state.titleEffects.craftSuccessBonus +
-      Math.min(0.08, state.loop.loopCount * BALANCE_CONFIG.crafting.perLoopSuccessBonus),
+      Math.min(0.08, state.loop.loopCount * BALANCE_CONFIG.crafting.perLoopSuccessBonus) +
+      (evo.craftSuccessRate || 0),
     greatRate: stage * 0.008 + (productionType === "cooking" ? state.titleEffects.cookGreatSuccessRateBonus : 0),
-    highRate: stage * 0.01,
+    highRate: stage * 0.01 + (evo.highQualityRate || 0),
     godRate:
       stage >= 3
-        ? 0.002 + stage * 0.001 + Math.min(0.02, state.loop.loopCount * BALANCE_CONFIG.crafting.perLoopGodBonus)
-        : 0
+        ? 0.002 + stage * 0.001 + Math.min(0.02, state.loop.loopCount * BALANCE_CONFIG.crafting.perLoopGodBonus) + (evo.divineQualityRate || 0)
+        : (evo.divineQualityRate || 0) * 0.5
   };
   if (productionType === "smith") {
     bonus.highRate += 0.02;
@@ -7599,9 +8204,9 @@ function renderStatusView(container) {
     ["レベル", state.player.level],
     ["経験値", `${state.player.exp} / ${expToNextLevel()}`],
     ["所持金", `${state.player.gold}G`],
-    ["メインジョブ", state.player.mainJob || "未設定"],
-    ["サブジョブ", state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放")],
-    ["生産ジョブ", `${state.player.productionJob} (${PRODUCTION_JOB_PATHS[state.player.productionJob].stages[state.player.productionJobStage]})`],
+    ["メインジョブ", `${state.player.mainJob || "未設定"} (Tier ${state.player.mainJobTier || 1})`],
+    ["サブジョブ", `${state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放")}${state.player.subJobId ? ` (Tier ${state.player.subJobTier || 1})` : ""}`],
+    ["生産ジョブ", `${getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob)?.nameJa || state.player.productionJob} (Tier ${state.player.productionJobTier || 1}) / ${PRODUCTION_JOB_PATHS[state.player.productionJob].stages[state.player.productionJobStage]}`],
     ["生産Lv", `${state.player.productionJobLevel} / EXP ${state.player.productionJobExp}`],
     ["HP", `${Math.floor(state.player.hp)} / ${Math.floor(effective.maxHp)}`],
     ["MP", `${Math.floor(state.player.mp)} / ${Math.floor(effective.maxMp)}`],
@@ -8224,6 +8829,8 @@ function splitRunAndPersistentState() {
     guild: deepCopyPlain(state.guild),
     player: deepCopyPlain(state.player),
     stats: deepCopyPlain(state.stats),
+    jobEvolutionFlags: deepCopyPlain(state.jobEvolutionFlags),
+    unlockedSkills: deepCopyPlain(state.unlockedSkills),
     quests: {
       active: deepCopyPlain(state.guild.activeQuestIds),
       completed: deepCopyPlain(state.guild.completedQuestIds),
@@ -8340,6 +8947,8 @@ function applyLoadedState(payload) {
   state.guild = { ...state.guild, ...(run.guild || {}) };
   state.player = { ...state.player, ...(run.player || {}) };
   state.stats = { ...state.stats, ...(run.stats || {}) };
+  state.jobEvolutionFlags = { ...state.jobEvolutionFlags, ...(run.jobEvolutionFlags || {}) };
+  state.unlockedSkills = { ...state.unlockedSkills, ...(run.unlockedSkills || {}) };
   state.stats.defeatsByStage = state.stats.defeatsByStage || {};
   state.guild.activeQuestIds = run.quests?.active || state.guild.activeQuestIds;
   state.guild.completedQuestIds = run.quests?.completed || state.guild.completedQuestIds;
@@ -8400,8 +9009,8 @@ function applyLoadedState(payload) {
   applyLoopUnlocks();
   applyLoopTitleLimitUpgrades();
   updateBoardThreadsFromProgress();
+  initializeJobEvolutionState({ silent: true });
   recalculateTitleEffects();
-  unlockSubJob({ silent: true });
   refreshPlayerDerivedStats();
   updateUnlockedBattleSpeeds();
   return true;
@@ -8965,6 +9574,9 @@ function bindGameEvents() {
     document.querySelectorAll(".mainjob-select-btn").forEach((btn) => btn.addEventListener("click", () => selectMainJobFromTemple(btn.dataset.mainJobId)));
     document.querySelectorAll(".production-select-btn").forEach((btn) => btn.addEventListener("click", () => selectProductionJob(btn.dataset.productionJob)));
     document.querySelectorAll(".subjob-select-btn").forEach((btn) => btn.addEventListener("click", () => selectSubJob(btn.dataset.subJobId)));
+    document.querySelectorAll(".evolve-main-job-btn").forEach((btn) => btn.addEventListener("click", () => evolveBattleJob("main")));
+    document.querySelectorAll(".evolve-sub-job-btn").forEach((btn) => btn.addEventListener("click", () => evolveBattleJob("sub")));
+    document.querySelectorAll(".evolve-production-job-btn").forEach((btn) => btn.addEventListener("click", () => evolveProductionJob()));
     document.querySelectorAll(".workshop-tab-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
         const tab = btn.dataset.workshopTab;
@@ -9715,6 +10327,12 @@ function resetForNewLoop() {
   state.runtime.buildTags = [];
   state.runtime.exploitTags = [];
   state.runtime.loopStartedAt = Date.now();
+  state.unlockedSkills = { battle: {} };
+  state.jobEvolutionFlags = {
+    main: { canEvolve: false, hasUnread: false, targetJobId: null, manualWaiting: false, autoEvolved: false },
+    sub: { canEvolve: false, hasUnread: false, targetJobId: null, manualWaiting: false, autoEvolved: false },
+    production: { canEvolve: false, hasUnread: false, targetJobId: null, manualWaiting: false, autoEvolved: false }
+  };
   state.battle = {
     isActive: false,
     stageId: null,
@@ -9747,8 +10365,13 @@ function resetForNewLoop() {
   state.player.level = 1;
   state.player.exp = 0;
   state.player.gold = 100;
+  state.player.mainJobTier = 1;
+  state.player.mainJobCurrentId = state.player.mainJobBaseId || state.player.mainJobId || null;
   state.player.subJobId = null;
   state.player.subJob = null;
+  state.player.subJobBaseId = null;
+  state.player.subJobTier = 1;
+  state.player.subJobCurrentId = null;
   state.player.subJobUnlocked = false;
   state.player.equipmentEnhancements = {};
   syncEquipmentEnhancementCache();
@@ -9772,6 +10395,9 @@ function resetForNewLoop() {
     { itemId: "noviceRobe", quantity: 1 }
   ];
   state.player.productionJob = "apothecary";
+  state.player.productionJobBaseId = "apothecary";
+  state.player.productionJobTier = 1;
+  state.player.productionJobCurrentId = "apothecary";
   state.player.productionJobLevel = 1;
   state.player.productionJobExp = 0;
   state.player.productionJobStage = 0;
@@ -9780,19 +10406,12 @@ function resetForNewLoop() {
     blacksmith: { level: 1, exp: 0, stage: 0, crafts: 0 },
     cook: { level: 1, exp: 0, stage: 0, crafts: 0 }
   };
-  if (state.player.mainJobId && JOB_DATA.main[state.player.mainJobId]) {
-    const job = JOB_DATA.main[state.player.mainJobId];
-    state.player.mainJob = job.name;
-    state.player.maxHp = job.baseStats.hp;
-    state.player.hp = job.baseStats.hp;
-    state.player.maxMp = job.baseStats.mp;
-    state.player.mp = job.baseStats.mp;
-    state.player.attack = job.baseStats.attack;
-    state.player.defense = job.baseStats.defense;
-    state.player.speed = job.baseStats.speed;
-    state.player.intelligence = job.baseStats.intelligence;
-    state.player.luck = job.baseStats.luck;
-    state.player.equippedSkills = (state.world.skills[state.player.mainJobId] || []).slice(0, 4).map((s) => s.id);
+  const mainBaseId = state.player.mainJobBaseId || state.player.mainJobId;
+  if (mainBaseId && JOB_DATA.main[mainBaseId]) {
+    syncMainJobState(mainBaseId, 1, mainBaseId, true);
+    initializeJobEvolutionState({ silent: true });
+    const lineId = getJobDataById(mainBaseId)?.baseLineId;
+    state.player.equippedSkills = getUnlockedSkillIdsForLine(lineId).slice(0, 4);
   } else {
     state.player.equippedSkills = [null, null, null, null];
   }
