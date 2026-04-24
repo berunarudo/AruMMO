@@ -230,6 +230,21 @@ const OVERHEAL_DEFENSE_BUFF_PREFIX = "overheal_defense_stack";
 const OVERHEAL_DEFENSE_STACK_LIMIT = 6;
 const OVERHEAL_DEFENSE_STACK_MULTIPLIER = 1.03;
 const OVERHEAL_DEFENSE_DURATION_MS = 15000;
+const NINJA_DEBUFF_ATTACK_BUFF_PREFIX = "ninja_debuff_attack_stack";
+const NINJA_DEBUFF_ATTACK_STACK_LIMIT = 6;
+const NINJA_DEBUFF_ATTACK_STACK_MULTIPLIER = 1.02;
+const NINJA_DEBUFF_ATTACK_DURATION_MS = 15000;
+const NINJA_TITLE_TOOL_MASTER_BUFF_PREFIX = "ninja_title_tool_master_stack";
+const NINJA_TITLE_TOOL_MASTER_STACK_LIMIT = 3;
+const NINJA_TITLE_TOOL_MASTER_STACK_MULTIPLIER = 1.03;
+const NINJA_TITLE_MERCILESS_BUFF_PREFIX = "ninja_title_merciless_stack";
+const NINJA_TITLE_MERCILESS_STACK_LIMIT = 3;
+const NINJA_TITLE_MERCILESS_STACK_MULTIPLIER = 1.02;
+const NINJA_TITLE_DEBUFF_STACK_DURATION_MS = 15000;
+const MAGE_ATTACK_MP_RECOVERY_RATIO = 0.015;
+const MAGE_ATTACK_MP_RECOVERY_FLAT = 2;
+const SWORDSMAN_BUFF_HEAL_RATIO = 0.012;
+const SWORDSMAN_BUFF_HEAL_FLAT = 6;
 
 function normalizeSkillData() {
   Object.keys(SKILL_DATA).forEach((jobId) => {
@@ -2478,6 +2493,197 @@ Object.assign(TITLE_CHECKERS, {
   }
 });
 
+const PHASE15_TITLE_EXPANSION_CHEAT = [
+  {
+    id: "basic_master",
+    name: "基本の達人",
+    category: "cheat",
+    description: "草原連勝で基礎を極めた者",
+    conditionDescription: "草原で100連勝",
+    effectDescription: "スキルダメージがまあまあ上昇",
+    effect: { skillDamageMultiplier: 0.12 },
+    trigger: ["afterBattle"],
+    customCheckerId: "basic_master",
+    tier: "epic",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "basic_god",
+    name: "基本の神",
+    category: "cheat",
+    description: "草原連勝を神域まで積み上げた者",
+    conditionDescription: "草原で1000連勝",
+    effectDescription: "スキルダメージが結構上昇",
+    effect: { skillDamageMultiplier: 0.24 },
+    trigger: ["afterBattle"],
+    customCheckerId: "basic_god",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "single_blade_master",
+    name: "一刀流の達人",
+    category: "cheat",
+    description: "一刀運用でボスを斬り伏せた剣士",
+    conditionDescription: "剣士系で武器1枠のみ装備してボス撃破",
+    effectDescription: "剣士系スキルダメージ上昇",
+    effect: { swordsmanSkillDamageMultiplier: 0.18 },
+    trigger: ["afterFieldBossClear"],
+    customCheckerId: "single_blade_master",
+    tier: "epic",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "dual_cast",
+    name: "二重詠唱",
+    category: "cheat",
+    description: "二本運用で詠唱を重ねた魔術師",
+    conditionDescription: "魔術師系で武器2枠装備してボス撃破",
+    effectDescription: "魔術スキルダメージ上昇",
+    effect: { mageSkillDamageMultiplier: 0.2 },
+    trigger: ["afterFieldBossClear"],
+    customCheckerId: "dual_cast",
+    tier: "epic",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "tool_master",
+    name: "道具の達人",
+    category: "cheat",
+    description: "武器なしで弱体を積み重ねる忍",
+    conditionDescription: "忍者系で武器なしデバフ付与100回",
+    effectDescription: "デバフ付与時に与ダメ上昇(3% x 3)",
+    effect: {},
+    trigger: ["afterBattle", "afterKill"],
+    customCheckerId: "tool_master",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "stealth_master",
+    name: "隠密の達人",
+    category: "cheat",
+    description: "無手でボスを落とした隠密",
+    conditionDescription: "忍者系で武器なしボス撃破",
+    effectDescription: "回避率+25%",
+    effect: { evadeByRegion: { grassland: 0.25, desert: 0.25, sea: 0.25, volcano: 0.25, final: 0.25 } },
+    trigger: ["afterFieldBossClear"],
+    customCheckerId: "stealth_master",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "nonstealth_ninja",
+    name: "忍ばない忍者",
+    category: "cheat",
+    description: "回避を捨てて殴り合いを選んだ忍",
+    conditionDescription: "忍者系で回避10%以下の状態でボス敗北",
+    effectDescription: "回避10%以下時 被ダメ軽減 + 与ダメ上昇",
+    effect: { ninjaLowEvasionConditional: { threshold: 0.1, attackMultiplier: 0.12, damageReduction: 0.1 } },
+    trigger: ["afterDefeat"],
+    customCheckerId: "nonstealth_ninja",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "wannabe_ninja",
+    name: "忍びたい忍者",
+    category: "cheat",
+    description: "草原で何度も鍛え直した未熟な忍",
+    conditionDescription: "忍者系で1-1に100回敗北",
+    effectDescription: "回避率+15%",
+    effect: { evadeByRegion: { grassland: 0.15, desert: 0.15, sea: 0.15, volcano: 0.15, final: 0.15 } },
+    trigger: ["afterDefeat"],
+    customCheckerId: "wannabe_ninja",
+    tier: "epic",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "merciless_ninja",
+    name: "容赦ない忍者",
+    category: "cheat",
+    description: "草原で弱体を刻み続けた忍",
+    conditionDescription: "忍者系で草原デバフ付与100回",
+    effectDescription: "デバフ付与時に与ダメ上昇(2% x 3)",
+    effect: {},
+    trigger: ["afterBattle", "afterKill"],
+    customCheckerId: "merciless_ninja",
+    tier: "epic",
+    canCarryOver: true,
+    carryOverType: "direct"
+  }
+];
+
+const PHASE15_TITLE_EXPANSION_NORMAL = [
+  {
+    id: "physical_cleric",
+    name: "物理型僧侶",
+    category: "normal",
+    description: "祈らず殴る僧侶の流派",
+    conditionDescription: "僧侶系でスキル未セットのまま100体撃破",
+    effectDescription: "僧侶の非回復スキルダメージ上昇",
+    effect: { priestNonHealSkillDamageMultiplier: 0.08 },
+    trigger: ["afterKill", "afterBattle"],
+    customCheckerId: "physical_cleric",
+    tier: "rare",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "cold_priest",
+    name: "冷徹な僧侶",
+    category: "normal",
+    description: "癒しを捨てた実戦派僧侶",
+    conditionDescription: "僧侶系で回復スキル未装備で50勝",
+    effectDescription: "攻撃スキルダメージ上昇",
+    effect: { priestOffensiveSkillDamageMultiplier: 0.06 },
+    trigger: ["afterBattle", "afterKill"],
+    customCheckerId: "cold_priest",
+    tier: "rare",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "radical_priest",
+    name: "過激な僧侶",
+    category: "normal",
+    description: "攻撃術だけで進軍する僧侶",
+    conditionDescription: "僧侶系で攻撃スキルのみ装備で50勝",
+    effectDescription: "攻撃スキルダメージ上昇",
+    effect: { priestOffensiveSkillDamageMultiplier: 0.08 },
+    trigger: ["afterBattle", "afterKill"],
+    customCheckerId: "radical_priest",
+    tier: "epic",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  }
+];
+
+TITLE_DATA.push(...PHASE15_TITLE_EXPANSION_CHEAT, ...PHASE15_TITLE_EXPANSION_NORMAL);
+
+Object.assign(TITLE_CHECKERS, {
+  basic_master: () => (state.stats.grasslandWinStreakBest || 0) >= 100,
+  basic_god: () => (state.stats.grasslandWinStreakBest || 0) >= 1000,
+  single_blade_master: () => (state.stats.swordsmanSingleWeaponBossKillCount || 0) >= 1,
+  dual_cast: () => (state.stats.mageDualWeaponBossKillCount || 0) >= 1,
+  tool_master: () => (state.stats.ninjaNoWeaponDebuffApplyCount || 0) >= 100,
+  stealth_master: () => (state.stats.ninjaNoWeaponBossKillCount || 0) >= 1,
+  nonstealth_ninja: () => (state.stats.ninjaLowEvasionBossDefeatCount || 0) >= 1,
+  wannabe_ninja: () => (state.stats.ninjaStage11DefeatCount || 0) >= 100,
+  merciless_ninja: () => (state.stats.ninjaGrasslandDebuffApplyCount || 0) >= 100,
+  physical_cleric: () => (state.stats.priestNoSkillKillCount || 0) >= 100,
+  cold_priest: () => (state.stats.priestNoHealWinCount || 0) >= 50,
+  radical_priest: () => (state.stats.priestOnlyOffenseWinCount || 0) >= 50
+});
+
 function applyPhase10TitleBalance() {
   const patch = (id, effectPatch) => {
     const title = TITLE_DATA.find((t) => t.id === id);
@@ -3191,7 +3397,19 @@ const state = {
     uniqueNoRetreatResolveCount: 0,
     uniqueRetreatCount: 0,
     noReturnExpeditionActive: true,
-    noReturnRegionClears: {}
+    noReturnRegionClears: {},
+    grasslandWinStreakCurrent: 0,
+    grasslandWinStreakBest: 0,
+    swordsmanSingleWeaponBossKillCount: 0,
+    mageDualWeaponBossKillCount: 0,
+    ninjaNoWeaponDebuffApplyCount: 0,
+    ninjaGrasslandDebuffApplyCount: 0,
+    ninjaNoWeaponBossKillCount: 0,
+    ninjaLowEvasionBossDefeatCount: 0,
+    ninjaStage11DefeatCount: 0,
+    priestNoSkillKillCount: 0,
+    priestNoHealWinCount: 0,
+    priestOnlyOffenseWinCount: 0
   },
   guild: {
     rank: "D",
@@ -3411,6 +3629,12 @@ function createDefaultTitleEffects() {
     perEquippedAttackDefenseBonus: 0,
     perEquippedAttackDefenseBonusCap: 0.2,
     noReturnCombatBonus: null,
+    skillDamageMultiplier: 0,
+    swordsmanSkillDamageMultiplier: 0,
+    mageSkillDamageMultiplier: 0,
+    priestNonHealSkillDamageMultiplier: 0,
+    priestOffensiveSkillDamageMultiplier: 0,
+    ninjaLowEvasionConditional: null,
     evadeByRegion: {},
     firstBattleDamageReduction: 0,
     lowHpDefenseMultiplier: 0,
@@ -4631,6 +4855,7 @@ function playerAction() {
   const damage = isCrit ? Math.floor(base * critMul) : base;
   state.runtime.lastHitMeta = { source: "normal", isCrit };
   applyDamage("player", damage, isCrit ? "会心の一撃" : "通常攻撃", isCrit);
+  recoverMpFromMageAttack("魔術師特性");
 }
 
 function enemyAction() {
@@ -4714,6 +4939,7 @@ function useSkill(skill) {
   if (skill.type === "attack" || skill.type === "magicAttack") {
     state.runtime.lastHitMeta = { source: "skill", skillType: skill.type, skillId: skill.id, isCrit: false };
     applyDamage("player", calculateSkillDamage(skill), skillName);
+    recoverMpFromMageAttack(skillName);
     return;
   }
   if (skill.type === "multiAttack") {
@@ -4725,6 +4951,7 @@ function useSkill(skill) {
       }
       applyDamage("player", Math.max(1, Math.floor(calculateSkillDamage(skill))), `${skillName} ${i + 1}Hit`);
     }
+    recoverMpFromMageAttack(skillName);
     return;
   }
   if (skill.type === "heal") {
@@ -4745,17 +4972,25 @@ function useSkill(skill) {
     }
     applyEffect("player", skill.id, { ...skill.effect, sourceSkillId: skill.id, displayNameJa: skillName, kind: "buff" });
     addLog(`バフ発動: ${skillName}`);
+    recoverHpFromSwordsmanBuff(skillName);
     return;
   }
   if (skill.type === "debuff") {
     applyEffect("enemy", skill.id, { ...skill.effect, sourceSkillId: skill.id, displayNameJa: skillName, kind: "debuff" });
     addLog(`デバフ付与: ${skillName}`);
+    recordNinjaDebuffApply();
+    addNinjaDebuffAttackStack();
+    addNinjaTitleDebuffStacks();
     return;
   }
   if (skill.type === "attackDebuff") {
     state.runtime.lastHitMeta = { source: "skill", skillType: skill.type, skillId: skill.id, isCrit: false };
     applyDamage("player", calculateSkillDamage(skill), skillName);
     applyEffect("enemy", skill.id, { ...skill.effect, sourceSkillId: skill.id, displayNameJa: skillName, kind: "debuff" });
+    recoverMpFromMageAttack(skillName);
+    recordNinjaDebuffApply();
+    addNinjaDebuffAttackStack();
+    addNinjaTitleDebuffStacks();
   }
 }
 
@@ -4827,6 +5062,12 @@ function handleEnemyDefeated() {
   state.stats.totalKills += 1;
   state.stats.enemyKillCounts[enemy.id] = (state.stats.enemyKillCounts[enemy.id] || 0) + 1;
   state.stats.winsByRegion[stage.mapId] = (state.stats.winsByRegion[stage.mapId] || 0) + 1;
+  if (mapId === "grassland") {
+    state.stats.grasslandWinStreakCurrent = (state.stats.grasslandWinStreakCurrent || 0) + 1;
+    state.stats.grasslandWinStreakBest = Math.max(state.stats.grasslandWinStreakBest || 0, state.stats.grasslandWinStreakCurrent);
+  } else {
+    state.stats.grasslandWinStreakCurrent = 0;
+  }
   state.battle.stageKillCount += 1;
   const prog = getStageProgress(stage.id);
   prog.kills = state.battle.stageKillCount;
@@ -4864,6 +5105,21 @@ function handleEnemyDefeated() {
   }
   if (mapId === "volcano" && state.battle.gimmick?.extra?.playerBurnedThisBattle) {
     state.stats.volcanoBurnWinCount = (state.stats.volcanoBurnWinCount || 0) + 1;
+  }
+  if (getCurrentMainBattleLineId() === "priest_line") {
+    const equippedSkills = getEquippedSkills();
+    if (equippedSkills.length === 0) {
+      state.stats.priestNoSkillKillCount = (state.stats.priestNoSkillKillCount || 0) + 1;
+    }
+    if (equippedSkills.length > 0 && equippedSkills.every((skill) => skill.type !== "heal")) {
+      state.stats.priestNoHealWinCount = (state.stats.priestNoHealWinCount || 0) + 1;
+    }
+    if (
+      equippedSkills.length > 0 &&
+      equippedSkills.every((skill) => ["attack", "magicAttack", "multiAttack", "attackDebuff"].includes(skill.type))
+    ) {
+      state.stats.priestOnlyOffenseWinCount = (state.stats.priestOnlyOffenseWinCount || 0) + 1;
+    }
   }
   if (state.battle.isUniqueBattle) {
     handleUniqueVictory(enemy);
@@ -4978,6 +5234,17 @@ function handleFieldBossClear(stageId) {
   recordBossFirstTryResult(stageId, true);
   if (!state.player.equipmentSlots.weapon1 && !state.player.equipmentSlots.weapon2) {
     state.stats.noWeaponBossKills += 1;
+  }
+  const mainLineId = getCurrentMainBattleLineId();
+  const weaponCount = getEquippedWeaponCount();
+  if (mainLineId === "swordsman_line" && weaponCount === 1) {
+    state.stats.swordsmanSingleWeaponBossKillCount = (state.stats.swordsmanSingleWeaponBossKillCount || 0) + 1;
+  }
+  if (mainLineId === "mage_line" && weaponCount >= 2) {
+    state.stats.mageDualWeaponBossKillCount = (state.stats.mageDualWeaponBossKillCount || 0) + 1;
+  }
+  if (mainLineId === "ninja_line" && weaponCount === 0) {
+    state.stats.ninjaNoWeaponBossKillCount = (state.stats.ninjaNoWeaponBossKillCount || 0) + 1;
   }
   if (!state.player.subJobId) {
     state.stats.noSubJobBossKillCount += 1;
@@ -5096,6 +5363,8 @@ function handleDefeat() {
   }
 
   const defeatStageId = state.battle.stageId;
+  const mainLineId = getCurrentMainBattleLineId();
+  const effective = getEffectivePlayerStats();
   state.stats.totalDeaths += 1;
   if (wasUniqueBattle) {
     state.stats.uniqueNoRetreatResolveCount = (state.stats.uniqueNoRetreatResolveCount || 0) + 1;
@@ -5104,7 +5373,14 @@ function handleDefeat() {
     state.stats.defeatsByStage = state.stats.defeatsByStage || {};
     state.stats.defeatsByStage[defeatStageId] = (state.stats.defeatsByStage[defeatStageId] || 0) + 1;
   }
+  if (mainLineId === "ninja_line" && stage?.isFieldBossStage && (effective.evasion || 0) <= 0.1) {
+    state.stats.ninjaLowEvasionBossDefeatCount = (state.stats.ninjaLowEvasionBossDefeatCount || 0) + 1;
+  }
+  if (mainLineId === "ninja_line" && defeatStageId === "1-1") {
+    state.stats.ninjaStage11DefeatCount = (state.stats.ninjaStage11DefeatCount || 0) + 1;
+  }
   state.stats.currentWinStreak = 0;
+  state.stats.grasslandWinStreakCurrent = 0;
   state.stats.noReturnExpeditionActive = false;
   state.stats.noReturnRegionClears = {};
   state.titleRuntime.reviveBuffPending = true;
@@ -6244,6 +6520,21 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.skillPowerIfSkillSlotOpen === "number") {
     target.skillPowerIfSkillSlotOpen += effect.skillPowerIfSkillSlotOpen;
   }
+  if (typeof effect.skillDamageMultiplier === "number") {
+    target.skillDamageMultiplier += effect.skillDamageMultiplier;
+  }
+  if (typeof effect.swordsmanSkillDamageMultiplier === "number") {
+    target.swordsmanSkillDamageMultiplier += effect.swordsmanSkillDamageMultiplier;
+  }
+  if (typeof effect.mageSkillDamageMultiplier === "number") {
+    target.mageSkillDamageMultiplier += effect.mageSkillDamageMultiplier;
+  }
+  if (typeof effect.priestNonHealSkillDamageMultiplier === "number") {
+    target.priestNonHealSkillDamageMultiplier += effect.priestNonHealSkillDamageMultiplier;
+  }
+  if (typeof effect.priestOffensiveSkillDamageMultiplier === "number") {
+    target.priestOffensiveSkillDamageMultiplier += effect.priestOffensiveSkillDamageMultiplier;
+  }
   if (typeof effect.skillCooldownRecoveryIfSkillSlotOpen === "number") {
     target.skillCooldownRecoveryIfSkillSlotOpen += effect.skillCooldownRecoveryIfSkillSlotOpen;
   }
@@ -6298,6 +6589,13 @@ function mergeTitleEffect(target, effect) {
       hpThreshold: Math.max(target.lowHpConditionalCombat?.hpThreshold || 0, effect.lowHpConditionalCombat.hpThreshold || 0),
       attackMultiplier: (target.lowHpConditionalCombat?.attackMultiplier || 0) + (effect.lowHpConditionalCombat.attackMultiplier || 0),
       damageReduction: (target.lowHpConditionalCombat?.damageReduction || 0) + (effect.lowHpConditionalCombat.damageReduction || 0)
+    };
+  }
+  if (effect.ninjaLowEvasionConditional) {
+    target.ninjaLowEvasionConditional = {
+      threshold: Math.max(target.ninjaLowEvasionConditional?.threshold || 0, effect.ninjaLowEvasionConditional.threshold || 0),
+      attackMultiplier: (target.ninjaLowEvasionConditional?.attackMultiplier || 0) + (effect.ninjaLowEvasionConditional.attackMultiplier || 0),
+      damageReduction: (target.ninjaLowEvasionConditional?.damageReduction || 0) + (effect.ninjaLowEvasionConditional.damageReduction || 0)
     };
   }
   if (effect.statusResistByType) {
@@ -7048,6 +7346,14 @@ function getEffectivePlayerStats() {
       stats.attack *= 1 + (cond.attackMultiplier || 0);
     }
   }
+  if (state.titleEffects.ninjaLowEvasionConditional && getCurrentMainBattleLineId() === "ninja_line") {
+    const cond = state.titleEffects.ninjaLowEvasionConditional;
+    const threshold = Number(cond.threshold || 0.1);
+    if (stats.evasion <= threshold) {
+      stats.attack *= 1 + Number(cond.attackMultiplier || 0);
+      extraDamageReductionMultiplier *= 1 - Number(cond.damageReduction || 0);
+    }
+  }
   if (state.titleEffects.burnConditionalAttackMultiplier > 0 && state.battle.isActive && state.battle.gimmick?.extra?.playerBurnedThisBattle) {
     stats.attack *= 1 + state.titleEffects.burnConditionalAttackMultiplier;
   }
@@ -7232,6 +7538,137 @@ function applyEffect(target, fromSkillId, effectData) {
 function removeExpiredEffects() {
   const now = Date.now();
   state.activeEffects = state.activeEffects.filter((effect) => effect.expiresAt > now);
+}
+
+function getCurrentMainBattleLineId() {
+  const mainData = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId);
+  return mainData?.baseLineId || null;
+}
+
+function getEquippedWeaponCount() {
+  let count = 0;
+  if (state.player.equipmentSlots?.weapon1) count += 1;
+  if (state.player.equipmentSlots?.weapon2) count += 1;
+  return count;
+}
+
+function recordNinjaDebuffApply() {
+  if (getCurrentMainBattleLineId() !== "ninja_line") {
+    return;
+  }
+  if (getEquippedWeaponCount() === 0) {
+    state.stats.ninjaNoWeaponDebuffApplyCount = (state.stats.ninjaNoWeaponDebuffApplyCount || 0) + 1;
+  }
+  const regionId = getCurrentCombatRegionId();
+  if (regionId === "grassland") {
+    state.stats.ninjaGrasslandDebuffApplyCount = (state.stats.ninjaGrasslandDebuffApplyCount || 0) + 1;
+  }
+}
+
+function recoverMpFromMageAttack(sourceName = "魔術師特性") {
+  if (!state.battle.isActive || getCurrentMainBattleLineId() !== "mage_line") {
+    return;
+  }
+  const effective = getEffectivePlayerStats();
+  const recover = Math.max(1, Math.floor(effective.maxMp * MAGE_ATTACK_MP_RECOVERY_RATIO + MAGE_ATTACK_MP_RECOVERY_FLAT));
+  const before = state.battle.playerCurrentMp;
+  const after = Math.min(effective.maxMp, before + recover);
+  const gained = Math.max(0, after - before);
+  if (gained <= 0) {
+    return;
+  }
+  state.battle.playerCurrentMp = after;
+  state.player.mp = after;
+  addLog(`${sourceName}: MP +${gained}`);
+}
+
+function recoverHpFromSwordsmanBuff(sourceName = "剣士特性") {
+  if (!state.battle.isActive || getCurrentMainBattleLineId() !== "swordsman_line") {
+    return;
+  }
+  const effective = getEffectivePlayerStats();
+  const heal = Math.max(1, Math.floor(effective.maxHp * SWORDSMAN_BUFF_HEAL_RATIO + SWORDSMAN_BUFF_HEAL_FLAT));
+  const result = applyHealing(heal, sourceName, false);
+  if (result.actualHeal > 0) {
+    addLog(`剣士特性: HP +${result.actualHeal}`);
+  }
+}
+
+function addNinjaDebuffAttackStack() {
+  if (!state.battle.isActive || getCurrentMainBattleLineId() !== "ninja_line") {
+    return;
+  }
+  removeExpiredEffects();
+  const now = Date.now();
+  const activeStacks = state.activeEffects
+    .filter((effect) => effect.target === "player" && typeof effect.fromSkillId === "string" && effect.fromSkillId.startsWith(NINJA_DEBUFF_ATTACK_BUFF_PREFIX))
+    .sort((a, b) => a.expiresAt - b.expiresAt);
+  if (activeStacks.length >= NINJA_DEBUFF_ATTACK_STACK_LIMIT) {
+    const removeCount = activeStacks.length - NINJA_DEBUFF_ATTACK_STACK_LIMIT + 1;
+    const removeSet = new Set(activeStacks.slice(0, removeCount));
+    state.activeEffects = state.activeEffects.filter((effect) => !removeSet.has(effect));
+  }
+  state.activeEffects.push({
+    target: "player",
+    fromSkillId: `${NINJA_DEBUFF_ATTACK_BUFF_PREFIX}_${now}_${Math.floor(Math.random() * 100000)}`,
+    sourceSkillId: "ninja_debuff_attack",
+    displayNameJa: "忍術追撃",
+    kind: "buff",
+    stat: "attack",
+    multiplier: NINJA_DEBUFF_ATTACK_STACK_MULTIPLIER,
+    expiresAt: now + NINJA_DEBUFF_ATTACK_DURATION_MS
+  });
+  const stackCount = state.activeEffects.filter((effect) => effect.target === "player" && typeof effect.fromSkillId === "string" && effect.fromSkillId.startsWith(NINJA_DEBUFF_ATTACK_BUFF_PREFIX)).length;
+  addLog(`忍者特性: 与ダメ強化 ${stackCount}/${NINJA_DEBUFF_ATTACK_STACK_LIMIT}`);
+}
+
+function addNinjaDebuffTitleStack(prefix, limit, multiplier, sourceSkillId, displayName) {
+  removeExpiredEffects();
+  const now = Date.now();
+  const activeStacks = state.activeEffects
+    .filter((effect) => effect.target === "player" && typeof effect.fromSkillId === "string" && effect.fromSkillId.startsWith(prefix))
+    .sort((a, b) => a.expiresAt - b.expiresAt);
+  if (activeStacks.length >= limit) {
+    const removeCount = activeStacks.length - limit + 1;
+    const removeSet = new Set(activeStacks.slice(0, removeCount));
+    state.activeEffects = state.activeEffects.filter((effect) => !removeSet.has(effect));
+  }
+  state.activeEffects.push({
+    target: "player",
+    fromSkillId: `${prefix}_${now}_${Math.floor(Math.random() * 100000)}`,
+    sourceSkillId,
+    displayNameJa: displayName,
+    kind: "buff",
+    stat: "attack",
+    multiplier,
+    expiresAt: now + NINJA_TITLE_DEBUFF_STACK_DURATION_MS
+  });
+  const stackCount = state.activeEffects.filter((effect) => effect.target === "player" && typeof effect.fromSkillId === "string" && effect.fromSkillId.startsWith(prefix)).length;
+  addLog(`${displayName}: 与ダメ強化 ${stackCount}/${limit}`);
+}
+
+function addNinjaTitleDebuffStacks() {
+  if (!state.battle.isActive || getCurrentMainBattleLineId() !== "ninja_line") {
+    return;
+  }
+  if ((state.activeTitles || []).includes("tool_master")) {
+    addNinjaDebuffTitleStack(
+      NINJA_TITLE_TOOL_MASTER_BUFF_PREFIX,
+      NINJA_TITLE_TOOL_MASTER_STACK_LIMIT,
+      NINJA_TITLE_TOOL_MASTER_STACK_MULTIPLIER,
+      "tool_master_stack",
+      "道具の達人"
+    );
+  }
+  if ((state.activeTitles || []).includes("merciless_ninja")) {
+    addNinjaDebuffTitleStack(
+      NINJA_TITLE_MERCILESS_BUFF_PREFIX,
+      NINJA_TITLE_MERCILESS_STACK_LIMIT,
+      NINJA_TITLE_MERCILESS_STACK_MULTIPLIER,
+      "merciless_ninja_stack",
+      "容赦ない忍者"
+    );
+  }
 }
 
 function addOverhealDefenseStack() {
@@ -7484,11 +7921,27 @@ function calculateSkillDamage(skill) {
   const equippedSkillCount = getEquippedSkills().length;
   const hasOpenSkillSlot = equippedSkillCount < 4;
   const slotOpenMul = hasOpenSkillSlot ? 1 + (state.titleEffects.skillPowerIfSkillSlotOpen || 0) : 1;
+  const mainLineId = getCurrentMainBattleLineId();
+  let skillMul = slotOpenMul * (1 + (state.titleEffects.skillDamageMultiplier || 0));
+  if (mainLineId === "swordsman_line") {
+    skillMul *= 1 + (state.titleEffects.swordsmanSkillDamageMultiplier || 0);
+  }
+  if (mainLineId === "mage_line" && skill.type === "magicAttack") {
+    skillMul *= 1 + (state.titleEffects.mageSkillDamageMultiplier || 0);
+  }
+  if (mainLineId === "priest_line") {
+    if (skill.type !== "heal") {
+      skillMul *= 1 + (state.titleEffects.priestNonHealSkillDamageMultiplier || 0);
+    }
+    if (["attack", "magicAttack", "multiAttack", "attackDebuff"].includes(skill.type)) {
+      skillMul *= 1 + (state.titleEffects.priestOffensiveSkillDamageMultiplier || 0);
+    }
+  }
   if (skill.type === "magicAttack") {
     const jobMul = getEffectivePlayerStats().magicPowerMultiplier || 1;
-    return Math.max(1, Math.floor((getEffectivePlayerStat("intelligence") * skill.power + state.player.level - enemyDef * 0.35) * jobMul * slotOpenMul));
+    return Math.max(1, Math.floor((getEffectivePlayerStat("intelligence") * skill.power + state.player.level - enemyDef * 0.35) * jobMul * skillMul));
   }
-  return Math.max(1, Math.floor((getEffectivePlayerStat("attack") * skill.power - enemyDef * 0.6) * slotOpenMul));
+  return Math.max(1, Math.floor((getEffectivePlayerStat("attack") * skill.power - enemyDef * 0.6) * skillMul));
 }
 
 function renderBattleView() {
@@ -9979,6 +10432,18 @@ function applyLoadedState(payload) {
   if (typeof state.stats.bossKillWithEmptySkillSlots !== "number") state.stats.bossKillWithEmptySkillSlots = 0;
   if (typeof state.stats.uniqueNoRetreatResolveCount !== "number") state.stats.uniqueNoRetreatResolveCount = 0;
   if (typeof state.stats.uniqueRetreatCount !== "number") state.stats.uniqueRetreatCount = 0;
+  if (typeof state.stats.grasslandWinStreakCurrent !== "number") state.stats.grasslandWinStreakCurrent = 0;
+  if (typeof state.stats.grasslandWinStreakBest !== "number") state.stats.grasslandWinStreakBest = 0;
+  if (typeof state.stats.swordsmanSingleWeaponBossKillCount !== "number") state.stats.swordsmanSingleWeaponBossKillCount = 0;
+  if (typeof state.stats.mageDualWeaponBossKillCount !== "number") state.stats.mageDualWeaponBossKillCount = 0;
+  if (typeof state.stats.ninjaNoWeaponDebuffApplyCount !== "number") state.stats.ninjaNoWeaponDebuffApplyCount = 0;
+  if (typeof state.stats.ninjaGrasslandDebuffApplyCount !== "number") state.stats.ninjaGrasslandDebuffApplyCount = 0;
+  if (typeof state.stats.ninjaNoWeaponBossKillCount !== "number") state.stats.ninjaNoWeaponBossKillCount = 0;
+  if (typeof state.stats.ninjaLowEvasionBossDefeatCount !== "number") state.stats.ninjaLowEvasionBossDefeatCount = 0;
+  if (typeof state.stats.ninjaStage11DefeatCount !== "number") state.stats.ninjaStage11DefeatCount = 0;
+  if (typeof state.stats.priestNoSkillKillCount !== "number") state.stats.priestNoSkillKillCount = 0;
+  if (typeof state.stats.priestNoHealWinCount !== "number") state.stats.priestNoHealWinCount = 0;
+  if (typeof state.stats.priestOnlyOffenseWinCount !== "number") state.stats.priestOnlyOffenseWinCount = 0;
   state.jobEvolutionFlags = { ...state.jobEvolutionFlags, ...(run.jobEvolutionFlags || {}) };
   state.unlockedSkills = { ...state.unlockedSkills, ...(run.unlockedSkills || {}) };
   state.stats.defeatsByStage = state.stats.defeatsByStage || {};
@@ -11612,6 +12077,18 @@ function resetForNewLoop() {
   state.stats.uniqueRetreatCount = 0;
   state.stats.noReturnExpeditionActive = true;
   state.stats.noReturnRegionClears = {};
+  state.stats.grasslandWinStreakCurrent = 0;
+  state.stats.grasslandWinStreakBest = 0;
+  state.stats.swordsmanSingleWeaponBossKillCount = 0;
+  state.stats.mageDualWeaponBossKillCount = 0;
+  state.stats.ninjaNoWeaponDebuffApplyCount = 0;
+  state.stats.ninjaGrasslandDebuffApplyCount = 0;
+  state.stats.ninjaNoWeaponBossKillCount = 0;
+  state.stats.ninjaLowEvasionBossDefeatCount = 0;
+  state.stats.ninjaStage11DefeatCount = 0;
+  state.stats.priestNoSkillKillCount = 0;
+  state.stats.priestNoHealWinCount = 0;
+  state.stats.priestOnlyOffenseWinCount = 0;
 
   if (!state.loop.carryUniqueRecords) {
     state.uniqueDefeatedIds = [];
