@@ -7949,6 +7949,9 @@ function renderBattleView() {
   const enemy = state.battle.enemy;
   const stats = getEffectivePlayerStats();
   const classes = `${state.battle.isFieldBossBattle ? "boss-encounter" : ""} ${state.battle.isUniqueBattle ? "unique-encounter" : ""}`;
+  const mapId = stage?.mapId || state.currentMap || "grassland";
+  const effectiveEvasion = Math.max(0, stats.evasion + (state.titleEffects.evadeByRegion?.[mapId] || 0));
+  const effectiveCritRate = Math.max(0, stats.critRate);
 
   return `
     <div class="main-header">
@@ -7970,7 +7973,7 @@ function renderBattleView() {
         <div class="bar hp-bar"><div style="width:${toPercent(state.battle.playerCurrentHp, stats.maxHp)}%"></div></div>
         <p class="tiny">MP ${Math.floor(state.battle.playerCurrentMp)} / ${Math.floor(stats.maxMp)}</p>
         <div class="bar mp-bar"><div style="width:${toPercent(state.battle.playerCurrentMp, stats.maxMp)}%"></div></div>
-        <p class="tiny">回避 ${(stats.evasion * 100).toFixed(1)}% / 会心 ${(stats.critRate * 100).toFixed(1)}%</p>
+        <p class="tiny">実効回避 ${(effectiveEvasion * 100).toFixed(1)}% / 実効会心 ${(effectiveCritRate * 100).toFixed(1)}%</p>
       </section>
       <section class="card battle-actor enemy-side ${classes}">
         <h4>${escapeHtml(enemy ? enemy.name : "敵を探索中...")}</h4>
@@ -9685,13 +9688,40 @@ function renderStatusView(container) {
     </div>
     ${
       state.statusSubTab === "profile"
-        ? `<div class="info-grid">${rows.map(([label, value]) => `<div class="card"><h4>${escapeHtml(label)}</h4><p>${escapeHtml(value)}</p></div>`).join("")}</div>`
+        ? `<div class="info-grid">${rows.map(([label, value]) => `<div class="card"><h4>${escapeHtml(label)}</h4><p>${escapeHtml(value)}</p></div>`).join("")}</div>${renderActiveTitleEffectsSummary()}`
         : state.statusSubTab === "titles"
         ? renderTitleCatalogLayout()
         : state.statusSubTab === "equipment"
           ? renderEquipmentLayout()
           : renderSkillSetupView()
     }
+  `;
+}
+
+function renderActiveTitleEffectsSummary() {
+  const equippedIds = getCombinedEquippedTitleIds();
+  if (!equippedIds.length) {
+    return `
+      <div class="card" style="margin-top:10px;">
+        <h4>装備中称号の効果</h4>
+        <p class="tiny">現在、称号は装備されていません。</p>
+      </div>
+    `;
+  }
+  const rows = equippedIds
+    .map((id) => getTitleById(id))
+    .filter(Boolean)
+    .map((title) => {
+      const cat = title.category === "cheat" ? "チート" : "ノーマル";
+      const desc = title.effectDescription || "効果説明なし";
+      return `<p class="tiny"><strong>[${escapeHtml(cat)}] ${escapeHtml(title.name)}</strong>: ${escapeHtml(desc)}</p>`;
+    })
+    .join("");
+  return `
+    <div class="card" style="margin-top:10px;">
+      <h4>装備中称号の効果</h4>
+      ${rows}
+    </div>
   `;
 }
 
