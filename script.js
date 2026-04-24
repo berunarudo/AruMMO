@@ -906,6 +906,83 @@ const MAP_DATA = {
   }
 };
 
+const REGION_BOSS_TITLE_SLOT_REWARD_DATA = {
+  grassland: { stageId: "1-10", bossId: "behemothBison", label: "草原突破", reward: { normal: 1, cheat: 1 } },
+  desert: { stageId: "2-10", bossId: "duneHydra", label: "砂漠突破", reward: { normal: 1, cheat: 1 } },
+  sea: { stageId: "3-10", bossId: "leviathan", label: "海域突破", reward: { normal: 1, cheat: 1 } },
+  volcano: { stageId: "4-10", bossId: "volkazard", label: "火山突破", reward: { normal: 1, cheat: 1 } }
+};
+
+function createDefaultRegionBossSlotRewardState() {
+  const base = {};
+  Object.keys(REGION_BOSS_TITLE_SLOT_REWARD_DATA).forEach((regionId) => {
+    base[regionId] = false;
+  });
+  return base;
+}
+
+function normalizeRegionBossSlotRewardState(source) {
+  const normalized = createDefaultRegionBossSlotRewardState();
+  if (!source || typeof source !== "object") {
+    return normalized;
+  }
+  Object.keys(normalized).forEach((regionId) => {
+    normalized[regionId] = !!source[regionId];
+  });
+  return normalized;
+}
+
+function inferRegionBossSlotRewardsFromFieldBossCleared(fieldBossCleared) {
+  const inferred = createDefaultRegionBossSlotRewardState();
+  if (!Array.isArray(fieldBossCleared)) {
+    return inferred;
+  }
+  Object.entries(REGION_BOSS_TITLE_SLOT_REWARD_DATA).forEach(([regionId, row]) => {
+    if (row?.stageId && fieldBossCleared.includes(row.stageId)) {
+      inferred[regionId] = true;
+    }
+  });
+  return inferred;
+}
+
+function hasClaimedBossTitleSlotReward(regionId) {
+  const normalized = normalizeRegionBossSlotRewardState(state.clearedRegionBossSlotRewards);
+  state.clearedRegionBossSlotRewards = normalized;
+  return !!normalized[regionId];
+}
+
+function getBossClearTitleSlotBonus() {
+  const normalized = normalizeRegionBossSlotRewardState(state.clearedRegionBossSlotRewards);
+  state.clearedRegionBossSlotRewards = normalized;
+  const bonus = { normal: 0, cheat: 0 };
+  Object.entries(REGION_BOSS_TITLE_SLOT_REWARD_DATA).forEach(([regionId, row]) => {
+    if (!normalized[regionId]) {
+      return;
+    }
+    bonus.normal += Number(row?.reward?.normal || 0);
+    bonus.cheat += Number(row?.reward?.cheat || 0);
+  });
+  return bonus;
+}
+
+function claimBossTitleSlotReward(regionId) {
+  const row = REGION_BOSS_TITLE_SLOT_REWARD_DATA[regionId];
+  if (!row) {
+    return null;
+  }
+  if (hasClaimedBossTitleSlotReward(regionId)) {
+    return null;
+  }
+  state.clearedRegionBossSlotRewards = normalizeRegionBossSlotRewardState(state.clearedRegionBossSlotRewards);
+  state.clearedRegionBossSlotRewards[regionId] = true;
+  const reward = {
+    normal: Number(row?.reward?.normal || 0),
+    cheat: Number(row?.reward?.cheat || 0)
+  };
+  recalculateTitleEffects();
+  return { regionId, label: row.label || regionId, reward };
+}
+
 const SHOP_REGION_TABS = [
   { id: "grassland", label: "草原" },
   { id: "desert", label: "砂漠" },
@@ -3175,6 +3252,9 @@ const state = {
     normalCanUpgrade: true,
     cheatCanUpgrade: true
   },
+  clearedRegionBossSlotRewards: createDefaultRegionBossSlotRewardState(),
+  bossClearNormalTitleSlotBonus: 0,
+  bossClearCheatTitleSlotBonus: 0,
   titleEffects: createDefaultTitleEffects(),
   unlockedTowns: ["balladore"],
   clearedStages: [],
@@ -5282,6 +5362,12 @@ function handleFieldBossClear(stageId) {
     state.stats.lowHpBossKillCount = (state.stats.lowHpBossKillCount || 0) + 1;
   }
   addLog(`フィールドボス撃破: ${stageId}`);
+  const slotReward = stage?.mapId ? claimBossTitleSlotReward(stage.mapId) : null;
+  if (slotReward) {
+    addLog(`${slotReward.label}報酬！ ノーマル称号枠+${slotReward.reward.normal} / チート称号枠+${slotReward.reward.cheat}`);
+    addLog("称号ビルドの幅が広がった！");
+    showCenterPopup({ text: `${slotReward.label}: 称号枠+${slotReward.reward.normal}/+${slotReward.reward.cheat}`, type: "important" });
+  }
 
   recordBossFirstTryResult(stageId, true);
   if (!state.player.equipmentSlots.weapon1 && !state.player.equipmentSlots.weapon2) {
@@ -5892,10 +5978,13 @@ function syncLegacyActiveTitles() {
 
 function recalculateTitleSlotCaps() {
   const tier = getTitleSlotTierValue();
+  const bossClearBonus = getBossClearTitleSlotBonus();
   state.normalTitleTierBonus = getTitleTierBonusByCategory("normal", tier);
   state.cheatTitleTierBonus = getTitleTierBonusByCategory("cheat", tier);
-  state.maxNormalTitleSlots = Math.max(1, (state.baseNormalTitleSlots || 1) + state.normalTitleTierBonus);
-  state.maxCheatTitleSlots = Math.max(1, (state.baseCheatTitleSlots || 1) + state.cheatTitleTierBonus);
+  state.bossClearNormalTitleSlotBonus = bossClearBonus.normal;
+  state.bossClearCheatTitleSlotBonus = bossClearBonus.cheat;
+  state.maxNormalTitleSlots = Math.max(1, (state.baseNormalTitleSlots || 1) + state.bossClearNormalTitleSlotBonus + state.normalTitleTierBonus);
+  state.maxCheatTitleSlots = Math.max(1, (state.baseCheatTitleSlots || 1) + state.bossClearCheatTitleSlotBonus + state.cheatTitleTierBonus);
 }
 
 function normalizeEquippedTitleSlots(options = {}) {
@@ -5960,6 +6049,9 @@ function ensureTitleSlotState() {
   }
   if (typeof state.titleSlotUnlocks.normalBasePlus !== "number") state.titleSlotUnlocks.normalBasePlus = 0;
   if (typeof state.titleSlotUnlocks.cheatBasePlus !== "number") state.titleSlotUnlocks.cheatBasePlus = 0;
+  state.clearedRegionBossSlotRewards = normalizeRegionBossSlotRewardState(state.clearedRegionBossSlotRewards);
+  if (typeof state.bossClearNormalTitleSlotBonus !== "number") state.bossClearNormalTitleSlotBonus = 0;
+  if (typeof state.bossClearCheatTitleSlotBonus !== "number") state.bossClearCheatTitleSlotBonus = 0;
   if (state.activeTitles.length > 0) {
     rebuildEquippedTitleBucketsFromActiveTitles();
   } else if (state.equippedNormalTitleIds.length > 0 || state.equippedCheatTitleIds.length > 0) {
@@ -10067,10 +10159,20 @@ function renderTitleCatalog() {
         : "チートTier解放は最大";
   const normalLoopHint = state.titleSlotUnlocks.normalBaseUnlocked ? "周回で初期ノーマル+1解放済み" : "周回1で初期ノーマル+1";
   const cheatLoopHint = state.titleSlotUnlocks.cheatBaseUnlocked ? "周回で初期チート+1解放済み" : "周回3で初期チート+1";
+  const baseNormal = TITLE_SLOT_RULES.normal.baseDefault;
+  const baseCheat = TITLE_SLOT_RULES.cheat.baseDefault;
+  const loopNormal = Math.max(0, Number(state.titleSlotUnlocks?.normalBasePlus || 0));
+  const loopCheat = Math.max(0, Number(state.titleSlotUnlocks?.cheatBasePlus || 0));
+  const bossNormal = Math.max(0, Number(state.bossClearNormalTitleSlotBonus || 0));
+  const bossCheat = Math.max(0, Number(state.bossClearCheatTitleSlotBonus || 0));
+  const tierNormal = Math.max(0, Number(state.normalTitleTierBonus || 0));
+  const tierCheat = Math.max(0, Number(state.cheatTitleTierBonus || 0));
   return `
     <div class="card" style="margin-bottom:10px;">
       <p>ノーマル称号: <strong>${state.equippedNormalTitleIds.length}/${state.maxNormalTitleSlots}</strong></p>
       <p>チート称号: <strong>${state.equippedCheatTitleIds.length}/${state.maxCheatTitleSlots}</strong></p>
+      <p class="tiny">内訳(N): 初期${baseNormal} + 周回${loopNormal} + 地域突破${bossNormal} + Tier${tierNormal}</p>
+      <p class="tiny">内訳(C): 初期${baseCheat} + 周回${loopCheat} + 地域突破${bossCheat} + Tier${tierCheat}</p>
       <p class="tiny">ノーマル装備中: ${escapeHtml(normalEquippedNames || "なし")}</p>
       <p class="tiny">チート装備中: ${escapeHtml(cheatEquippedNames || "なし")}</p>
       <p class="tiny">解放条件: ${escapeHtml(normalTierHint)} / ${escapeHtml(cheatTierHint)}</p>
@@ -10509,7 +10611,8 @@ function splitRunAndPersistentState() {
     },
     titleSlotUpgrades: {
       normalBasePlus: state.titleSlotUnlocks?.normalBasePlus || 0,
-      cheatBasePlus: state.titleSlotUnlocks?.cheatBasePlus || 0
+      cheatBasePlus: state.titleSlotUnlocks?.cheatBasePlus || 0,
+      clearedRegionBossSlotRewards: deepCopyPlain(state.clearedRegionBossSlotRewards || createDefaultRegionBossSlotRewardState())
     },
     endings: {
       unlockedEndings: deepCopyPlain(state.unlockedEndings),
@@ -10672,6 +10775,10 @@ function applyLoadedState(payload) {
     normalBasePlus: Number(persistent.titleSlotUpgrades?.normalBasePlus ?? state.titleSlotUnlocks?.normalBasePlus ?? 0),
     cheatBasePlus: Number(persistent.titleSlotUpgrades?.cheatBasePlus ?? state.titleSlotUnlocks?.cheatBasePlus ?? 0)
   };
+  state.clearedRegionBossSlotRewards = normalizeRegionBossSlotRewardState(
+    persistent.titleSlotUpgrades?.clearedRegionBossSlotRewards ??
+      inferRegionBossSlotRewardsFromFieldBossCleared(state.fieldBossCleared)
+  );
   state.unlockedEndings = persistent.endings?.unlockedEndings || [];
   state.finalContentUnlocked = !!persistent.endings?.finalContentUnlocked;
   state.finalBossFlags = persistent.endings?.finalBossFlags || {};
