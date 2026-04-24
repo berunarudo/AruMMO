@@ -609,7 +609,8 @@ const EQUIPMENT_DATA = {
 
 const ITEM_DATA = {
   potion: { id: "potion", name: "ポーション", nameJa: "ポーション", category: "consumable", effectType: "heal_hp", healAmount: 30, cooldown: 5, description: "HPを少量回復。", descriptionJa: "HPを少量回復。", autoUsable: true, buyPrice: 18, sellPrice: 9 },
-  ether: { id: "ether", name: "エーテル", nameJa: "エーテル", category: "consumable", effectType: "heal_mp", healAmount: 0, cooldown: 7, description: "MPを少量回復。", descriptionJa: "MPを少量回復。", autoUsable: false, buyPrice: 28, sellPrice: 14 },
+  ether: { id: "ether", name: "エーテル", nameJa: "エーテル", category: "consumable", effectType: "heal_mp", healAmount: 0, cooldown: 7, description: "MPを少量回復。", descriptionJa: "MPを少量回復。", autoUsable: true, buyPrice: 28, sellPrice: 14 },
+  hiEther: { id: "hiEther", name: "ハイエーテル", nameJa: "ハイエーテル", category: "consumable", effectType: "heal_mp", healAmount: 0, cooldown: 10, description: "MPを中回復。", descriptionJa: "MPを中回復。", autoUsable: true, buyPrice: 72, sellPrice: 36 },
   hiPotion: { id: "hiPotion", name: "ハイポーション", nameJa: "ハイポーション", category: "consumable", effectType: "heal_hp", healAmount: 70, cooldown: 8, description: "HPを中回復。", descriptionJa: "HPを中回復。", autoUsable: true, buyPrice: 45, sellPrice: 22 },
   antidote: { id: "antidote", name: "毒消し", category: "consumable", description: "毒を治療。", buyPrice: 24, sellPrice: 12 },
   herb: { id: "herb", name: "薬草", category: "material", description: "回復薬素材。", buyPrice: 10, sellPrice: 5 },
@@ -631,7 +632,9 @@ const ITEM_DATA = {
 
 const SHOP_ITEM_IDS = [
   "potion",
+  "ether",
   "hiPotion",
+  "hiEther",
   "antidote",
   "herb",
   "woodSword",
@@ -1818,6 +1821,38 @@ const RECIPE_DATA = [
     description: "上位回復薬"
   },
   {
+    id: "rx_ether",
+    name: "エーテル",
+    productionType: "alchemy",
+    requiredStage: 1,
+    materials: [{ itemId: "herb", qty: 1 }, { itemId: "manaStone", qty: 1 }],
+    goldCost: 24,
+    resultItemId: "ether",
+    baseSuccessRate: 0.84,
+    greatSuccessRate: 0.08,
+    highQualityRate: 0.08,
+    godQualityRate: 0.005,
+    expGain: 15,
+    tags: ["ether"],
+    description: "MP回復薬"
+  },
+  {
+    id: "rx_hi_ether",
+    name: "ハイエーテル",
+    productionType: "alchemy",
+    requiredStage: 2,
+    materials: [{ itemId: "fineHerb", qty: 1 }, { itemId: "manaStone", qty: 2 }, { itemId: "crystalShard", qty: 1 }],
+    goldCost: 54,
+    resultItemId: "hiEther",
+    baseSuccessRate: 0.78,
+    greatSuccessRate: 0.1,
+    highQualityRate: 0.1,
+    godQualityRate: 0.01,
+    expGain: 30,
+    tags: ["ether"],
+    description: "上位MP回復薬"
+  },
+  {
     id: "rx_antidote",
     name: "毒消し",
     productionType: "alchemy",
@@ -2103,6 +2138,8 @@ const NORMAL_TITLES = [
   { id: "alchemy_friend", name: "ちょい錬金好き", conditionDescription: "ポーションを10個作る", effectDescription: "ポーション作成時に追加生成", effect: { potionCraftBonusChance: 0.12 }, trigger: ["afterCraft"] },
   { id: "mass_producer", name: "量産職人", conditionDescription: "同一アイテムを30個作る", effectDescription: "10%で追加作成", effect: { extraCraftChance: 0.1 }, trigger: ["afterCraft"] },
   { id: "workshop_regular", name: "工房の常連", conditionDescription: "工房利用50回", effectDescription: "工房費用-10%", effect: { workshopCostReduction: 0.1 }, trigger: ["afterCraft", "afterEnhance"] },
+  { id: "workshop_commuter", name: "工房通い", description: "工房に足しげく通ううちに、手際が少し良くなった。", conditionDescription: "生産ジョブで工房のボタンを100回押す", effectDescription: "生産EXP+10%", effect: { productionExpRateBonus: 0.1 }, trigger: ["workshopAction"] },
+  { id: "workshop_maniac", name: "工房狂い", description: "もはや工房そのものが生活圏。生産の伸びが目に見えて違う。", conditionDescription: "生産ジョブで工房のボタンを1000回押す", effectDescription: "生産EXP+20%", effect: { productionExpRateBonus: 0.2 }, trigger: ["workshopAction"] },
   { id: "production_serious", name: "生産職の本気", conditionDescription: "生産Lv100到達", effectDescription: "品質1段階上昇率+20%", effect: { qualityStepUpChance: 0.2 }, trigger: ["afterProductionExp"] },
   { id: "forge_ruler", name: "鍛冶場の支配者", conditionDescription: "強化100回", effectDescription: "強化成功率+15%", effect: { smithEnhanceBonus: 0.15 }, trigger: ["afterEnhance"] },
   { id: "alchemy_seeker", name: "錬金の探究者", conditionDescription: "ポーション200個作成", effectDescription: "ポーション効果+20%", effect: { alchemyEffectBonus: 0.2 }, trigger: ["afterCraft"] },
@@ -2137,6 +2174,8 @@ const CHEAT_TITLES = [
   { id: "time_keeper_2", name: "時を刻みし者2", conditionDescription: "タイマーを20回押す", effectDescription: "3x解放", effect: { unlockBattleSpeed: [3] }, trigger: ["timerClick"], isHidden: true },
   { id: "time_keeper_3", name: "時を刻みし者3", conditionDescription: "タイマーを60回押す", effectDescription: "4x解放/倍速中EXP+10%", effect: { unlockBattleSpeed: [4], speedModeBonus: { expMultiplier: 0.1, minSpeed: 1.5 } }, trigger: ["timerClick"], isHidden: true },
   { id: "time_lord", name: "時の支配者", conditionDescription: "タイマー120回+2周目", effectDescription: "5x解放/倍速中EXP+25%", effect: { unlockBattleSpeed: [5], speedModeBonus: { expMultiplier: 0.25, minSpeed: 1.5 }, speedMultiplier: 0.1 }, trigger: ["timerClick", "afterLoopStart"], isHidden: true },
+  { id: "workshop_lodger", name: "工房暮らし", description: "工房に住んでいるのではと思われるほど居ついた者の称号。", conditionDescription: "生産ジョブで工房に3分滞在する", effectDescription: "生産EXP+30%", effect: { productionExpRateBonus: 0.3 }, trigger: ["workshopStayTick"] },
+  { id: "workshop_overtime", name: "残業", description: "工房に残り続けた者だけが知る、無駄のない手順。", conditionDescription: "生産ジョブで工房に10分滞在する", effectDescription: "品質向上時、35%で素材を1つ返却", effect: { qualityMaterialRefundChance: 0.35 }, trigger: ["workshopStayTick"] },
   { id: "unfavored_king", name: "不遇職の王", conditionDescription: "不遇職でゲームクリア", effectDescription: "メイン+40%/サブ+30%", effect: { allStatsMultiplier: 0.4, noSubJobBonus: 0.3 }, trigger: ["afterGameClear"], isHidden: true },
   { id: "production_is_main", name: "生産が本体", conditionDescription: "生産特化で終盤突破", effectDescription: "生産+20%/強化+20%", effect: { craftSuccessBonus: 0.2, enhanceSuccessBonus: 0.2 }, trigger: ["afterGameClear"], isHidden: true },
   { id: "one_man_army", name: "一騎当千", conditionDescription: "サブ未設定で終盤突破", effectDescription: "サブなし時に大幅強化", effect: { noSubJobBonus: 0.35 }, trigger: ["afterFieldBossClear", "afterGameClear"], isHidden: true },
@@ -2179,6 +2218,10 @@ const TITLE_CHECKERS = {
   alchemy_friend: () => (state.stats.producedItemCounts.potion || 0) >= 10,
   mass_producer: () => Object.values(state.stats.producedItemCounts).some((count) => count >= 30),
   workshop_regular: () => state.stats.totalEnhances + state.stats.totalCrafts >= 50,
+  workshop_commuter: () => (state.stats.productionWorkshopButtonPressCount || 0) >= 100,
+  workshop_maniac: () => (state.stats.productionWorkshopButtonPressCount || 0) >= 1000,
+  workshop_lodger: () => (state.stats.productionWorkshopStaySeconds || 0) >= 180,
+  workshop_overtime: () => (state.stats.productionWorkshopStaySeconds || 0) >= 600,
   production_serious: () => state.player.productionJobLevel >= 100 || state.player.productionJobStage >= 4,
   forge_ruler: () => state.stats.totalEnhances >= 100,
   alchemy_seeker: () => (state.stats.producedItemCounts.potion || 0) >= 200,
@@ -3409,7 +3452,10 @@ const state = {
     ninjaStage11DefeatCount: 0,
     priestNoSkillKillCount: 0,
     priestNoHealWinCount: 0,
-    priestOnlyOffenseWinCount: 0
+    priestOnlyOffenseWinCount: 0,
+    productionWorkshopButtonPressCount: 0,
+    productionWorkshopStaySeconds: 0,
+    productionWorkshopStayMs: 0
   },
   guild: {
     rank: "D",
@@ -3426,7 +3472,8 @@ const state = {
     guildQuestStats: { generated: 0, completed: 0, claimed: 0, refreshed: 0 },
     maxActiveQuests: 3,
     workshopTab: "craft",
-    shopRegionTab: "grassland"
+    shopRegionTab: "grassland",
+    shopMode: "buy"
   },
   battle: {
     isActive: false,
@@ -3646,6 +3693,8 @@ function createDefaultTitleEffects() {
     mpCostReduction: 0,
     healMultiplier: 0,
     sellPriceMultiplier: 0,
+    productionExpRateBonus: 0,
+    qualityMaterialRefundChance: 0,
     defenseToAttackRatio: 0,
     noWeaponAttackBonus: 0,
     stageRegenPerMinute: 0,
@@ -3701,6 +3750,7 @@ function createNavigationSnapshot() {
     guildFacility: state.guild.selectedFacility,
     guildWorkshopTab: state.guild.workshopTab,
     guildShopRegionTab: state.guild.shopRegionTab,
+    guildShopMode: state.guild.shopMode || "buy",
     currentTown: state.currentTown,
     currentMap: state.currentMap,
     currentStage: state.currentStage,
@@ -3723,6 +3773,7 @@ function isSameNavigationSnapshot(a, b) {
     a.guildFacility === b.guildFacility &&
     a.guildWorkshopTab === b.guildWorkshopTab &&
     a.guildShopRegionTab === b.guildShopRegionTab &&
+    a.guildShopMode === b.guildShopMode &&
     a.currentTown === b.currentTown &&
     a.currentMap === b.currentMap &&
     a.currentStage === b.currentStage &&
@@ -3756,6 +3807,7 @@ function applyNavigationSnapshot(snapshot) {
   state.guild.selectedFacility = snapshot.guildFacility || "reception";
   state.guild.workshopTab = snapshot.guildWorkshopTab || "craft";
   state.guild.shopRegionTab = SHOP_REGION_TABS.some((tab) => tab.id === snapshot.guildShopRegionTab) ? snapshot.guildShopRegionTab : "grassland";
+  state.guild.shopMode = snapshot.guildShopMode === "sell" ? "sell" : "buy";
   state.currentTown = snapshot.currentTown || state.currentTown;
   state.currentMap = snapshot.currentMap || state.currentMap;
   state.currentStage = snapshot.currentStage || state.currentStage;
@@ -6508,6 +6560,12 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.sellPriceMultiplier === "number") {
     target.sellPriceMultiplier += effect.sellPriceMultiplier;
   }
+  if (typeof effect.productionExpRateBonus === "number") {
+    target.productionExpRateBonus += effect.productionExpRateBonus;
+  }
+  if (typeof effect.qualityMaterialRefundChance === "number") {
+    target.qualityMaterialRefundChance += effect.qualityMaterialRefundChance;
+  }
   if (typeof effect.accuracyBonus === "number") {
     target.accuracyBonus += effect.accuracyBonus;
   }
@@ -8511,43 +8569,91 @@ function isItemShopUnlocked(itemId) {
   return true;
 }
 
-function renderShopView() {
-  const activeRegion = SHOP_REGION_TABS.some((tab) => tab.id === state.guild.shopRegionTab) ? state.guild.shopRegionTab : "grassland";
-  const tabButtons = SHOP_REGION_TABS
-    .map((tab) => `<button class="btn shop-region-tab-btn ${activeRegion === tab.id ? "active" : ""}" data-shop-region="${tab.id}">${tab.label}</button>`)
-    .join("");
+function renderShopBuyView(activeRegion) {
   const cards = [...new Set(SHOP_ITEM_IDS)]
     .filter((itemId) => getItemShopMapId(itemId) === activeRegion)
     .map((itemId) => {
-    const item = ITEM_DATA[itemId];
-    if (!item) {
-      return "";
-    }
-    const unlocked = isItemShopUnlocked(itemId);
-    const own = getInventoryCount(itemId);
-    const reqTown = getItemRequiredTown(itemId);
-    const reqBossStage = getItemRequiredFieldBossStage(itemId);
-    const reqText = [
-      reqTown ? `町解放: ${TOWN_DATA[reqTown]?.name || reqTown}` : null,
-      reqBossStage ? `ボス解放: ${reqBossStage}` : null
-    ].filter(Boolean).join(" / ");
-    const lockText = unlocked ? "購入可" : "未解放";
-    const canBuy = unlocked && item.buyPrice > 0;
-    return `
-      <div class="shop-card">
-        <h4>${item.name}</h4>
-        <p class="tiny">${item.description}</p>
-        <p class="tiny">カテゴリ: ${item.category}${reqText ? ` / ${reqText}` : ""}</p>
-        <p class="tiny">買値: ${item.buyPrice} / 売値: ${Math.floor(getSellPrice(item))} / 所持: ${own}</p>
-        <p class="tiny">状態: ${lockText}</p>
-        <div class="title-row">
-          <button class="btn shop-buy-btn" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>購入</button>
-          <button class="btn shop-sell-btn" data-item-id="${item.id}" ${own > 0 ? "" : "disabled"}>売却</button>
+      const item = ITEM_DATA[itemId];
+      if (!item) {
+        return "";
+      }
+      const unlocked = isItemShopUnlocked(itemId);
+      const own = getInventoryCount(itemId);
+      const reqTown = getItemRequiredTown(itemId);
+      const reqBossStage = getItemRequiredFieldBossStage(itemId);
+      const reqText = [
+        reqTown ? `町解放: ${TOWN_DATA[reqTown]?.name || reqTown}` : null,
+        reqBossStage ? `ボス解放: ${reqBossStage}` : null
+      ].filter(Boolean).join(" / ");
+      const lockText = unlocked ? "購入可" : "未解放";
+      const canBuy = unlocked && item.buyPrice > 0;
+      return `
+        <div class="shop-card">
+          <h4>${item.name}</h4>
+          <p class="tiny">${item.description}</p>
+          <p class="tiny">カテゴリ: ${item.category}${reqText ? ` / ${reqText}` : ""}</p>
+          <p class="tiny">買値: ${item.buyPrice} / 売値: ${Math.floor(getSellPrice(item))} / 所持: ${own}</p>
+          <p class="tiny">状態: ${lockText}</p>
+          <div class="title-row">
+            <button class="btn shop-buy-btn" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>購入</button>
+          </div>
         </div>
-      </div>
-    `;
-  }).join("");
-  return `<h3>ショップ</h3><p class="tiny">所持GOLD: ${state.player.gold}G</p><div class="status-tabs">${tabButtons}</div><div class="shop-grid">${cards || "<p class='tiny'>この地域で販売中の商品はありません。</p>"}</div>`;
+      `;
+    })
+    .join("");
+  return `<div class="shop-grid">${cards || "<p class='tiny'>この地域で販売中の商品はありません。</p>"}</div>`;
+}
+
+function canSellItem(item) {
+  if (!item) {
+    return false;
+  }
+  const sellPrice = Math.floor(getSellPrice(item));
+  return sellPrice > 0;
+}
+
+function renderShopSellView() {
+  const cards = state.player.inventory
+    .map((slot) => {
+      const item = ITEM_DATA[slot.itemId];
+      if (!item) {
+        return "";
+      }
+      const sellPrice = Math.floor(getSellPrice(item));
+      const sellable = canSellItem(item);
+      return `
+        <div class="shop-card">
+          <h4>${item.nameJa || item.name || slot.itemId}</h4>
+          <p class="tiny">${item.description || "説明なし"}</p>
+          <p class="tiny">カテゴリ: ${item.category || "unknown"} / 所持: ${slot.quantity}</p>
+          <p class="tiny">売却価格: ${sellable ? `${sellPrice}G` : "売却不可"}</p>
+          <div class="title-row">
+            <button class="btn shop-sell-btn" data-item-id="${item.id}" ${sellable && slot.quantity > 0 ? "" : "disabled"}>売る</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+  return `<p class="tiny">所持アイテムから1個ずつ売却できます。ショップ外では売却できません。</p><div class="shop-grid">${cards || "<p class='tiny'>売却できるアイテムがありません。</p>"}</div>`;
+}
+
+function renderShopView() {
+  const activeRegion = SHOP_REGION_TABS.some((tab) => tab.id === state.guild.shopRegionTab) ? state.guild.shopRegionTab : "grassland";
+  const activeMode = state.guild.shopMode === "sell" ? "sell" : "buy";
+  const modeButtons = `
+    <button class="btn shop-mode-tab-btn ${activeMode === "buy" ? "active" : ""}" data-shop-mode="buy">購入</button>
+    <button class="btn shop-mode-tab-btn ${activeMode === "sell" ? "active" : ""}" data-shop-mode="sell">売却</button>
+  `;
+  const regionButtons = SHOP_REGION_TABS
+    .map((tab) => `<button class="btn shop-region-tab-btn ${activeRegion === tab.id ? "active" : ""}" data-shop-region="${tab.id}">${tab.label}</button>`)
+    .join("");
+  const body = activeMode === "buy" ? renderShopBuyView(activeRegion) : renderShopSellView();
+  return `
+    <div class="title-row"><h3>ショップ</h3><div class="status-tabs">${modeButtons}</div></div>
+    <p class="tiny">所持GOLD: ${state.player.gold}G</p>
+    ${activeMode === "buy" ? `<div class="status-tabs">${regionButtons}</div>` : ""}
+    ${body}
+  `;
 }
 
 function buyItem(itemId) {
@@ -8577,24 +8683,31 @@ function buyItem(itemId) {
   render();
 }
 
-function sellItem(itemId) {
+function sellItem(itemId, quantity = 1, options = {}) {
+  const inShopSellMode = state.currentTab === "guild" && state.guild.selectedFacility === "shop" && state.guild.shopMode === "sell";
+  if (!options.force && !inShopSellMode) {
+    addLog("売却はショップの「売却」タブでのみ行えます。");
+    return;
+  }
   const item = ITEM_DATA[itemId];
-  if (!item || getInventoryCount(itemId) <= 0) {
+  if (!item || !canSellItem(item) || getInventoryCount(itemId) <= 0) {
     return;
   }
-  if (!removeItem(itemId, 1)) {
+  const qty = Math.max(1, Math.floor(quantity || 1));
+  if (!removeItem(itemId, qty)) {
     return;
   }
-  const sell = Math.floor(getSellPrice(item));
-  state.player.gold += sell;
+  const sell = Math.floor(getSellPrice(item)) * qty;
+  state.player.gold += Math.max(0, sell);
   state.stats.totalShopTrades += 1;
-  addLog(`ショップ売却: ${item.name} x1 (+${sell}G)`);
+  addLog(`ショップ売却: ${item.name} x${qty} (+${sell}G)`);
   checkTitleUnlocks("afterShopTrade");
   render();
 }
 
 function getSellPrice(item) {
-  let sell = (item.sellPrice || 0) * (1 + state.titleEffects.sellPriceMultiplier);
+  const baseSell = Number.isFinite(item.sellPrice) ? item.sellPrice : Math.floor((item.buyPrice || 0) * 0.5);
+  let sell = baseSell * (1 + state.titleEffects.sellPriceMultiplier);
   if (item.id === "grilledMeat" && state.titleEffects.cookedSellMultiplier > 0) {
     sell *= 1 + state.titleEffects.cookedSellMultiplier;
   }
@@ -8720,6 +8833,22 @@ function selectSubJob(jobId) {
   refreshPlayerDerivedStats();
   addLog(`神殿: サブジョブを ${job.name} に設定しました。進化段階は1です。`);
   render();
+}
+
+function isProductionWorkshopContext() {
+  return (
+    state.currentTab === "guild" &&
+    state.guild.selectedFacility === "workshop" &&
+    !!PRODUCTION_JOB_PATHS[state.player.productionJob]
+  );
+}
+
+function recordProductionWorkshopButtonPress() {
+  if (!isProductionWorkshopContext()) {
+    return;
+  }
+  state.stats.productionWorkshopButtonPressCount = (state.stats.productionWorkshopButtonPressCount || 0) + 1;
+  checkTitleUnlocks("workshopAction");
 }
 
 function renderWorkshopLayout() {
@@ -8879,6 +9008,7 @@ function craftRecipe(recipeId, quantity = 1) {
     recipe.materials.forEach((m) => removeItem(m.itemId, m.qty));
     const result = rollCraftResult(recipe, state.player, false);
     applyCraftQuality(result, recipe);
+    applyQualityMaterialRefund(recipe, result);
   }
   checkProductionRelatedTitles();
   refreshPlayerDerivedStats();
@@ -8981,9 +9111,29 @@ function applyCraftQuality(result, recipe) {
   gainProductionExp(result.expGain);
 }
 
+function applyQualityMaterialRefund(recipe, result) {
+  if (!recipe || !result) {
+    return;
+  }
+  if (!["great", "high", "god"].includes(result.quality)) {
+    return;
+  }
+  const refundChance = clamp(0, 0.9, state.titleEffects.qualityMaterialRefundChance || 0);
+  if (refundChance <= 0 || Math.random() >= refundChance) {
+    return;
+  }
+  const materials = (recipe.materials || []).filter((m) => m.qty > 0);
+  if (!materials.length) {
+    return;
+  }
+  const pick = materials[Math.floor(Math.random() * materials.length)];
+  addItem(pick.itemId, 1);
+  addLog(`残業効果: ${ITEM_DATA[pick.itemId]?.name || pick.itemId} を1個節約した。`);
+}
+
 function gainProductionExp(amount) {
   const pJob = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
-  const expMul = 1 + (pJob?.productionBonus?.productionExpRate || 0);
+  const expMul = 1 + (pJob?.productionBonus?.productionExpRate || 0) + (state.titleEffects.productionExpRateBonus || 0);
   const gained = Math.max(1, Math.floor(amount * expMul));
   state.player.productionJobExp += gained;
   state.stats.totalCraftExp += gained;
@@ -9796,7 +9946,11 @@ function getTitleProgress(titleId) {
     speed_ritualist: { current: state.stats.speedModeSeconds, target: 300, label: "高速秒数" },
     rare_hunter_nose: { current: state.stats.uniqueEncounterCount, target: 1, label: "ユニーク遭遇" },
     title_combo_breaker: { current: state.stats.totalTitleCombosTried, target: 25, label: "称号コンボ数" },
-    unique_theorist: { current: state.stats.totalUniqueTypesDefeated, target: 5, label: "ユニーク種類" }
+    unique_theorist: { current: state.stats.totalUniqueTypesDefeated, target: 5, label: "ユニーク種類" },
+    workshop_commuter: { current: state.stats.productionWorkshopButtonPressCount || 0, target: 100, label: "工房ボタン" },
+    workshop_maniac: { current: state.stats.productionWorkshopButtonPressCount || 0, target: 1000, label: "工房ボタン" },
+    workshop_lodger: { current: state.stats.productionWorkshopStaySeconds || 0, target: 180, label: "工房滞在秒" },
+    workshop_overtime: { current: state.stats.productionWorkshopStaySeconds || 0, target: 600, label: "工房滞在秒" }
   };
   const p = progressMap[titleId];
   if (!p) return null;
@@ -10183,7 +10337,7 @@ function renderAutoUseItemSetupView() {
         </label>
         <p class="tiny">セット中: ${item ? escapeHtml(getItemNameJa(item.id)) : "未設定"} / 所持 ${count}</p>
         <p class="tiny">回復量: ${item ? `${item.healAmount || 0}` : "-"} / CT: ${item ? `${item.cooldown || 0}s` : "-"}</p>
-        <p class="tiny">状態: ${slot.isEnabled ? "有効" : "無効"} / 発動条件 HP${slot.hpThresholdPercent}%以下</p>
+        <p class="tiny">状態: ${slot.isEnabled ? "有効" : "無効"} / 発動条件 HP/MP ${slot.hpThresholdPercent}%以下</p>
       </div>
     `;
   }).join("");
@@ -10474,6 +10628,9 @@ function applyLoadedState(payload) {
   if (typeof state.stats.priestNoSkillKillCount !== "number") state.stats.priestNoSkillKillCount = 0;
   if (typeof state.stats.priestNoHealWinCount !== "number") state.stats.priestNoHealWinCount = 0;
   if (typeof state.stats.priestOnlyOffenseWinCount !== "number") state.stats.priestOnlyOffenseWinCount = 0;
+  if (typeof state.stats.productionWorkshopButtonPressCount !== "number") state.stats.productionWorkshopButtonPressCount = 0;
+  if (typeof state.stats.productionWorkshopStaySeconds !== "number") state.stats.productionWorkshopStaySeconds = 0;
+  if (typeof state.stats.productionWorkshopStayMs !== "number") state.stats.productionWorkshopStayMs = 0;
   state.jobEvolutionFlags = { ...state.jobEvolutionFlags, ...(run.jobEvolutionFlags || {}) };
   state.unlockedSkills = { ...state.unlockedSkills, ...(run.unlockedSkills || {}) };
   state.stats.defeatsByStage = state.stats.defeatsByStage || {};
@@ -10494,6 +10651,7 @@ function applyLoadedState(payload) {
     refreshed: Number(state.guild.guildQuestStats?.refreshed || 0)
   };
   state.guild.shopRegionTab = SHOP_REGION_TABS.some((tab) => tab.id === state.guild.shopRegionTab) ? state.guild.shopRegionTab : "grassland";
+  state.guild.shopMode = state.guild.shopMode === "sell" ? "sell" : "buy";
 
   state.loop.loopCount = persistent.loop?.loopCount || 0;
   state.loop.carriedTitles = persistent.loop?.carriedTitles || [];
@@ -10695,7 +10853,7 @@ function consumeItem(itemId) {
 }
 
 function getAutoUsableItemList() {
-  return Object.values(ITEM_DATA).filter((item) => item.autoUsable && item.effectType === "heal_hp");
+  return Object.values(ITEM_DATA).filter((item) => item.autoUsable);
 }
 
 function calculateHpConsumableHeal(baseId, qualityMul = 1) {
@@ -10734,6 +10892,10 @@ function getAutoUseItemState(slotIndex) {
   const hpRate = state.battle?.isActive
     ? (state.battle.playerCurrentHp / Math.max(1, getEffectivePlayerStat("maxHp"))) * 100
     : 100;
+  const mpRate = state.battle?.isActive
+    ? (state.battle.playerCurrentMp / Math.max(1, getEffectivePlayerStat("maxMp"))) * 100
+    : 100;
+  const conditionRate = item?.effectType === "heal_mp" ? mpRate : hpRate;
   const firedUntil = (state.ui.autoItemVisualEffects || {})[String(slotIndex)] || 0;
   if (!slot.isEnabled) {
     return { code: "disabled", label: "無効", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
@@ -10753,7 +10915,7 @@ function getAutoUseItemState(slotIndex) {
   if (!state.battle?.isActive) {
     return { code: "standby", label: "待機中", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
   }
-  if (hpRate > slot.hpThresholdPercent) {
+  if (conditionRate > slot.hpThresholdPercent) {
     return { code: "condition_not_met", label: "条件未達", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
   }
   return { code: "usable", label: "使用可能", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
@@ -10813,8 +10975,19 @@ function tryUseAutoItem(slotIndex) {
   if (!slot || !item || !consumeItem(item.id)) {
     return false;
   }
-  const heal = calculateHpConsumableHeal(item.id, 1);
-  const result = applyHealing(heal, getItemNameJa(item.id), true);
+  if (item.effectType === "heal_mp") {
+    const maxMp = getEffectivePlayerStat("maxMp");
+    const mp = item.id === "hiEther"
+      ? Math.max(20, Math.floor(maxMp * 0.5))
+      : Math.max(10, Math.floor(maxMp * 0.25));
+    if (state.battle.isActive) state.battle.playerCurrentMp = Math.min(maxMp, state.battle.playerCurrentMp + mp);
+    state.player.mp = Math.min(maxMp, state.player.mp + mp);
+    addLog(`${getItemNameJa(item.id)}を自動使用した！ MPが${mp}回復した`);
+  } else {
+    const heal = calculateHpConsumableHeal(item.id, 1);
+    const result = applyHealing(heal, getItemNameJa(item.id), true);
+    addLog(`${getItemNameJa(item.id)}を自動使用した！ HPが${Math.floor(result.actualHeal)}回復した`);
+  }
   const cooldownSec = Number(item.cooldown || 0);
   slot.cooldownUntil = Date.now() + cooldownSec * 1000;
   slot.cooldownRemaining = cooldownSec;
@@ -10822,7 +10995,6 @@ function tryUseAutoItem(slotIndex) {
   state.battle.autoItemGlobalCooldownUntil = Date.now() + 700;
   state.battle.itemUsedInStage = true;
   triggerAutoItemVisualEffect(idx);
-  addLog(`${getItemNameJa(item.id)}を自動使用した！ HPが${Math.floor(result.actualHeal)}回復した`);
   return true;
 }
 
@@ -10866,6 +11038,12 @@ function useInventoryItem(itemId) {
     if (state.battle.isActive) state.battle.playerCurrentMp = Math.min(maxMp, state.battle.playerCurrentMp + mp);
     state.player.mp = Math.min(maxMp, state.player.mp + mp);
     addLog(`アイテム使用: エーテルでMP+${mp}`);
+    used = true;
+  } else if (baseId === "hiEther") {
+    const mp = Math.max(20, Math.floor(maxMp * 0.5 * qualityMul));
+    if (state.battle.isActive) state.battle.playerCurrentMp = Math.min(maxMp, state.battle.playerCurrentMp + mp);
+    state.player.mp = Math.min(maxMp, state.player.mp + mp);
+    addLog(`アイテム使用: ハイエーテルでMP+${mp}`);
     used = true;
   } else if (baseId === "attackTonic") {
     applyEffect("player", `item_${baseId}`, { stat: "attack", multiplier: 1 + 0.12 * qualityMul, durationMs: Math.floor(70000 * qualityMul) });
@@ -10924,6 +11102,11 @@ function handleSecondTick() {
     }
     if (state.battleSpeedMultiplier > 1) {
       state.stats.speedModeSeconds += 1;
+    }
+    if (isProductionWorkshopContext()) {
+      state.stats.productionWorkshopStaySeconds = (state.stats.productionWorkshopStaySeconds || 0) + 1;
+      state.stats.productionWorkshopStayMs = (state.stats.productionWorkshopStayMs || 0) + 1000;
+      checkTitleUnlocks("workshopStayTick");
     }
     autoSaveIfNeeded("timer");
   }
@@ -11112,6 +11295,17 @@ function bindGameEvents() {
     );
     document.querySelectorAll(".shop-buy-btn").forEach((btn) => btn.addEventListener("click", () => buyItem(btn.dataset.itemId)));
     document.querySelectorAll(".shop-sell-btn").forEach((btn) => btn.addEventListener("click", () => sellItem(btn.dataset.itemId)));
+    document.querySelectorAll(".shop-mode-tab-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.shopMode;
+        if (!["buy", "sell"].includes(mode) || mode === state.guild.shopMode) {
+          return;
+        }
+        pushNavigationHistory();
+        state.guild.shopMode = mode;
+        render();
+      })
+    );
     document.querySelectorAll(".shop-region-tab-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
         const region = btn.dataset.shopRegion;
@@ -11132,6 +11326,9 @@ function bindGameEvents() {
     document.querySelectorAll(".workshop-tab-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
         const tab = btn.dataset.workshopTab;
+        if (tab) {
+          recordProductionWorkshopButtonPress();
+        }
         if (!tab || tab === state.guild.workshopTab) {
           return;
         }
@@ -11140,14 +11337,30 @@ function bindGameEvents() {
         render();
       })
     );
-    document.querySelectorAll(".craft-btn").forEach((btn) => btn.addEventListener("click", () => craftItem(btn.dataset.recipeId)));
-    document.querySelectorAll(".craft-batch-btn").forEach((btn) =>
-      btn.addEventListener("click", () => craftRecipe(btn.dataset.recipeId, Number(btn.dataset.craftQty || 1)))
+    document.querySelectorAll(".craft-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        recordProductionWorkshopButtonPress();
+        craftItem(btn.dataset.recipeId);
+      })
     );
-    document.querySelectorAll(".enhance-btn").forEach((btn) => btn.addEventListener("click", () => enhanceEquipment(btn.dataset.itemId)));
+    document.querySelectorAll(".craft-batch-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        recordProductionWorkshopButtonPress();
+        craftRecipe(btn.dataset.recipeId, Number(btn.dataset.craftQty || 1));
+      })
+    );
+    document.querySelectorAll(".enhance-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        recordProductionWorkshopButtonPress();
+        enhanceEquipment(btn.dataset.itemId);
+      })
+    );
     const gatherBtn = document.getElementById("gather-materials-btn");
     if (gatherBtn) {
-      gatherBtn.addEventListener("click", () => gatherMaterials(state.currentMap));
+      gatherBtn.addEventListener("click", () => {
+        recordProductionWorkshopButtonPress();
+        gatherMaterials(state.currentMap);
+      });
     }
   }
 
@@ -11985,6 +12198,7 @@ function resetForNewLoop() {
   state.guild.selectedFacility = "reception";
   state.guild.workshopTab = "craft";
   state.guild.shopRegionTab = "grassland";
+  state.guild.shopMode = "buy";
 
   state.stats.totalBattles = 0;
   state.stats.totalWins = 0;
@@ -12119,6 +12333,9 @@ function resetForNewLoop() {
   state.stats.priestNoSkillKillCount = 0;
   state.stats.priestNoHealWinCount = 0;
   state.stats.priestOnlyOffenseWinCount = 0;
+  state.stats.productionWorkshopButtonPressCount = 0;
+  state.stats.productionWorkshopStaySeconds = 0;
+  state.stats.productionWorkshopStayMs = 0;
 
   if (!state.loop.carryUniqueRecords) {
     state.uniqueDefeatedIds = [];
