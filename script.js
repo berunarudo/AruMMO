@@ -1,7 +1,7 @@
 ﻿const MAX_LOG_LINES = 140;
 const BATTLE_TICK_MS = 180;
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 4;
 const AUTO_SAVE_INTERVAL_MS = 120000;
 const STORAGE_KEYS = {
   MAIN: "mmorpg_save_main",
@@ -37,6 +37,252 @@ const BALANCE_CONFIG = {
     loop5: 1
   }
 };
+
+const NEVEREND_ACCESS_DATA = {
+  ticketItemId: "neverendTicket",
+  defaultTicketPrice: 1000000,
+  postVolcanoTicketPrice: 100
+};
+
+const NEVEREND_CHIP_EXCHANGE_DATA = {
+  buyRateGoldPerChip: 1,
+  sellRateGoldPerChip: 0.94
+};
+
+const NEVEREND_ROULETTE_RULES = {
+  minBet: 1000,
+  maxBet: 120000,
+  hitChance: 0.2,
+  payoutMultiplier: 4.2
+};
+
+const NEVEREND_VIP_ROULETTE_RULES = {
+  minBet: 10000,
+  maxBet: 600000,
+  hitChance: 0.16,
+  payoutMultiplier: 6.0,
+  crashChance: 0.12,
+  crashLossRate: 0.4
+};
+
+const NEVEREND_TOWN_MODE_DATA = {
+  reception: "カジノ",
+  shop: "オークション",
+  temple: "ルーレット",
+  workshop: "VIP"
+};
+
+const OTHERWORLD_UNLOCK_RULES = {
+  keyItemId: "otherworldKey",
+  requiredUniqueIds: ["fenrir", "jormungand", "cerberus", "griffon", "minotauros", "phoenix", "kirin"],
+  defaultLevelCap: 200,
+  kingRecognizedLevelCap: 300,
+  protagonistLevelCap: 9999
+};
+
+const OTHERWORLD_STAGE_BOSS_DATA = {
+  "6-1": "behemothBisonReborn",
+  "6-2": "duneHydraAbyss",
+  "6-3": "leviathanOvertide",
+  "6-4": "volkazardInferno",
+  "6-5": "protocol3",
+  "6-6": "awakenedBehemothBison",
+  "6-7": "awakenedDuneHydra",
+  "6-8": "awakenedLeviathan",
+  "6-9": "awakenedProtocol3",
+  "6-10": "otherworldKing"
+};
+
+const OTHERWORLD_SUPPORT_LOG_DATA = [
+  "行け、そこまで行ったなら勝てる",
+  "浪漫侍: 剣を振れ、主人公",
+  "AKA.ベル: 避けろじゃない、進め",
+  "守り神しめ鯖: もう折れるな、ここからは祈りじゃなく意志だ",
+  "紅の魔術師: 勝て。世界の結末を更新しろ",
+  "総合スレ民: うおおおおお",
+  "お前ならやれる",
+  "ここまで見てきたんだ、終わらせてくれ",
+  "今だけは全員お前の味方だ"
+];
+
+const OTHERWORLD_ENDING_CHEER_LOG_DATA = [
+  "総合スレ: お疲れ様でしたあああああ",
+  "浪漫侍: 主人公、お前の勝ちだ",
+  "紅の魔術師: 世界線更新、完了",
+  "AKA.ベル: 最高のラストだった",
+  "守り神しめ鯖: よく帰ってきた、ありがとう",
+  "考察班: ここに到達したの、ガチで偉業",
+  "攻略班: 異界の王撃破報告、確認",
+  "全員: 世界は救われた"
+];
+
+function hasClearedVolcano() {
+  return Array.isArray(state.fieldBossCleared) && state.fieldBossCleared.includes("4-10");
+}
+
+function getNeverendTicketPrice() {
+  return hasClearedVolcano() ? NEVEREND_ACCESS_DATA.postVolcanoTicketPrice : NEVEREND_ACCESS_DATA.defaultTicketPrice;
+}
+
+function canEnterNeverend(current = state) {
+  return !!(current.neverendUnlocked || current.hasNeverendTicket || (Array.isArray(current.unlockedTowns) && current.unlockedTowns.includes("neverend")));
+}
+
+function isNeverendTownActive() {
+  return state.currentTown === "neverend";
+}
+
+function hasOtherworldKey(current = state) {
+  return getInventoryCount(OTHERWORLD_UNLOCK_RULES.keyItemId) > 0 || !!current.hasOtherworldKey;
+}
+
+function hasAllUniqueDefeated(current = state) {
+  return OTHERWORLD_UNLOCK_RULES.requiredUniqueIds.every((id) => (current.uniqueDefeatedIds || []).includes(id));
+}
+
+function canEnterOtherworld(current = state) {
+  return !!(current.otherworldUnlocked || hasOtherworldKey(current) || hasAllUniqueDefeated(current) || (Array.isArray(current.unlockedTowns) && current.unlockedTowns.includes("otherworld")));
+}
+
+function isOtherworldStage(stageId = state?.battle?.stageId) {
+  const stage = STAGE_DATA?.[stageId];
+  return !!stage && stage.mapId === "otherworld";
+}
+
+function isOtherworldKingBattle() {
+  return !!state.battle?.isActive && state.battle?.enemy?.id === "otherworldKing";
+}
+
+function hasTitleUnlocked(titleId) {
+  return Array.isArray(state.unlockedTitles) && state.unlockedTitles.includes(titleId);
+}
+
+function getPlayerLevelCap() {
+  if (hasTitleUnlocked("protagonist")) return OTHERWORLD_UNLOCK_RULES.protagonistLevelCap;
+  if (hasTitleUnlocked("acknowledged_by_king") || (state.otherworldLevelCapBonus || 0) >= 100) return OTHERWORLD_UNLOCK_RULES.kingRecognizedLevelCap;
+  return OTHERWORLD_UNLOCK_RULES.defaultLevelCap;
+}
+
+function canPlayerStayAtOneHpInOtherworldKingBattle() {
+  return isOtherworldKingBattle() && hasTitleUnlocked("fate_redeemer");
+}
+
+function shouldUseOtherworldSupportLog() {
+  return !!state.otherworldKingSupportLogMode || (isOtherworldKingBattle() && hasTitleUnlocked("fate_redeemer"));
+}
+
+function pushOtherworldSupportLog(force = false) {
+  if (!shouldUseOtherworldSupportLog() && !force) return;
+  if (!force && Math.random() > 0.35) return;
+  addLog(weightedPick(OTHERWORLD_SUPPORT_LOG_DATA) || OTHERWORLD_SUPPORT_LOG_DATA[0], "board", { important: true });
+}
+
+function createDefaultNeverendUiState() {
+  return {
+    rouletteNumber: 1,
+    vipRouletteNumber: 1
+  };
+}
+
+function createDefaultAuctionRefreshState() {
+  return {
+    seed: 1,
+    lastRefreshAt: 0,
+    refreshCount: 0
+  };
+}
+
+function createDefaultRouletteStats() {
+  return {
+    spins: 0,
+    wins: 0,
+    vipSpins: 0,
+    vipWins: 0,
+    chipsWon: 0,
+    chipsLost: 0
+  };
+}
+
+function ensureNeverendState() {
+  if (typeof state.hasNeverendTicket !== "boolean") state.hasNeverendTicket = false;
+  if (typeof state.neverendUnlocked !== "boolean") state.neverendUnlocked = false;
+  if (typeof state.neverendVipUnlocked !== "boolean") state.neverendVipUnlocked = false;
+  if (!Number.isFinite(Number(state.chips))) state.chips = 0;
+  state.chips = Math.max(0, Math.floor(Number(state.chips || 0)));
+  state.neverendBossClearFlags = state.neverendBossClearFlags && typeof state.neverendBossClearFlags === "object" ? state.neverendBossClearFlags : {};
+  state.auctionRefreshState = state.auctionRefreshState && typeof state.auctionRefreshState === "object"
+    ? { ...createDefaultAuctionRefreshState(), ...state.auctionRefreshState }
+    : createDefaultAuctionRefreshState();
+  state.rouletteStats = state.rouletteStats && typeof state.rouletteStats === "object"
+    ? { ...createDefaultRouletteStats(), ...state.rouletteStats }
+    : createDefaultRouletteStats();
+  state.neverendUi = state.neverendUi && typeof state.neverendUi === "object"
+    ? { ...createDefaultNeverendUiState(), ...state.neverendUi }
+    : createDefaultNeverendUiState();
+}
+
+function ensureOtherworldState() {
+  if (typeof state.otherworldUnlocked !== "boolean") state.otherworldUnlocked = false;
+  if (typeof state.otherworldKingDefeatCount !== "number") state.otherworldKingDefeatCount = 0;
+  if (typeof state.otherworldKingFirstDefeatRewardClaimed !== "boolean") state.otherworldKingFirstDefeatRewardClaimed = false;
+  if (typeof state.otherworldKingTenDefeatRewardClaimed !== "boolean") state.otherworldKingTenDefeatRewardClaimed = false;
+  if (typeof state.otherworldKingHundredDefeatRewardClaimed !== "boolean") state.otherworldKingHundredDefeatRewardClaimed = false;
+  if (typeof state.otherworldKingCleared !== "boolean") state.otherworldKingCleared = false;
+  if (typeof state.otherworldKingSupportLogMode !== "boolean") state.otherworldKingSupportLogMode = false;
+  if (typeof state.otherworldLevelCapBonus !== "number") state.otherworldLevelCapBonus = 0;
+  if (typeof state.otherworldNormalTitleSlotBonus !== "number") state.otherworldNormalTitleSlotBonus = 0;
+  if (typeof state.otherworldCheatTitleSlotBonus !== "number") state.otherworldCheatTitleSlotBonus = 0;
+  if (typeof state.hasProtagonistTitle !== "boolean") state.hasProtagonistTitle = false;
+  if (typeof state.endingUnlocked !== "boolean") state.endingUnlocked = false;
+  state.otherworldKingDefeatCount = Math.max(0, Math.floor(state.otherworldKingDefeatCount || 0));
+  state.otherworldLevelCapBonus = Math.max(0, Math.floor(state.otherworldLevelCapBonus || 0));
+  state.otherworldNormalTitleSlotBonus = Math.max(0, Math.floor(state.otherworldNormalTitleSlotBonus || 0));
+  state.otherworldCheatTitleSlotBonus = Math.max(0, Math.floor(state.otherworldCheatTitleSlotBonus || 0));
+  if (hasOtherworldKey(state)) state.hasOtherworldKey = true;
+}
+
+function unlockOtherworldAccess(options = {}) {
+  ensureOtherworldState();
+  const { silent = false, reason = "" } = options;
+  if (state.otherworldUnlocked) return false;
+  state.otherworldUnlocked = true;
+  if (!state.unlockedTowns.includes("otherworld")) {
+    state.unlockedTowns.push("otherworld");
+  }
+  if (!silent) {
+    addLog(`異界への道が開いた。${reason ? ` (${reason})` : ""}`, "important", { important: true });
+    showCenterPopup({ text: "異界 解放", type: "important" });
+  }
+  return true;
+}
+
+function syncOtherworldUnlockState(options = {}) {
+  ensureOtherworldState();
+  const silent = !!options.silent;
+  let reason = "";
+  if (hasOtherworldKey(state)) reason = "異界のカギ";
+  if (hasAllUniqueDefeated(state) && !reason) reason = "ユニーク全撃破";
+  if (reason) {
+    unlockOtherworldAccess({ silent, reason });
+  }
+}
+
+function unlockNeverendAccess(options = {}) {
+  ensureNeverendState();
+  const { silent = false, fromTicket = false } = options;
+  state.hasNeverendTicket = true;
+  state.neverendUnlocked = true;
+  if (!state.unlockedTowns.includes("neverend")) {
+    if (silent) {
+      state.unlockedTowns.push("neverend");
+    } else {
+      unlockTown("neverend");
+    }
+  }
+  if (!silent) {
+    addLog(fromTicket ? "天空都市ネバーエンドの入場権を取得した。" : "天空都市ネバーエンドへの入場が解放された。");
+  }
+}
 
 const TITLE_SLOT_RULES = {
   normal: {
@@ -616,6 +862,7 @@ const ITEM_DATA = {
   hiEther: { id: "hiEther", name: "ハイエーテル", nameJa: "ハイエーテル", category: "consumable", effectType: "heal_mp", healAmount: 0, cooldown: 10, description: "MPを中回復。", descriptionJa: "MPを中回復。", autoUsable: true, buyPrice: 72, sellPrice: 36 },
   hiPotion: { id: "hiPotion", name: "ハイポーション", nameJa: "ハイポーション", category: "consumable", effectType: "heal_hp", healAmount: 70, cooldown: 8, description: "HPを中回復。", descriptionJa: "HPを中回復。", autoUsable: true, buyPrice: 45, sellPrice: 22 },
   antidote: { id: "antidote", name: "毒消し", category: "consumable", description: "毒を治療。", buyPrice: 24, sellPrice: 12 },
+  neverendTicket: { id: "neverendTicket", name: "天空都市入場券", category: "special", description: "天空都市ネバーエンドへの入場権。", buyPrice: NEVEREND_ACCESS_DATA.defaultTicketPrice, sellPrice: 0 },
   herb: { id: "herb", name: "薬草", category: "material", description: "回復薬素材。", buyPrice: 10, sellPrice: 5 },
   grilledMeat: { id: "grilledMeat", name: "焼き肉", category: "crafted", description: "香ばしい料理。", buyPrice: 0, sellPrice: 16 },
   ...Object.fromEntries(
@@ -639,6 +886,7 @@ const SHOP_ITEM_IDS = [
   "hiPotion",
   "hiEther",
   "antidote",
+  "neverendTicket",
   "herb",
   "woodSword",
   "ironSword",
@@ -686,6 +934,20 @@ Object.assign(ITEM_DATA, {
   hydraScale: { id: "hydraScale", name: "ヒドラ鱗", category: "material", description: "砂海ヒドラの鱗片", buyPrice: 0, sellPrice: 140 },
   leviathanFin: { id: "leviathanFin", name: "リヴァイア鰭", category: "material", description: "蒼海王の巨大な鰭", buyPrice: 0, sellPrice: 220 },
   volkaCore: { id: "volkaCore", name: "ヴォルカ核", category: "material", description: "炎獄竜の灼熱核", buyPrice: 0, sellPrice: 340 }
+  ,
+  controlBoard: { id: "controlBoard", name: "制御基板", category: "material", description: "機械都市の中枢制御基板", buyPrice: 0, sellPrice: 420, neverendExclusive: true },
+  overclockCircuit: { id: "overclockCircuit", name: "オーバークロック回路", category: "material", description: "暴走制御用の高熱回路", buyPrice: 0, sellPrice: 540, neverendExclusive: true },
+  collapseArmorShard: { id: "collapseArmorShard", name: "崩壊装甲片", category: "material", description: "高密度装甲の破断片", buyPrice: 0, sellPrice: 680, neverendExclusive: true },
+  skyFurnaceCore: { id: "skyFurnaceCore", name: "天空炉心", category: "material", description: "天空都市炉の心臓部", buyPrice: 0, sellPrice: 960, neverendExclusive: true },
+  divineSteelBase: { id: "divineSteelBase", name: "神鉄の素地", category: "material", description: "神鉄加工の中間素材", buyPrice: 0, sellPrice: 520, neverendExclusive: true },
+  emptyAetherBoard: { id: "emptyAetherBoard", name: "空魔導基板", category: "material", description: "空属性導線を刻んだ基板", buyPrice: 0, sellPrice: 560, neverendExclusive: true },
+  blessingCircuit: { id: "blessingCircuit", name: "祝福回路", category: "material", description: "安定化祝福が刻まれた回路", buyPrice: 0, sellPrice: 640, neverendExclusive: true },
+  royalCatalyst: { id: "royalCatalyst", name: "王家の触媒", category: "material", description: "王家印の高純度触媒", buyPrice: 0, sellPrice: 780, neverendExclusive: true },
+  kingsElixir: { id: "kingsElixir", name: "王の秘薬", category: "consumable", effectType: "heal_hp", healAmount: 180, cooldown: 12, description: "王都級の再生をもたらす秘薬", buyPrice: 0, sellPrice: 900, neverendExclusive: true },
+  angelElixir: { id: "angelElixir", name: "天使の霊薬", category: "consumable", effectType: "heal_hp", healAmount: 360, cooldown: 16, description: "戦闘不能寸前から立て直す霊薬", buyPrice: 0, sellPrice: 1300, neverendExclusive: true },
+  berserkStim: { id: "berserkStim", name: "暴走促進剤", category: "consumable", description: "攻撃性を極限まで高める危険薬", buyPrice: 0, sellPrice: 1600, neverendExclusive: true },
+  fullRebootDrug: { id: "fullRebootDrug", name: "完全再起動薬", category: "consumable", effectType: "heal_hp", healAmount: 520, cooldown: 20, description: "身体機能を初期化し全快を狙う", buyPrice: 0, sellPrice: 2100, neverendExclusive: true },
+  otherworldKey: { id: "otherworldKey", name: "異界のカギ", category: "special", description: "この世のものとは思えないカギ", buyPrice: 0, sellPrice: 0, neverendExclusive: true, futureFlag: "otherworld_key_owned" }
 });
 
 const REGIONAL_EQUIPMENT_DEFS = [
@@ -754,7 +1016,8 @@ const REGIONAL_EQUIPMENT_DEFS = [
   { id: "volcaCrest", name: "ヴォルカクレスト", category: "accessory", unlockTown: "rulacia", rarity: "mythic", attack: 10, defense: 10, speed: -1, intelligence: 4, luck: 4, hp: 32, mp: 16, weight: 4, price: 5980, sellPrice: 2392, specialTags: ["volcano", "boss_series", "boss_damage"], description: "火耐性と殴り合い性能を伸ばす頂点護章。" }
 ];
 
-function registerRegionalEquipment(defs) {
+function registerRegionalEquipment(defs, options = {}) {
+  const addToShop = options.addToShop !== false;
   defs.forEach((eq) => {
     EQUIPMENT_DATA[eq.id] = {
       id: eq.id,
@@ -774,7 +1037,8 @@ function registerRegionalEquipment(defs) {
       price: eq.price || 0,
       sellPrice: eq.sellPrice || 0,
       description: eq.description || "",
-      unlockTown: eq.unlockTown || null
+      unlockTown: eq.unlockTown || null,
+      neverendExclusive: !!eq.neverendExclusive
     };
     ITEM_DATA[eq.id] = {
       id: eq.id,
@@ -783,15 +1047,72 @@ function registerRegionalEquipment(defs) {
       description: eq.description || "",
       buyPrice: eq.price || 0,
       sellPrice: eq.sellPrice || 0,
-      unlockTown: eq.unlockTown || null
+      unlockTown: eq.unlockTown || null,
+      neverendExclusive: !!eq.neverendExclusive
     };
-    if (!SHOP_ITEM_IDS.includes(eq.id)) {
+    if (addToShop && !SHOP_ITEM_IDS.includes(eq.id)) {
       SHOP_ITEM_IDS.push(eq.id);
     }
   });
 }
 
 registerRegionalEquipment(REGIONAL_EQUIPMENT_DEFS);
+
+const NEVEREND_AUCTION_EQUIPMENT_DEFS = [
+  { id: "reversalGreatsword", name: "逆転の大剣", category: "weapon", unlockTown: "neverend", rarity: "mythic", attack: 138, defense: -16, speed: 6, intelligence: 0, luck: 7, hp: 0, mp: 0, weight: 46, price: 0, sellPrice: 6600, specialTags: ["neverend", "high_risk", "execution"], description: "防御を捨てるほど火力が伸びる逆転型大剣。", neverendExclusive: true },
+  { id: "voidEaterTwins", name: "空欄喰らいの双刃", category: "weapon", unlockTown: "neverend", rarity: "mythic", attack: 112, defense: 0, speed: 22, intelligence: 0, luck: 12, hp: -22, mp: 0, weight: 26, price: 0, sellPrice: 7200, specialTags: ["neverend", "multi_hit", "high_risk"], description: "隙間を裂く超高速双刃。", neverendExclusive: true },
+  { id: "overloadRod", name: "オーバーロードロッド", category: "weapon", unlockTown: "neverend", rarity: "mythic", attack: 30, defense: 2, speed: 4, intelligence: 96, luck: 8, hp: 0, mp: 78, weight: 24, price: 0, sellPrice: 7600, specialTags: ["neverend", "magic", "overclock"], description: "高負荷詠唱で術火力を押し上げるロッド。", neverendExclusive: true },
+  { id: "grailCrusherMace", name: "聖杯砕きのメイス", category: "weapon", unlockTown: "neverend", rarity: "mythic", attack: 88, defense: 28, speed: -4, intelligence: 40, luck: 4, hp: 60, mp: 20, weight: 40, price: 0, sellPrice: 7500, specialTags: ["neverend", "support", "boss_damage"], description: "祈りごと叩き割る重聖メイス。", neverendExclusive: true },
+  { id: "goldfangKunai", name: "黄金牙の苦無", category: "weapon", unlockTown: "neverend", rarity: "mythic", attack: 98, defense: 2, speed: 24, intelligence: 0, luck: 22, hp: 0, mp: 0, weight: 16, price: 0, sellPrice: 7300, specialTags: ["neverend", "lucky", "speed"], description: "会心時に爆発力が跳ねる苦無。", neverendExclusive: true },
+  { id: "crackedExcalibur", name: "ひび割れたエクスカリバー", category: "weapon", unlockTown: "neverend", rarity: "mythic", attack: 168, defense: 8, speed: -12, intelligence: 0, luck: 0, hp: -80, mp: 0, weight: 66, price: 0, sellPrice: 11000, specialTags: ["neverend", "ultra_risk", "burst"], description: "扱いは難しいが瞬間火力は規格外。", neverendExclusive: true },
+
+  { id: "cursedHeavyArmor", name: "呪縛の重鎧", category: "armor", unlockTown: "neverend", rarity: "mythic", attack: 2, defense: 88, speed: -12, intelligence: 0, luck: 0, hp: 136, mp: -20, weight: 86, price: 0, sellPrice: 8600, specialTags: ["neverend", "heavy_armor", "high_risk"], description: "圧倒的耐久と引き換えに機動を奪う。", neverendExclusive: true },
+  { id: "mirageMantleNeo", name: "蜃気楼の外套", category: "armor", unlockTown: "neverend", rarity: "mythic", attack: 10, defense: 42, speed: 18, intelligence: 14, luck: 10, hp: 24, mp: 32, weight: 28, price: 0, sellPrice: 7900, specialTags: ["neverend", "speed_build", "evasion"], description: "幻像を重ねて被弾を散らす外套。", neverendExclusive: true },
+  { id: "gamblerRobe", name: "賭博師の法衣", category: "armor", unlockTown: "neverend", rarity: "mythic", attack: 0, defense: 34, speed: 10, intelligence: 28, luck: 24, hp: 8, mp: 44, weight: 20, price: 0, sellPrice: 8200, specialTags: ["neverend", "lucky", "magic_armor"], description: "運が良ければ極めて強い賭博法衣。", neverendExclusive: true },
+  { id: "refusalWorkwear", name: "終業拒否の作業服", category: "armor", unlockTown: "neverend", rarity: "mythic", attack: 4, defense: 64, speed: 6, intelligence: 8, luck: 4, hp: 88, mp: 12, weight: 42, price: 0, sellPrice: 8000, specialTags: ["neverend", "defense_build", "sustain"], description: "長期戦でしぶとく粘る作業服。", neverendExclusive: true },
+  { id: "unbrokenFormal", name: "崩れぬ礼装", category: "armor", unlockTown: "neverend", rarity: "mythic", attack: 6, defense: 56, speed: 8, intelligence: 18, luck: 10, hp: 66, mp: 28, weight: 34, price: 0, sellPrice: 8700, specialTags: ["neverend", "balanced", "elite"], description: "攻防を崩さない上位礼装。", neverendExclusive: true },
+
+  { id: "luckyRuinRing", name: "幸運破産の指輪", category: "accessory", unlockTown: "neverend", rarity: "mythic", attack: 10, defense: -6, speed: 8, intelligence: 4, luck: 30, hp: 0, mp: 0, weight: 2, price: 0, sellPrice: 7000, specialTags: ["neverend", "lucky", "high_risk"], description: "超高幸運だが防御事故が起こりやすい。", neverendExclusive: true },
+  { id: "chainBattleNecklace", name: "連戦中毒の首飾り", category: "accessory", unlockTown: "neverend", rarity: "mythic", attack: 14, defense: 4, speed: 10, intelligence: 2, luck: 8, hp: 34, mp: 10, weight: 3, price: 0, sellPrice: 7400, specialTags: ["neverend", "aggressive", "sustain"], description: "連戦時の火力維持に特化した首飾り。", neverendExclusive: true },
+  { id: "adversityEmblem", name: "逆境の徽章", category: "accessory", unlockTown: "neverend", rarity: "mythic", attack: 8, defense: 8, speed: 6, intelligence: 8, luck: 8, hp: 42, mp: 20, weight: 3, price: 0, sellPrice: 7600, specialTags: ["neverend", "boss_damage", "balanced"], description: "劣勢で真価を発揮する徽章。", neverendExclusive: true },
+  { id: "runawayReactorCharm", name: "暴走炉の護符", category: "accessory", unlockTown: "neverend", rarity: "mythic", attack: 20, defense: 0, speed: 4, intelligence: 18, luck: 4, hp: 0, mp: 24, weight: 4, price: 0, sellPrice: 7800, specialTags: ["neverend", "overclock", "burst"], description: "攻撃偏重の暴走炉護符。", neverendExclusive: true },
+  { id: "outControlUnit", name: "制御外ユニット", category: "accessory", unlockTown: "neverend", rarity: "mythic", attack: 26, defense: -10, speed: 16, intelligence: 10, luck: 12, hp: -20, mp: 16, weight: 4, price: 0, sellPrice: 9800, specialTags: ["neverend", "ultra_risk", "speed"], description: "制御不能な代わりに性能は規格外。", neverendExclusive: true }
+];
+
+registerRegionalEquipment(NEVEREND_AUCTION_EQUIPMENT_DEFS, { addToShop: false });
+
+const NEVEREND_AUCTION_ITEM_TABLE = [
+  { id: "auction_reversalGreatsword", itemId: "reversalGreatsword", chipPrice: 30000, category: "weapon", neverendExclusive: true },
+  { id: "auction_voidEaterTwins", itemId: "voidEaterTwins", chipPrice: 50000, category: "weapon", neverendExclusive: true },
+  { id: "auction_overloadRod", itemId: "overloadRod", chipPrice: 100000, category: "weapon", neverendExclusive: true },
+  { id: "auction_grailCrusherMace", itemId: "grailCrusherMace", chipPrice: 90000, category: "weapon", neverendExclusive: true },
+  { id: "auction_goldfangKunai", itemId: "goldfangKunai", chipPrice: 85000, category: "weapon", neverendExclusive: true },
+  { id: "auction_crackedExcalibur", itemId: "crackedExcalibur", chipPrice: 500000, category: "weapon", neverendExclusive: true },
+
+  { id: "auction_cursedHeavyArmor", itemId: "cursedHeavyArmor", chipPrice: 120000, category: "armor", neverendExclusive: true },
+  { id: "auction_mirageMantleNeo", itemId: "mirageMantleNeo", chipPrice: 100000, category: "armor", neverendExclusive: true },
+  { id: "auction_gamblerRobe", itemId: "gamblerRobe", chipPrice: 100000, category: "armor", neverendExclusive: true },
+  { id: "auction_refusalWorkwear", itemId: "refusalWorkwear", chipPrice: 110000, category: "armor", neverendExclusive: true },
+  { id: "auction_unbrokenFormal", itemId: "unbrokenFormal", chipPrice: 130000, category: "armor", neverendExclusive: true },
+
+  { id: "auction_luckyRuinRing", itemId: "luckyRuinRing", chipPrice: 100000, category: "accessory", neverendExclusive: true },
+  { id: "auction_chainBattleNecklace", itemId: "chainBattleNecklace", chipPrice: 100000, category: "accessory", neverendExclusive: true },
+  { id: "auction_adversityEmblem", itemId: "adversityEmblem", chipPrice: 120000, category: "accessory", neverendExclusive: true },
+  { id: "auction_runawayReactorCharm", itemId: "runawayReactorCharm", chipPrice: 150000, category: "accessory", neverendExclusive: true },
+  { id: "auction_outControlUnit", itemId: "outControlUnit", chipPrice: 300000, category: "accessory", neverendExclusive: true },
+
+  { id: "auction_divineSteelBase", itemId: "divineSteelBase", chipPrice: 10000, category: "material", neverendExclusive: true },
+  { id: "auction_emptyAetherBoard", itemId: "emptyAetherBoard", chipPrice: 30000, category: "material", neverendExclusive: true },
+  { id: "auction_collapseArmorShard", itemId: "collapseArmorShard", chipPrice: 50000, category: "material", neverendExclusive: true },
+  { id: "auction_blessingCircuit", itemId: "blessingCircuit", chipPrice: 100000, category: "material", neverendExclusive: true },
+  { id: "auction_royalCatalyst", itemId: "royalCatalyst", chipPrice: 300000, category: "material", neverendExclusive: true },
+
+  { id: "auction_kingsElixir", itemId: "kingsElixir", chipPrice: 10000, category: "consumable", neverendExclusive: true },
+  { id: "auction_angelElixir", itemId: "angelElixir", chipPrice: 30000, category: "consumable", neverendExclusive: true },
+  { id: "auction_berserkStim", itemId: "berserkStim", chipPrice: 50000, category: "consumable", neverendExclusive: true },
+  { id: "auction_fullRebootDrug", itemId: "fullRebootDrug", chipPrice: 100000, category: "consumable", neverendExclusive: true },
+  { id: "auction_otherworldKey", itemId: "otherworldKey", chipPrice: 1000000, category: "special", neverendExclusive: true }
+];
 
 function normalizeItemData() {
   Object.keys(ITEM_DATA).forEach((itemId) => {
@@ -863,7 +1184,9 @@ const TOWN_DATA = {
   balladore: { id: "balladore", name: "王国 バラードール", mapId: "grassland", unlockByFieldBossStage: null },
   dustria: { id: "dustria", name: "砂漠の国 ダストリア", mapId: "desert", unlockByFieldBossStage: "1-10" },
   akamatsu: { id: "akamatsu", name: "海の国 赤枩", mapId: "sea", unlockByFieldBossStage: "2-10" },
-  rulacia: { id: "rulacia", name: "火の国 ルーラシア", mapId: "volcano", unlockByFieldBossStage: "3-10" }
+  rulacia: { id: "rulacia", name: "火の国 ルーラシア", mapId: "volcano", unlockByFieldBossStage: "3-10" },
+  neverend: { id: "neverend", name: "天空都市ネバーエンド", mapId: "neverend", unlockByFieldBossStage: null },
+  otherworld: { id: "otherworld", name: "異界", mapId: "otherworld", unlockByFieldBossStage: null }
 };
 
 const MAP_DATA = {
@@ -906,6 +1229,26 @@ const MAP_DATA = {
     normalEnemyPool: ["flameBat", "lavaSlime", "magmaLizard", "scorchWolf", "ignisGolem", "fireElemental", "magmaTurtle"],
     fieldBoss: "volkazard",
     bossGimmick: { type: "enrage", triggerHpRate: 0.45, warning: "ヴォルカザードが怒り狂った!", attackBoost: 1.35, hint: "終盤はバフで押し切る" }
+  },
+  neverend: {
+    id: "neverend",
+    mapIndex: 5,
+    name: "天空都市ネバーエンド",
+    region: "天空",
+    recommendedLevel: "200-320",
+    normalEnemyPool: ["skygearDrone", "autoTurret", "metalHound", "bladeWorker", "repairUnit", "heavyFrame", "plasmaCore", "dataEater", "guardianArm", "hollowEnforcer", "signalCore", "overloadFrame"],
+    fieldBoss: "protocol3",
+    bossGimmick: { type: "protocol3Core", triggerHpRate: 0.3, warning: "Protocol3 が過熱し、制御崩壊モードへ移行した!", hint: "終盤は危険だが装甲が緩む。押し切れ。" }
+  },
+  otherworld: {
+    id: "otherworld",
+    mapIndex: 6,
+    name: "異界",
+    region: "異界",
+    recommendedLevel: "260-420",
+    normalEnemyPool: ["riftGnawer", "hollowWalker", "fragmentBeast", "abyssHand", "facelessPredator", "collapseEye", "lifelineReaper"],
+    fieldBoss: "otherworldKing",
+    bossGimmick: { type: "otherworldKing", triggerHpRate: 0.5, warning: "異界の王が世界法則を捻じ曲げる。", hint: "敗北すら糧にしろ。" }
   }
 };
 
@@ -1059,7 +1402,9 @@ const SHOP_REGION_TABS = [
   { id: "grassland", label: "草原" },
   { id: "desert", label: "砂漠" },
   { id: "sea", label: "海" },
-  { id: "volcano", label: "火山" }
+  { id: "volcano", label: "火山" },
+  { id: "neverend", label: "天空都市" },
+  { id: "otherworld", label: "異界" }
 ];
 
 const MAP_SCALING_DATA = {
@@ -1128,6 +1473,38 @@ const MAP_SCALING_DATA = {
     gimmickDamageMultiplier: 1.62,
     gimmickScalePerStage: 0.04
   },
+  neverend: {
+    mapBaseMultiplier: 2.9,
+    attackBaseMultiplier: 2.85,
+    defenseBaseMultiplier: 2.52,
+    speedBaseMultiplier: 1.09,
+    hpScalePerStage: 0.11,
+    attackScalePerStage: 0.13,
+    defenseScalePerStage: 0.1,
+    speedScalePerStage: 0.018,
+    bossBonusMultiplier: 2.08,
+    bossAttackMultiplier: 1.42,
+    bossDefenseMultiplier: 1.36,
+    bossSpeedMultiplier: 1.24,
+    gimmickDamageMultiplier: 1.85,
+    gimmickScalePerStage: 0.05
+  },
+  otherworld: {
+    mapBaseMultiplier: 3.55,
+    attackBaseMultiplier: 3.62,
+    defenseBaseMultiplier: 3.18,
+    speedBaseMultiplier: 1.2,
+    hpScalePerStage: 0.12,
+    attackScalePerStage: 0.14,
+    defenseScalePerStage: 0.11,
+    speedScalePerStage: 0.02,
+    bossBonusMultiplier: 2.35,
+    bossAttackMultiplier: 1.58,
+    bossDefenseMultiplier: 1.46,
+    bossSpeedMultiplier: 1.33,
+    gimmickDamageMultiplier: 2.0,
+    gimmickScalePerStage: 0.06
+  },
   default: {
     mapBaseMultiplier: 1,
     attackBaseMultiplier: 1,
@@ -1194,6 +1571,39 @@ const ADVENTURE_REGION_BALANCE_CONFIG = {
       magmaTurtle: { hp: 1.32, attack: 1.2, defense: 1.32, speed: 0.95, intelligence: 1.04, luck: 1.02 },
       volkazard: { hp: 1.18, attack: 1.16, defense: 1.16, speed: 1.08, intelligence: 1.1, luck: 1.08 }
     }
+  },
+  neverend: {
+    regionBase: { hp: 1.08, attack: 1.62, defense: 1.66, speed: 1.14, intelligence: 1.18, luck: 1.12 },
+    stageGrowth: { hp: 0.008, attack: 0.018, defense: 0.016, speed: 0.006, intelligence: 0.007, luck: 0.005 },
+    lateStageSpike: { fromStage: 7, hp: 1.06, attack: 1.18, defense: 1.16, speed: 1.1, intelligence: 1.12, luck: 1.08 },
+    stageBossCandidate: { fromStage: 8, hp: 1.06, attack: 1.14, defense: 1.12, speed: 1.08, intelligence: 1.1, luck: 1.08 },
+    fieldBoss: { hp: 1.08, attack: 1.2, defense: 1.22, speed: 1.13, intelligence: 1.14, luck: 1.1 },
+    gimmick: { damageMultiplier: 1.45, attackBoostMultiplier: 1.2 },
+    enemySpecific: {
+      skygearDrone: { hp: 0.96, attack: 1.18, defense: 1.12, speed: 1.2, intelligence: 1.06, luck: 1.08 },
+      autoTurret: { hp: 0.92, attack: 1.22, defense: 1.32, speed: 0.9, intelligence: 1.08, luck: 1.04 },
+      metalHound: { hp: 1.0, attack: 1.2, defense: 1.14, speed: 1.22, intelligence: 1.02, luck: 1.08 },
+      bladeWorker: { hp: 0.95, attack: 1.24, defense: 1.14, speed: 1.24, intelligence: 1.06, luck: 1.1 },
+      repairUnit: { hp: 0.9, attack: 1.02, defense: 1.18, speed: 1.1, intelligence: 1.26, luck: 1.06 },
+      heavyFrame: { hp: 1.2, attack: 1.28, defense: 1.4, speed: 0.86, intelligence: 1.05, luck: 1.02 },
+      plasmaCore: { hp: 0.86, attack: 1.34, defense: 1.08, speed: 1.16, intelligence: 1.32, luck: 1.1 },
+      dataEater: { hp: 0.88, attack: 1.22, defense: 1.12, speed: 1.18, intelligence: 1.28, luck: 1.12 },
+      guardianArm: { hp: 1.12, attack: 1.3, defense: 1.42, speed: 0.92, intelligence: 1.1, luck: 1.04 },
+      overloadFrame: { hp: 1.18, attack: 1.36, defense: 1.4, speed: 0.95, intelligence: 1.14, luck: 1.06 },
+      protocol3: { hp: 1.05, attack: 1.38, defense: 1.45, speed: 1.16, intelligence: 1.18, luck: 1.1 }
+    }
+  },
+  otherworld: {
+    regionBase: { hp: 1.3, attack: 1.86, defense: 1.62, speed: 1.22, intelligence: 1.28, luck: 1.2 },
+    stageGrowth: { hp: 0.016, attack: 0.022, defense: 0.018, speed: 0.008, intelligence: 0.01, luck: 0.008 },
+    lateStageSpike: { fromStage: 6, hp: 1.08, attack: 1.2, defense: 1.16, speed: 1.12, intelligence: 1.1, luck: 1.08 },
+    stageBossCandidate: { fromStage: 1, hp: 1.0, attack: 1.0, defense: 1.0, speed: 1.0, intelligence: 1.0, luck: 1.0 },
+    fieldBoss: { hp: 1.18, attack: 1.36, defense: 1.26, speed: 1.18, intelligence: 1.22, luck: 1.14 },
+    gimmick: { damageMultiplier: 1.6, attackBoostMultiplier: 1.28 },
+    enemySpecific: {
+      otherworldKing: { hp: 1.2, attack: 1.4, defense: 1.34, speed: 1.22, intelligence: 1.28, luck: 1.2 },
+      awakenedProtocol3: { hp: 1.14, attack: 1.34, defense: 1.3, speed: 1.2, intelligence: 1.24, luck: 1.16 }
+    }
   }
 };
 
@@ -1210,7 +1620,7 @@ function multiplyStatMultipliers(target, values) {
 
 function getAdventureRegionStatMultipliers(enemy, stageData) {
   const base = { hp: 1, attack: 1, defense: 1, speed: 1, intelligence: 1, luck: 1 };
-  if (!enemy || !stageData || !["desert", "sea", "volcano"].includes(stageData.mapId)) {
+  if (!enemy || !stageData || !["desert", "sea", "volcano", "neverend", "otherworld"].includes(stageData.mapId)) {
     return base;
   }
   const config = ADVENTURE_REGION_BALANCE_CONFIG[stageData.mapId];
@@ -1270,7 +1680,7 @@ function isMainAdventureStage(stageId) {
   if (!stage) {
     return false;
   }
-  if (!["grassland", "desert", "sea", "volcano"].includes(stage.mapId)) {
+  if (!["grassland", "desert", "sea", "volcano", "neverend", "otherworld"].includes(stage.mapId)) {
     return false;
   }
   return stage.stageNo >= 1 && stage.stageNo <= 10;
@@ -1519,6 +1929,36 @@ const ENEMY_DATA = {
   magmaTurtle: enemyTemplate({ id: "magmaTurtle", name: "マグマタートル", species: "reptile", region: "volcano", rarity: "elite", hp: 1680, attack: 160, defense: 125, speed: 16, intelligence: 30, luck: 19, exp: 420, gold: 350 }),
   volkazard: enemyTemplate({ id: "volkazard", name: "炎獄竜 ヴォルカザード", species: "boss", region: "volcano", rarity: "fieldBoss", hp: 4200, attack: 238, defense: 150, speed: 40, intelligence: 62, luck: 30, exp: 5200, gold: 4300, aiType: "boss" }),
 
+  skygearDrone: enemyTemplate({ id: "skygearDrone", name: "スカイギア・ドローン", species: "machine", region: "neverend", hp: 2100, attack: 420, defense: 360, speed: 108, intelligence: 82, luck: 35, exp: 2300, gold: 2600 }),
+  autoTurret: enemyTemplate({ id: "autoTurret", name: "オートタレット", species: "machine", region: "neverend", hp: 2400, attack: 520, defense: 440, speed: 52, intelligence: 88, luck: 30, exp: 2700, gold: 3000 }),
+  metalHound: enemyTemplate({ id: "metalHound", name: "メタルハウンド", species: "machine", region: "neverend", hp: 2200, attack: 480, defense: 390, speed: 116, intelligence: 78, luck: 34, exp: 2450, gold: 2800 }),
+  bladeWorker: enemyTemplate({ id: "bladeWorker", name: "ブレードワーカー", species: "machine", region: "neverend", hp: 2000, attack: 560, defense: 370, speed: 122, intelligence: 84, luck: 36, exp: 2500, gold: 2920 }),
+  repairUnit: enemyTemplate({ id: "repairUnit", name: "リペアユニット", species: "machine", region: "neverend", hp: 1900, attack: 300, defense: 420, speed: 95, intelligence: 120, luck: 32, exp: 2400, gold: 2850 }),
+  heavyFrame: enemyTemplate({ id: "heavyFrame", name: "ヘヴィフレーム", species: "machine", region: "neverend", rarity: "elite", hp: 2900, attack: 620, defense: 560, speed: 48, intelligence: 92, luck: 28, exp: 3200, gold: 3900 }),
+  plasmaCore: enemyTemplate({ id: "plasmaCore", name: "プラズマコア", species: "machine", region: "neverend", hp: 1700, attack: 660, defense: 340, speed: 102, intelligence: 132, luck: 40, exp: 3150, gold: 3600 }),
+  dataEater: enemyTemplate({ id: "dataEater", name: "データイーター", species: "machine", region: "neverend", hp: 1850, attack: 520, defense: 360, speed: 98, intelligence: 126, luck: 44, exp: 3000, gold: 3420 }),
+
+  guardianArm: enemyTemplate({ id: "guardianArm", name: "ガーディアン・アーム", species: "machine", region: "neverend", rarity: "elite", hp: 3200, attack: 680, defense: 590, speed: 62, intelligence: 96, luck: 32, exp: 3800, gold: 4300 }),
+  hollowEnforcer: enemyTemplate({ id: "hollowEnforcer", name: "ホロウ・エンフォーサー", species: "machine", region: "neverend", rarity: "elite", hp: 2700, attack: 720, defense: 500, speed: 84, intelligence: 110, luck: 36, exp: 4000, gold: 4450 }),
+  signalCore: enemyTemplate({ id: "signalCore", name: "シグナル・コア", species: "machine", region: "neverend", rarity: "elite", hp: 2500, attack: 760, defense: 480, speed: 90, intelligence: 136, luck: 42, exp: 4100, gold: 4600 }),
+  overloadFrame: enemyTemplate({ id: "overloadFrame", name: "オーバーロード・フレーム", species: "machine", region: "neverend", rarity: "elite", hp: 3800, attack: 820, defense: 660, speed: 72, intelligence: 120, luck: 40, exp: 6200, gold: 7000, aiType: "boss" }),
+  protocol3: enemyTemplate({ id: "protocol3", name: "Protocol3", species: "machineBoss", region: "neverend", rarity: "fieldBoss", hp: 9800, attack: 980, defense: 900, speed: 128, intelligence: 156, luck: 54, exp: 22000, gold: 26000, aiType: "boss" }),
+
+  riftGnawer: enemyTemplate({ id: "riftGnawer", name: "歪み喰らい", species: "otherworld", region: "otherworld", hp: 6200, attack: 1180, defense: 760, speed: 132, intelligence: 150, luck: 62, exp: 18000, gold: 15000 }),
+  hollowWalker: enemyTemplate({ id: "hollowWalker", name: "虚ろ歩き", species: "otherworld", region: "otherworld", hp: 7000, attack: 1120, defense: 860, speed: 120, intelligence: 142, luck: 60, exp: 19000, gold: 16000 }),
+  fragmentBeast: enemyTemplate({ id: "fragmentBeast", name: "断章獣", species: "otherworld", region: "otherworld", hp: 7600, attack: 1260, defense: 900, speed: 116, intelligence: 138, luck: 58, exp: 20500, gold: 17000 }),
+  abyssHand: enemyTemplate({ id: "abyssHand", name: "深淵の手", species: "otherworld", region: "otherworld", hp: 6400, attack: 1320, defense: 780, speed: 136, intelligence: 165, luck: 66, exp: 21000, gold: 17500 }),
+  facelessPredator: enemyTemplate({ id: "facelessPredator", name: "無貌の捕食者", species: "otherworld", region: "otherworld", hp: 8100, attack: 1360, defense: 940, speed: 128, intelligence: 156, luck: 68, exp: 22800, gold: 18800 }),
+  collapseEye: enemyTemplate({ id: "collapseEye", name: "崩界の眼", species: "otherworld", region: "otherworld", hp: 5800, attack: 1480, defense: 740, speed: 142, intelligence: 172, luck: 70, exp: 23000, gold: 19000 }),
+  lifelineReaper: enemyTemplate({ id: "lifelineReaper", name: "命脈断ち", species: "otherworld", region: "otherworld", hp: 7200, attack: 1420, defense: 880, speed: 138, intelligence: 168, luck: 72, exp: 24000, gold: 20000 }),
+
+  awakenedBehemothBison: enemyTemplate({ id: "awakenedBehemothBison", name: "覚醒ベヒモスバイソン", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 22000, attack: 1650, defense: 1220, speed: 136, intelligence: 180, luck: 78, exp: 52000, gold: 42000, aiType: "boss" }),
+  awakenedDuneHydra: enemyTemplate({ id: "awakenedDuneHydra", name: "覚醒デューンヒドラ", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 26000, attack: 1780, defense: 1320, speed: 144, intelligence: 188, luck: 82, exp: 56000, gold: 45000, aiType: "boss" }),
+  awakenedLeviathan: enemyTemplate({ id: "awakenedLeviathan", name: "覚醒リヴァイアサン", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 30000, attack: 1940, defense: 1420, speed: 152, intelligence: 202, luck: 86, exp: 62000, gold: 50000, aiType: "boss" }),
+  awakenedVolkazard: enemyTemplate({ id: "awakenedVolkazard", name: "覚醒ヴォルカザード", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 34000, attack: 2100, defense: 1560, speed: 160, intelligence: 214, luck: 90, exp: 68000, gold: 56000, aiType: "boss" }),
+  awakenedProtocol3: enemyTemplate({ id: "awakenedProtocol3", name: "覚醒Protocol3", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 36000, attack: 2280, defense: 1680, speed: 172, intelligence: 228, luck: 94, exp: 76000, gold: 64000, aiType: "boss" }),
+  otherworldKing: enemyTemplate({ id: "otherworldKing", name: "異界の王", species: "otherworldKing", region: "otherworld", rarity: "fieldBoss", hp: 88000, attack: 3300, defense: 2400, speed: 208, intelligence: 280, luck: 120, exp: 180000, gold: 120000, aiType: "boss" }),
+
   behemothBisonReborn: enemyTemplate({ id: "behemothBisonReborn", name: "ベヒモスバイソン・再臨", species: "boss", region: "grassland", rarity: "loopBoss", hp: 1600, attack: 118, defense: 74, speed: 28, intelligence: 22, luck: 18, exp: 2200, gold: 1800, aiType: "boss" }),
   duneHydraAbyss: enemyTemplate({ id: "duneHydraAbyss", name: "デューンヒドラ・深層種", species: "boss", region: "desert", rarity: "loopBoss", hp: 3200, attack: 186, defense: 118, speed: 34, intelligence: 46, luck: 24, exp: 4800, gold: 3900, aiType: "boss" }),
   leviathanOvertide: enemyTemplate({ id: "leviathanOvertide", name: "リヴァイアサン・暴走潮王", species: "boss", region: "sea", rarity: "loopBoss", hp: 6200, attack: 318, defense: 200, speed: 42, intelligence: 72, luck: 32, exp: 8800, gold: 7300, aiType: "boss" }),
@@ -1549,6 +1989,9 @@ function buildStageData() {
       const lvMin = Number(map.recommendedLevel.split("-")[0]);
       const lvMax = Number(map.recommendedLevel.split("-")[1]);
       const recommended = Math.floor(lvMin + ((lvMax - lvMin) * (i - 1)) / 9);
+      const isOtherworld = map.id === "otherworld";
+      const stageBossEnemyId = isOtherworld ? OTHERWORLD_STAGE_BOSS_DATA[stageId] || null : null;
+      const targetKills = isOtherworld ? (i === 10 ? 1 : 6) : (i === 10 ? 1 : 10);
       stages[stageId] = {
         id: stageId,
         mapId: map.id,
@@ -1556,10 +1999,13 @@ function buildStageData() {
         stageNo: i,
         recommendedLevel: recommended,
         normalEnemyPool: map.normalEnemyPool,
-        bossEnemy: i >= 8 ? map.normalEnemyPool[map.normalEnemyPool.length - 1] : null,
-        fieldBoss: i === 10 ? map.fieldBoss : null,
+        bossEnemy: isOtherworld ? stageBossEnemyId : (i >= 8 ? map.normalEnemyPool[map.normalEnemyPool.length - 1] : null),
+        fieldBoss: i === 10 ? (isOtherworld ? stageBossEnemyId : map.fieldBoss) : null,
         isFieldBossStage: i === 10,
-        targetKills: i === 10 ? 1 : 10
+        targetKills,
+        hasStageBoss: isOtherworld && i < 10,
+        stageBossEnemyId,
+        disableUniqueEncounter: isOtherworld
       };
     }
   });
@@ -1753,7 +2199,9 @@ const GUILD_REGION_RANK_CAP = {
   grassland: "C",
   desert: "B",
   sea: "A",
-  volcano: "S"
+  volcano: "S",
+  neverend: "S",
+  otherworld: "S"
 };
 const GUILD_RANK_TITLE_SLOT_BONUS = {
   D: { normal: 0, cheat: 0 },
@@ -1763,11 +2211,11 @@ const GUILD_RANK_TITLE_SLOT_BONUS = {
   S: { normal: 3, cheat: 2 }
 };
 const GUILD_QUEST_RANK_MAP_WEIGHTS = {
-  D: { grassland: 1.0, desert: 0, sea: 0, volcano: 0 },
-  C: { grassland: 0.45, desert: 0.55, sea: 0, volcano: 0 },
-  B: { grassland: 0.2, desert: 0.45, sea: 0.35, volcano: 0 },
-  A: { grassland: 0.1, desert: 0.25, sea: 0.4, volcano: 0.25 },
-  S: { grassland: 0.05, desert: 0.2, sea: 0.3, volcano: 0.45 }
+  D: { grassland: 1.0, desert: 0, sea: 0, volcano: 0, neverend: 0, otherworld: 0 },
+  C: { grassland: 0.45, desert: 0.55, sea: 0, volcano: 0, neverend: 0, otherworld: 0 },
+  B: { grassland: 0.2, desert: 0.45, sea: 0.35, volcano: 0, neverend: 0, otherworld: 0 },
+  A: { grassland: 0.1, desert: 0.25, sea: 0.4, volcano: 0.25, neverend: 0, otherworld: 0 },
+  S: { grassland: 0.04, desert: 0.16, sea: 0.24, volcano: 0.36, neverend: 0.14, otherworld: 0.06 }
 };
 
 const GUILD_QUEST_TEMPLATE_DATA = [
@@ -2365,6 +2813,13 @@ const REGION_GATHER_TABLE = {
     { itemId: "ironOre", weight: 24 },
     { itemId: "manaStone", weight: 18 },
     { itemId: "crystalShard", weight: 16 }
+  ],
+  neverend: [
+    { itemId: "controlBoard", weight: 28 },
+    { itemId: "overclockCircuit", weight: 24 },
+    { itemId: "collapseArmorShard", weight: 20 },
+    { itemId: "skyFurnaceCore", weight: 10 },
+    { itemId: "blessingCircuit", weight: 18 }
   ]
 };
 
@@ -3456,6 +3911,7 @@ applyEndingAffinities();
 const BOARD_CATEGORIES = [
   { id: "all", label: "すべて" },
   { id: "beginner", label: "初心者" },
+  { id: "theory", label: "考察" },
   { id: "strategy", label: "攻略" },
   { id: "boss", label: "ボス" },
   { id: "unique", label: "ユニーク" },
@@ -3467,6 +3923,13 @@ const BOARD_CATEGORIES = [
   { id: "loop", label: "周回勢" },
   { id: "chat", label: "雑談" }
 ];
+
+const BOARD_CHARACTER_PROFILES = {
+  romanSamurai: { id: "romanSamurai", name: "浪漫侍", role: "剣士系上位勢", style: "重装と武器強化を軸に安定攻略を語る。" },
+  crimsonMage: { id: "crimsonMage", name: "紅の魔術師", role: "魔術師系上位勢", style: "MP管理と単体高火力の最適化を好む。" },
+  akaBell: { id: "akaBell", name: "AKA.ベル", role: "忍者系上位勢", style: "回避と会心を絡めた変則ビルドを推す。" },
+  shimeSaba: { id: "shimeSaba", name: "守り神しめ鯖", role: "僧侶系上位勢", style: "過剰回復と防御シナジーの安定構築が得意。" }
+};
 
 const BOARD_RESPONSE_SETS = {
   starter_job: [
@@ -3575,6 +4038,82 @@ const BOARD_RESPONSE_SETS = {
   myth_godslayer: [
     { author: "神話踏破候補", body: "七体全部倒すと神殺しが出るって噂、ついに確認された。", tone: "legend", important: true },
     { author: "無課金仙人", body: "ここまで来ると別ゲーム。", tone: "loop" }
+  ],
+  story_grassland_clear: [
+    { author: "草原在住", body: "草原ボスの演出、討伐より『通すか止めるか』みたいに見えた。", tone: "theory", important: true },
+    { author: "運営監視班", body: "女神のセリフだけ妙に生っぽい。AI台本感が薄いんだよな。", tone: "theory" },
+    { author: "無課金仙人", body: "このゲーム、妙に現実感あるの怖い。", tone: "chat" }
+  ],
+  story_desert_clear: [
+    { author: "遺跡ガチ勢", body: "砂漠遺跡の壁面、生活圏の記録っぽい。背景画像の解像度じゃない。", tone: "theory", important: true },
+    { author: "七体目未発見", body: "ユニークって災厄扱いだけど、封印側の役目も持ってないか？", tone: "theory" },
+    { author: "運営監視班", body: "ラグナロクって単語、ログで拾える箇所が増えてる。", tone: "theory" }
+  ],
+  story_sea_clear: [
+    { author: "海域観測班", body: "海の暴走個体、ただ強いんじゃなくて均衡が崩れてる挙動に見える。", tone: "theory", important: true },
+    { author: "AKA.ベル", body: "均衡ワード出始めてから敵の行動パターンまで不穏。", tone: "theory" },
+    { author: "守り神しめ鯖", body: "修復してるつもりで刺激してる可能性、否定しきれない。", tone: "theory" }
+  ],
+  story_volcano_clear: [
+    { author: "壁画スクショ勢", body: "火山壁画、どう見ても『神殺し』儀式の図だろ。", tone: "theory", important: true },
+    { author: "浪漫侍", body: "ここからはレベルより構成。称号複合で耐久ライン作れ。", tone: "guide" },
+    { author: "紅の魔術師", body: "機械文明の予告が露骨。次マップは対策の質で差が付く。", tone: "guide" }
+  ],
+  story_neverend_arrive: [
+    { author: "運営監視班", body: "カジノやオークション、ネタ施設じゃなく旧文明の娯楽層っぽい。", tone: "theory", important: true },
+    { author: "遺跡ガチ勢", body: "ネバーエンドは遊園地に見えて兵器管理都市の残骸だと思う。", tone: "theory" },
+    { author: "紅の魔術師", body: "機械敵は高防御高火力低HP。短期決戦前提で詠唱回しを組め。", tone: "guide" }
+  ],
+  story_unique_collapse: [
+    { author: "運営監視班", body: "ユニーク全撃破後に空の挙動が変わった。これ討伐コンプが正解じゃない。", tone: "theory", important: true },
+    { author: "守り神しめ鯖", body: "守護者を倒し切った結果、栓が外れた説が現実味を帯びてきた。", tone: "theory", important: true },
+    { author: "七体目未発見", body: "異界の怪物って単語、ついにログに出たんだが。", tone: "legend" }
+  ],
+  operator_theory: [
+    { author: "運営監視班", body: "運営会社の痕跡が薄すぎる。最初から神話側の偽装組織じゃないか？", tone: "theory", important: true },
+    { author: "草原在住", body: "最初の女神、案内役NPCってより本物の神格っぽい反応がある。", tone: "theory" },
+    { author: "無課金仙人", body: "つまり俺ら、ゲームしてるつもりで別世界の復興手伝ってる？", tone: "chat" }
+  ],
+  swordsman_meta_builds: [
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "剣士は武器強化と重装で土台を作れ。砂漠以降は耐久称号を混ぜると安定する。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "火力一本より『ボス特攻+軽減』の複合が勝率を伸ばす。", tone: "guide" },
+    { author: "不遇職警察", body: "草原30前後、砂漠50前後を目安に強化ラインを越えると別ゲー。", tone: "hint", isHint: true }
+  ],
+  mage_meta_builds: [
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "海以降は範囲より単体高火力。MP回復手段を2枚積んで回転を止めない。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "称号はMP効率系+単体火力系を複合。火山ボスで差が出る。", tone: "guide" },
+    { author: "バフ飯研究所", body: "魔術師は料理バフで詠唱事故が減る。", tone: "hint", isHint: true }
+  ],
+  ninja_meta_builds: [
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "忍者はサブ僧侶が安定。自己強化+命中デバフで回避が回る。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "会心型は楽しいが、海以降は被弾一発が重い。回避称号を1枠入れろ。", tone: "guide" },
+    { author: "影歩き", body: "軽装の強みは行動回数。手数で押し切る。", tone: "hint", isHint: true }
+  ],
+  priest_meta_builds: [
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "僧侶は回復2枚+防御支援で基盤を作って、サブ攻撃系で詰めるのが丸い。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "過剰回復ビルドは長期戦で真価。火山以降の事故率が目に見えて下がる。", tone: "guide" },
+    { author: "真面目な僧侶", body: "守り切る構成は最終的に火力にも繋がる。", tone: "chat" }
+  ],
+  title_research_lab: [
+    { author: "称号コレクター", body: "地域馴染み+壁を越える者は海攻略の定番。", tone: "hint", isHint: true, important: true },
+    { author: "運営監視班", body: "火山はチート称号の複合次第。単純レベル差より構成差が出る。", tone: "guide" },
+    { author: "浪漫侍", body: "剣士は防御寄り称号1枠で事故死が激減する。", tone: "guide" }
+  ],
+  map_boss_route_notes: [
+    { author: "攻略班テンプレ職人", body: "草原ボスはLv30前後で武器強化優先。", tone: "hint", isHint: true },
+    { author: "攻略班テンプレ職人", body: "砂漠ボスはLv50前後+称号枠拡張が目安。", tone: "hint", isHint: true },
+    { author: "攻略班テンプレ職人", body: "海は『壁を越える者』『地域馴染み』が安定。", tone: "hint", isHint: true },
+    { author: "攻略班テンプレ職人", body: "火山はチート称号の組み合わせで突破率が変わる。", tone: "hint", isHint: true }
+  ],
+  neverend_strategy_notes: [
+    { author: "紅の魔術師", body: "Protocol3は三連撃対策が最優先。軽減と回復タイミングを合わせる。", tone: "guide", important: true },
+    { author: "浪漫侍", body: "激怒後は被ダメも通る。守り切るより削り切りに切り替えろ。", tone: "guide" },
+    { author: "AKA.ベル", body: "機械敵は低HPだから先手で落とす構成が刺さる。", tone: "hint", isHint: true }
+  ],
+  neverend_economy_notes: [
+    { author: "市場観測班", body: "カジノはGOLD→チップの入口。オークションは高額一点狙いが基本。", tone: "guide" },
+    { author: "守り神しめ鯖", body: "ルーレットは欲張ると溶ける。収支ラインを決めて撤退しろ。", tone: "hint", isHint: true },
+    { author: "無課金仙人", body: "VIPは夢あるけど地獄もある。勝ち逃げ推奨。", tone: "chat" }
   ]
 };
 
@@ -3592,6 +4131,11 @@ const BOARD_THREAD_DEFS = [
   { id: "th_desert", category: "strategy", title: "砂漠の毒きつすぎ問題", visibleIf: { unlockedTown: "dustria" }, responseSetId: "desert_toxic" },
   { id: "th_sea", category: "strategy", title: "海マップのクラゲ許せん", visibleIf: { unlockedTown: "akamatsu" }, responseSetId: "sea_jelly" },
   { id: "th_volcano", category: "strategy", title: "火山のゴーレム硬すぎる", visibleIf: { unlockedTown: "rulacia" }, responseSetId: "volcano_wall" },
+  { id: "th_story_grassland", category: "theory", title: "草原ボス、討伐演出が妙に不穏だった件", visibleIf: { fieldBossCleared: "1-10" }, responseSetId: "story_grassland_clear" },
+  { id: "th_story_desert", category: "theory", title: "砂漠遺跡ってただの背景じゃなくない？", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "story_desert_clear" },
+  { id: "th_story_sea", category: "theory", title: "海以降の敵、世界バグみたいな挙動してる", visibleIf: { fieldBossCleared: "3-10" }, responseSetId: "story_sea_clear" },
+  { id: "th_story_volcano", category: "theory", title: "火山壁画の神殺し図、見たやついる？", visibleIf: { fieldBossCleared: "4-10" }, responseSetId: "story_volcano_clear" },
+  { id: "th_operator_theory", category: "theory", title: "運営会社と女神、設定以上の違和感がある", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "operator_theory" },
   { id: "th_bison", category: "boss", title: "ベヒモスバイソン初見で轢かれた", visibleIf: { minStage: "1-10" }, responseSetId: "boss_bison" },
   { id: "th_bison_loss10", category: "boss", title: "【1-10】10連敗したんだが、何を直せばいい？", visibleIf: { all: [{ minStage: "1-10" }, { stageDefeatsAtLeast: { stageId: "1-10", count: 10 } }] }, responseSetId: "bison_loss_streak" },
   { id: "th_leviathan", category: "boss", title: "リヴァイアサンのブレスどうすんの？", visibleIf: { minStage: "3-10" }, responseSetId: "boss_leviathan" },
@@ -3607,6 +4151,12 @@ const BOARD_THREAD_DEFS = [
   { id: "th_alchemy", category: "production", title: "薬師の秘薬、壊れてない？", visibleIf: { titleAny: ["production_is_main", "alchemy_explorer"] }, responseSetId: "production_power" },
   { id: "th_godq", category: "production", title: "神品質って都市伝説じゃないの？", visibleIf: { godQualityAtLeast: 1 }, responseSetId: "production_power", variantSelector: "production_hype" },
   { id: "th_main_prod", category: "production", title: "生産職が本体って本当だったわ", visibleIf: { titleAny: ["production_is_main"] }, responseSetId: "production_power" },
+  { id: "th_title_lab", category: "title", title: "称号研究所: 地域別おすすめを共有しよう", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "title_research_lab" },
+  { id: "th_boss_route_notes", category: "boss", title: "マップボス攻略メモを積み上げるスレ", visibleIf: { fieldBossCleared: "1-10" }, responseSetId: "map_boss_route_notes" },
+  { id: "th_job_swordsman", category: "build", title: "剣士系ビルド相談所", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "swordsman_meta_builds" },
+  { id: "th_job_mage", category: "build", title: "魔術師系ビルド相談所", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "mage_meta_builds" },
+  { id: "th_job_ninja", category: "build", title: "忍者系ビルド相談所", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "ninja_meta_builds" },
+  { id: "th_job_priest", category: "build", title: "僧侶系ビルド相談所", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "priest_meta_builds" },
   { id: "th_heavy", category: "build", title: "重装が弱いと思ってた俺が悪かった", visibleIf: { buildTag: "heavy_build" }, responseSetId: "overweight_truth" },
   { id: "th_overweight", category: "build", title: "過積載で火山抜けた人いる？", visibleIf: { buildTagAny: ["overweight_build", "extreme_overweight"] }, responseSetId: "overweight_truth" },
   { id: "th_noweapon", category: "build", title: "武器なしでボス倒した変態おる？", visibleIf: { buildTag: "no_weapon" }, responseSetId: "no_weapon" },
@@ -3624,6 +4174,11 @@ const BOARD_THREAD_DEFS = [
   { id: "th_board_meta", category: "chat", title: "掲示板見てると世界が変わる気がする", visibleIf: { boardReadAtLeast: 10 }, responseSetId: "chat_town" },
   { id: "th_loop_challenge_open", category: "loop", title: "追憶カテゴリ解放されたんだが", visibleIf: { featureUnlocked: "loop_challenge_basic" }, responseSetId: "loop_carry", variantSelector: "loop_chat" },
   { id: "th_reborn_boss", category: "boss", title: "再臨ボス、通常ボスの顔してない", visibleIf: { featureUnlocked: "enhanced_boss" }, responseSetId: "endgame_titles" },
+  { id: "th_story_neverend", category: "theory", title: "ネバーエンド、娯楽都市に見えて終末遺跡すぎる", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "story_neverend_arrive" },
+  { id: "th_neverend_strategy", category: "strategy", title: "天空都市攻略: 機械敵とProtocol3対策", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "neverend_strategy_notes" },
+  { id: "th_neverend_economy", category: "strategy", title: "天空都市のギャンブル/オークション情報共有", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "neverend_economy_notes" },
+  { id: "th_protocol3_identity", category: "theory", title: "Protocol3って対ユニーク兵器では？", visibleIf: { worldStateFlag: "protocol3Slayer" }, responseSetId: "story_neverend_arrive" },
+  { id: "th_unique_balance_break", category: "unique", title: "ユニーク全撃破後、空がおかしい", visibleIf: { uniqueTypesAtLeast: 7 }, responseSetId: "story_unique_collapse" },
   { id: "th_deep_clear", category: "loop", title: "深層踏破者ってここで取れる？", visibleIf: { specialChallengeClearAtLeast: 1 }, responseSetId: "endgame_titles" },
   { id: "th_loop4", category: "legend", title: "4周目から空気変わりすぎだろ", visibleIf: { loopAtLeast: 4 }, responseSetId: "myth_godslayer" },
   { id: "th_true_route", category: "legend", title: "神話の残滓に道が開いたってマジ？", visibleIf: { endingEligible: "true" }, responseSetId: "myth_godslayer" },
@@ -3634,6 +4189,61 @@ const BOARD_THREAD_DEFS = [
   { id: "th_hidden_end_clear", category: "loop", title: "裏エンド、世界観が別物すぎる", visibleIf: { unlockedEnding: "hidden_end" }, responseSetId: "endgame_titles" },
   { id: "th_chaos_end_clear", category: "loop", title: "混沌エンド行ったら掲示板まで壊れた", visibleIf: { unlockedEnding: "chaos_end" }, responseSetId: "endgame_titles" }
 ];
+
+const STORY_FRAGMENTS = {
+  grassland_clear: {
+    id: "grassland_clear",
+    title: "草原の違和感",
+    logText: "女神の声は機械音声ではない。ベヒモスは侵入者を止めるように立ちはだかった。",
+    helpText: "草原: 守護者は本当に敵だったのか？"
+  },
+  desert_clear: {
+    id: "desert_clear",
+    title: "砂塵の記録",
+    logText: "砂漠遺跡には滅びた人類文明の痕跡が残る。ラグナロクという語が断片的に見える。",
+    helpText: "砂漠: 遺跡は過去戦争の記録庫かもしれない。"
+  },
+  sea_clear: {
+    id: "sea_clear",
+    title: "均衡の揺らぎ",
+    logText: "海域の暴走は災害というより均衡崩壊の兆候。ユニークは調和側という説が浮上する。",
+    helpText: "海: 俺たちは修復者か、刺激者か。"
+  },
+  volcano_clear: {
+    id: "volcano_clear",
+    title: "神殺しの影",
+    logText: "火山壁画は人類の神殺し計画を示していた。次に待つのは兵器文明の残骸だ。",
+    helpText: "火山: ラグナロクは神話ではなく戦争だった。"
+  },
+  neverend_enter: {
+    id: "neverend_enter",
+    title: "天空都市ネバーエンド",
+    logText: "ネバーエンドは娯楽と兵器が混ざった人類文明の残り香。誰かの帰還を待つ都市。",
+    helpText: "天空都市: 娯楽施設は旧文明の記憶装置。"
+  },
+  protocol3_clear: {
+    id: "protocol3_clear",
+    title: "対ユニーク兵器",
+    logText: "Protocol3 はユニーク討伐のために造られた残存兵器。役目を失ったまま稼働し続けている。",
+    helpText: "Protocol3: 人類は守るために世界を壊した。"
+  },
+  unique_all_clear: {
+    id: "unique_all_clear",
+    title: "栓の崩壊",
+    logText: "七体のユニークが消え、空が裂ける。異界の怪物という名だけがログに残された。",
+    helpText: "全ユニーク撃破: 守護者を倒した代償が始まる。"
+  }
+};
+
+const STORY_UNLOCK_CONDITIONS = {
+  grassland_clear: { fieldBossCleared: "1-10" },
+  desert_clear: { fieldBossCleared: "2-10" },
+  sea_clear: { fieldBossCleared: "3-10" },
+  volcano_clear: { fieldBossCleared: "4-10" },
+  neverend_enter: { worldStateFlag: "neverendArrived" },
+  protocol3_clear: { worldStateFlag: "protocol3Slayer" },
+  unique_all_clear: { uniqueTypesAtLeast: 7 }
+};
 
 const INTRO_MESSAGES = [
   { speaker: "管理AI: AURORA", text: "ようこそ、冒険者プロトコルへ。" },
@@ -3868,6 +4478,14 @@ const state = {
   cheatTitleShopSlotBonus: 0,
   titleEffects: createDefaultTitleEffects(),
   unlockedTowns: ["balladore"],
+  hasNeverendTicket: false,
+  neverendUnlocked: false,
+  neverendVipUnlocked: false,
+  chips: 0,
+  neverendBossClearFlags: {},
+  auctionRefreshState: createDefaultAuctionRefreshState(),
+  rouletteStats: createDefaultRouletteStats(),
+  neverendUi: createDefaultNeverendUiState(),
   clearedStages: [],
   currentTown: "balladore",
   currentMap: TOWN_DATA.balladore.mapId,
@@ -4776,6 +5394,9 @@ function renderGameScreen() {
 }
 
 function renderTopBar() {
+  ensureNeverendState();
+  ensureOtherworldState();
+  syncOtherworldUnlockState({ silent: true });
   ensureTitleSlotState();
   const activeNames = getCombinedEquippedTitleIds().map((id) => getTitleById(id)?.name).filter(Boolean);
   const normalCount = state.equippedNormalTitleIds.length;
@@ -4805,6 +5426,7 @@ function renderTopBar() {
         <div class="hud-item">町: <strong>${escapeHtml(TOWN_DATA[state.currentTown].name)}</strong></div>
         <div class="hud-item">MAP/STAGE: <strong>${escapeHtml(state.currentMap)}</strong> / <strong>${escapeHtml(stageLabel)}</strong></div>
         <div class="hud-item">GOLD: <strong>${state.player.gold}</strong></div>
+        <div class="hud-item">チップ: <strong>${state.chips}</strong></div>
         <div class="hud-item">ループ: <strong>${state.loop.loopCount}</strong> / titleLimit <strong>${getCurrentTitleLimit()}</strong></div>
         <div class="hud-item">職: ${escapeHtml(state.player.mainJob || "未設定")} / サブ: ${escapeHtml(state.player.subJob || (state.player.subJobUnlocked ? "未設定" : "未解放"))} / 生産: ${escapeHtml(getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob)?.nameJa || PRODUCTION_JOB_PATHS[state.player.productionJob]?.stages?.[state.player.productionJobStage] || state.player.productionJob || "未設定")}</div>
         <div class="hud-item">HP/MP: <strong>${Math.floor(state.player.hp)}/${Math.floor(getEffectivePlayerStat("maxHp"))}</strong> / <strong>${Math.floor(state.player.mp)}/${Math.floor(getEffectivePlayerStat("maxMp"))}</strong></div>
@@ -4831,6 +5453,15 @@ function renderHelpPanel() {
   if (!state.ui.helpOpen) {
     return "";
   }
+  const unlockedStory = getUnlockedStoryFragmentIds();
+  const storyLines = unlockedStory.length
+    ? unlockedStory
+        .slice(-3)
+        .map((id) => STORY_FRAGMENTS[id]?.helpText)
+        .filter(Boolean)
+        .map((text) => `<p class="tiny">物語: ${escapeHtml(text)}</p>`)
+        .join("")
+    : `<p class="tiny">物語: ボス討伐と掲示板閲覧で断片が解放されます。</p>`;
   return `
     <div id="help-panel" class="help-panel show">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -4841,6 +5472,7 @@ function renderHelpPanel() {
       <p class="tiny">称号: ステータス→称号図鑑でON/OFF。</p>
       <p class="tiny">重量: 装備タブで総重量/許容重量を確認。</p>
       <p class="tiny">周回: 4-10クリア後にリザルトから次周回へ。</p>
+      ${storyLines}
     </div>
   `;
 }
@@ -5007,6 +5639,7 @@ function renderAdventureView(container) {
     return;
   }
   const nextStage = getNextUnlockableStage(state.currentMap);
+  const totalFieldBoss = Object.values(MAP_DATA).filter((map) => !!map.fieldBoss).length;
   container.innerHTML = `
     <div class="main-header">
       <h2>冒険</h2>
@@ -5016,7 +5649,7 @@ function renderAdventureView(container) {
       <p>現在マップ: <strong>${escapeHtml(MAP_DATA[state.currentMap].name)}</strong> (${MAP_DATA[state.currentMap].recommendedLevel})</p>
       <p>現在ステージ: <strong>${escapeHtml(state.currentStage)}</strong> / 撃破数 ${state.currentStageKillCount}/${state.currentStageTargetKills}</p>
       <p>次解放ステージ: <strong>${escapeHtml(nextStage || "なし")}</strong></p>
-      <p>フィールドボス撃破: ${state.fieldBossCleared.length} / 4</p>
+      <p>フィールドボス撃破: ${state.fieldBossCleared.length} / ${totalFieldBoss}</p>
     </div>
     ${renderTownSelector()}
     ${renderStageList()}
@@ -5031,16 +5664,39 @@ function renderAdventureView(container) {
 }
 
 function renderTownSelector() {
+  ensureNeverendState();
+  ensureOtherworldState();
+  syncOtherworldUnlockState({ silent: true });
   const buttons = Object.values(TOWN_DATA)
     .map((town) => {
-      const unlocked = state.unlockedTowns.includes(town.id);
-      return `<button class="btn town-btn ${state.currentTown === town.id ? "active" : ""}" data-town-id="${town.id}" ${unlocked ? "" : "disabled"}>${town.name}${unlocked ? "" : " (LOCK)"}</button>`;
+      const unlocked =
+        town.id === "neverend"
+          ? canEnterNeverend()
+          : town.id === "otherworld"
+            ? canEnterOtherworld()
+            : state.unlockedTowns.includes(town.id);
+      const lockLabel =
+        town.id === "neverend"
+          ? " (入場券が必要)"
+          : town.id === "otherworld"
+            ? " (異界のカギ or ユニーク全撃破)"
+            : " (LOCK)";
+      return `<button class="btn town-btn ${state.currentTown === town.id ? "active" : ""}" data-town-id="${town.id}" ${unlocked ? "" : "disabled"}>${town.name}${unlocked ? "" : lockLabel}</button>`;
     })
     .join("");
+  const unlockedTownNames = state.unlockedTowns
+    .map((id) => TOWN_DATA[id]?.name)
+    .filter(Boolean);
+  if (canEnterNeverend() && !unlockedTownNames.includes(TOWN_DATA.neverend.name)) {
+    unlockedTownNames.push(TOWN_DATA.neverend.name);
+  }
+  if (canEnterOtherworld() && !unlockedTownNames.includes(TOWN_DATA.otherworld.name)) {
+    unlockedTownNames.push(TOWN_DATA.otherworld.name);
+  }
   return `
     <div class="card" style="margin-top:10px;">
       <h4>町選択</h4>
-      <p class="tiny">解放済み町: ${escapeHtml(state.unlockedTowns.map((id) => TOWN_DATA[id].name).join(" / "))}</p>
+      <p class="tiny">解放済み町: ${escapeHtml(unlockedTownNames.join(" / "))}</p>
       <div class="town-grid">${buttons}</div>
     </div>
   `;
@@ -5133,7 +5789,23 @@ function renderEndingProgressPanel() {
 }
 
 function selectTown(townId) {
-  if (!state.unlockedTowns.includes(townId)) {
+  ensureNeverendState();
+  ensureOtherworldState();
+  syncOtherworldUnlockState({ silent: true });
+  if (townId === "neverend" && canEnterNeverend() && !state.unlockedTowns.includes("neverend")) {
+    state.unlockedTowns.push("neverend");
+  }
+  if (townId === "otherworld" && canEnterOtherworld() && !state.unlockedTowns.includes("otherworld")) {
+    state.unlockedTowns.push("otherworld");
+    state.otherworldUnlocked = true;
+  }
+  const townUnlocked =
+    townId === "neverend"
+      ? canEnterNeverend()
+      : townId === "otherworld"
+        ? canEnterOtherworld()
+        : state.unlockedTowns.includes(townId);
+  if (!townUnlocked) {
     addLog("未解放の町です。");
     return;
   }
@@ -5144,6 +5816,14 @@ function selectTown(townId) {
   state.currentTown = townId;
   state.currentMap = TOWN_DATA[townId].mapId;
   state.player.currentTown = TOWN_DATA[townId].name;
+  if (townId === "neverend") {
+    state.worldStateFlags = { ...(state.worldStateFlags || {}), neverendArrived: true };
+  } else if (townId === "otherworld") {
+    state.worldStateFlags = { ...(state.worldStateFlags || {}), otherworldArrived: true };
+    state.otherworldUnlocked = true;
+    showCenterPopup({ text: "異界へ到達した", type: "important" });
+    addLog("異界到達: 世界の綻びの先へ踏み込んだ。", "important", { important: true });
+  }
   state.stats.townVisitCount += 1;
   state.stats.viewSwitchCount += 1;
   checkTitleUnlocks("townVisit");
@@ -5155,6 +5835,8 @@ function selectTown(townId) {
   if (prevMapId !== state.currentMap) {
     refreshGuildQuestsForCurrentTown(true);
   }
+  syncStoryProgress();
+  updateBoardThreadsFromProgress();
   addLog(`転移門を使って ${TOWN_DATA[townId].name} へ移動した。`);
   autoSaveIfNeeded("townMove");
   render();
@@ -5309,9 +5991,15 @@ function spawnStageEnemy() {
   state.battle.isUniqueBattle = false;
   state.battle.isFieldBossBattle = stage.isFieldBossStage;
   state.battle.gimmick = { warnedAt: 0, triggered: false, extra: {} };
+  const stageKillCount = Math.max(0, Number(state.battle.stageKillCount || 0));
+  const stageTargetKills = Math.max(1, Number(state.battle.stageTargetKills || stage.targetKills || 1));
+  const shouldSpawnStageBoss = !!stage.hasStageBoss && !!stage.stageBossEnemyId && stageKillCount >= stageTargetKills - 1;
 
   if (stage.isFieldBossStage) {
     master = getScaledEnemyStats(stage.fieldBoss, stage.mapId, stage.id, true);
+  } else if (shouldSpawnStageBoss) {
+    master = getScaledEnemyStats(stage.stageBossEnemyId, stage.mapId, stage.id, true);
+    state.battle.isFieldBossBattle = true;
   } else if (rollUniqueEncounter()) {
     master = spawnUniqueEnemy();
     state.battle.isUniqueBattle = true;
@@ -5345,8 +6033,11 @@ function spawnStageEnemy() {
     showBattleSpecialPopup(`ユニーク出現: ${master.name}`);
     showCenterPopup({ text: `ユニーク遭遇: ${master.name}`, type: "important" });
   } else if (state.battle.isFieldBossBattle) {
-    showBattleSpecialPopup(`フィールドボス出現: ${master.name}`);
+    showBattleSpecialPopup(`${shouldSpawnStageBoss && !stage.isFieldBossStage ? "ステージボス出現" : "フィールドボス出現"}: ${master.name}`);
     showCenterPopup({ text: `BOSS: ${master.name}`, type: "important" });
+    if (stage.mapId === "otherworld" && String(master.name || "").includes("覚醒")) {
+      addLog(`異界補正: ${master.name} が再演された。`, "important", { important: true });
+    }
   }
 }
 
@@ -5355,6 +6046,9 @@ function rollUniqueEncounter() {
     return false;
   }
   const stage = STAGE_DATA[state.battle.stageId];
+  if (!stage || stage.disableUniqueEncounter) {
+    return false;
+  }
   if (stage.isFieldBossStage) {
     return false;
   }
@@ -5639,6 +6333,19 @@ function triggerBossGimmick(gimmick) {
       addLog(`【予兆】${gimmick.warning} ヒント: ${gimmick.hint}`);
       addLog("[ギミック] ボスが怒り状態に入った");
     }
+    return;
+  }
+
+  if (gimmick.type === "protocol3Core") {
+    if (!state.battle.gimmick.warnedAt) {
+      state.battle.gimmick.warnedAt = now;
+      addLog(`【予兆】${gimmick.warning} ヒント: ${gimmick.hint}`);
+      return;
+    }
+    if (!state.battle.gimmick.triggered && state.battle.enemy.hp <= state.battle.enemy.maxHp * gimmick.triggerHpRate) {
+      state.battle.gimmick.triggered = true;
+      addLog("[ギミック] Protocol3がコア過熱状態へ。後半フェーズが開始。");
+    }
   }
 }
 
@@ -5684,6 +6391,10 @@ function enemyAction() {
   if (!state.battle.enemy || state.battle.enemy.hp <= 0) {
     return;
   }
+  if (state.battle.enemy.id === "protocol3") {
+    enemyActionProtocol3();
+    return;
+  }
   const uniqueProfile = getCurrentUniqueCombatProfile();
   const effective = getEffectivePlayerStats();
   const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "grassland";
@@ -5720,19 +6431,195 @@ function enemyAction() {
   const raw = Math.max(1, Math.floor(state.battle.enemy.attack - effective.defense * 0.55));
   const isCrit = !!uniqueProfile && Math.random() < (uniqueProfile.critRate || 0);
   const uniqueMul = uniqueProfile?.damageMultiplier || 1;
-  const baseDamage = Math.max(1, Math.floor(raw * uniqueMul * (isCrit ? 1.7 : 1)));
+  let roleMul = 1;
+  let forcedHits = null;
+  let forcedCritChance = uniqueProfile?.critRate || 0;
+  if (!uniqueProfile && regionId === "neverend") {
+    const enemyId = state.battle.enemy.id;
+    if (enemyId === "skygearDrone") {
+      roleMul = 0.9;
+      forcedHits = Math.random() < 0.45 ? 2 : 1;
+    } else if (enemyId === "autoTurret") {
+      roleMul = 1.28;
+    } else if (enemyId === "metalHound") {
+      roleMul = 0.82;
+      forcedHits = Math.random() < 0.4 ? 3 : 2;
+    } else if (enemyId === "bladeWorker") {
+      roleMul = 0.95;
+      forcedHits = Math.random() < 0.55 ? 3 : 2;
+    } else if (enemyId === "repairUnit") {
+      if (Math.random() < 0.42) {
+        const heal = Math.max(1, Math.floor(state.battle.enemy.maxHp * 0.18));
+        state.battle.enemy.hp = Math.min(state.battle.enemy.maxHp, state.battle.enemy.hp + heal);
+        addLog("リペアユニットが自己修復を実行した。");
+        return;
+      }
+      roleMul = 0.78;
+    } else if (enemyId === "heavyFrame") {
+      roleMul = 1.34;
+    } else if (enemyId === "plasmaCore") {
+      roleMul = Math.random() < 0.24 ? 1.7 : 1.08;
+      forcedCritChance = 0.14;
+    } else if (enemyId === "dataEater") {
+      roleMul = 1.08;
+      if (Math.random() < 0.3) {
+        state.battle.playerNextActionAt += 260;
+        addLog("データイーターが演算妨害を仕掛けた。");
+      }
+    } else if (enemyId === "guardianArm") {
+      roleMul = 1.3;
+      forcedHits = Math.random() < 0.42 ? 2 : 1;
+    } else if (enemyId === "hollowEnforcer") {
+      roleMul = 1.25;
+      forcedCritChance = 0.2;
+      forcedHits = 2;
+    } else if (enemyId === "signalCore") {
+      roleMul = 1.16;
+      if (Math.random() < 0.35) {
+        state.battle.gimmick.extra.playerAimPenaltyUntil = Date.now() + 2600;
+      }
+    } else if (enemyId === "overloadFrame") {
+      roleMul = 1.22;
+      forcedHits = Math.random() < 0.55 ? 3 : 2;
+      forcedCritChance = 0.18;
+    }
+  }
+  const finalCrit = uniqueProfile ? isCrit : Math.random() < forcedCritChance;
+  const baseDamage = Math.max(1, Math.floor(raw * uniqueMul * roleMul * (finalCrit ? 1.7 : 1)));
   const hits = uniqueProfile && Math.random() < (uniqueProfile.multiHitChance || 0)
     ? 1 + Math.floor(Math.random() * Math.max(1, uniqueProfile.multiHitMax || 1))
-    : 1;
+    : forcedHits || 1;
   for (let i = 0; i < hits; i += 1) {
     let damage = Math.max(1, Math.floor(baseDamage * reduction));
     if (state.titleEffects.priestDamageHalfChance > 0 && Math.random() < state.titleEffects.priestDamageHalfChance) {
       damage = Math.max(1, Math.floor(damage * 0.5));
       addLog("目覚めた僧侶: 被ダメージ半減が発動");
     }
-    applyDamage("enemy", damage, isCrit ? `会心攻撃 ${i + 1}Hit` : `通常攻撃 ${i + 1}Hit`);
+    applyDamage("enemy", damage, finalCrit ? `会心攻撃 ${i + 1}Hit` : `通常攻撃 ${i + 1}Hit`);
     if (state.battle.playerCurrentHp <= 0) {
       break;
+    }
+  }
+}
+
+function enemyActionProtocol3() {
+  const enemy = state.battle.enemy;
+  if (!enemy) return;
+  const extra = state.battle.gimmick.extra;
+  const now = Date.now();
+  if (!extra.protocol3Init) {
+    extra.protocol3Init = true;
+    extra.protocol3BaseAttack = enemy.attack;
+    extra.protocol3BaseDefense = enemy.defense;
+    extra.protocol3BaseSpeed = enemy.speed;
+    extra.protocol3Rage = false;
+    extra.protocol3TargetLockUntil = 0;
+    extra.protocol3DamageTakenMultiplier = 1;
+  }
+  const hpRate = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
+  if (!extra.protocol3Rage && hpRate <= 0.3) {
+    extra.protocol3Rage = true;
+    enemy.attack = Math.floor(extra.protocol3BaseAttack * 1.62);
+    enemy.speed = Math.floor(extra.protocol3BaseSpeed * 1.25);
+    enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.72);
+    extra.protocol3DamageTakenMultiplier = 1.36;
+    addLog("Protocol3 が激怒状態へ移行。火力が激増し、装甲が脆化した。");
+  }
+  const enraged = !!extra.protocol3Rage;
+  const normalActions = [
+    { id: "tri_burst", weight: 28 },
+    { id: "pulse_cannon", weight: 24 },
+    { id: "armor_deploy", weight: 16 },
+    { id: "target_lock", weight: 16 },
+    { id: "cool_restart", weight: 16 }
+  ];
+  const enragedActions = [
+    { id: "overclock", weight: 16 },
+    { id: "break_burst", weight: 28 },
+    { id: "control_break", weight: 18 },
+    { id: "ignition", weight: 22 },
+    { id: "tri_burst", weight: 16 }
+  ];
+  const action = weightedPick(enraged ? enragedActions : normalActions)?.id || "tri_burst";
+  if (action === "armor_deploy") {
+    enemy.defense = Math.min(Math.floor(extra.protocol3BaseDefense * 1.42), Math.floor(enemy.defense * 1.18));
+    addLog("Protocol3: 装甲展開（防御上昇）");
+    return;
+  }
+  if (action === "target_lock") {
+    extra.protocol3TargetLockUntil = now + 5000;
+    addLog("Protocol3: ターゲットロック（命中・会心上昇）");
+    return;
+  }
+  if (action === "cool_restart") {
+    state.activeEffects = state.activeEffects.filter((effect) => !(effect.target === "enemy" && ["enemyAttack", "enemyAccuracy", "defense", "speed"].includes(effect.stat)));
+    enemy.defense = Math.max(enemy.defense, Math.floor(extra.protocol3BaseDefense * (enraged ? 0.72 : 1)));
+    addLog("Protocol3: 冷却再起動（弱体一部解除）");
+    return;
+  }
+  if (action === "overclock") {
+    enemy.attack = Math.floor(enemy.attack * 1.12);
+    enemy.speed = Math.floor(enemy.speed * 1.08);
+    addLog("Protocol3: オーバークロック（攻撃・速度上昇）");
+    return;
+  }
+  if (action === "control_break") {
+    enemy.attack = Math.floor(enemy.attack * 1.15);
+    enemy.defense = Math.max(1, Math.floor(enemy.defense * 0.86));
+    extra.protocol3DamageTakenMultiplier = Math.max(extra.protocol3DamageTakenMultiplier || 1, 1.45);
+    addLog("Protocol3: 制御崩壊（与ダメ上昇 / 被ダメ上昇）");
+    return;
+  }
+  if (action === "pulse_cannon") {
+    protocol3Strike({ label: "パルスキャノン", hits: 1, power: 1.52, critBonus: 0.08 });
+    return;
+  }
+  if (action === "break_burst") {
+    protocol3Strike({ label: "ブレイクバースト", hits: 3, power: 0.88, critBonus: 0.12, applyDefenseBreakChance: 0.22 });
+    return;
+  }
+  if (action === "ignition") {
+    protocol3Strike({ label: "プロトコル・イグニッション", hits: 1, power: 2.2, critBonus: 0.18 });
+    return;
+  }
+  protocol3Strike({ label: "トライバースト", hits: 3, power: 0.82, critBonus: 0.1 });
+}
+
+function protocol3Strike(options) {
+  const enemy = state.battle.enemy;
+  if (!enemy) return;
+  const effective = getEffectivePlayerStats();
+  const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "grassland";
+  const evasion = getCappedEffectiveEvasion(effective, regionId);
+  const extra = state.battle.gimmick.extra;
+  const lockOn = (extra.protocol3TargetLockUntil || 0) > Date.now();
+  let hitChance = (0.92 * getEnemyAccuracyMultiplier()) - evasion + (lockOn ? 0.18 : 0);
+  hitChance = clamp(0.45, 0.99, hitChance);
+  let reduction = getDamageReductionMultiplier();
+  reduction *= effective.damageReductionMultiplier || 1;
+  const regionReduction = state.titleEffects.regionDamageReduction?.[regionId] || 0;
+  if (regionReduction > 0) reduction *= 1 - regionReduction;
+  const hits = Math.max(1, Math.floor(options.hits || 1));
+  for (let i = 0; i < hits; i += 1) {
+    if (!state.battle.isActive || state.battle.playerCurrentHp <= 0) {
+      return;
+    }
+    if (Math.random() > hitChance) {
+      addLog(`Protocol3の${options.label} ${i + 1}段目を回避した。`);
+      continue;
+    }
+    const critChance = (options.critBonus || 0) + (lockOn ? 0.12 : 0);
+    const isCrit = Math.random() < critChance;
+    const raw = Math.max(1, Math.floor(enemy.attack * (options.power || 1) - effective.defense * 0.52));
+    let damage = Math.max(1, Math.floor(raw * reduction * (isCrit ? 1.62 : 1)));
+    if (state.titleEffects.priestDamageHalfChance > 0 && Math.random() < state.titleEffects.priestDamageHalfChance) {
+      damage = Math.max(1, Math.floor(damage * 0.5));
+      addLog("目覚めた僧侶: 被ダメージ半減が発動");
+    }
+    applyDamage("enemy", damage, isCrit ? `${options.label} 会心` : `${options.label} ${i + 1}段`);
+    if (options.applyDefenseBreakChance && Math.random() < options.applyDefenseBreakChance) {
+      applyEffect("player", "protocol3_break", { stat: "defense", multiplier: 0.88, durationMs: 4200, displayNameJa: "防御破壊" });
+      addLog("Protocol3の破壊信号で防御が低下した。");
     }
   }
 }
@@ -5867,6 +6754,10 @@ function applyDamage(source, amount, actionName, isCrit = false) {
   }
   if (source === "player") {
     let damage = applyPlayerDamageBonuses(amount, state.battle.enemy);
+    if (state.battle.enemy.id === "protocol3") {
+      const mul = Number(state.battle.gimmick?.extra?.protocol3DamageTakenMultiplier || 1);
+      damage = Math.max(1, Math.floor(damage * mul));
+    }
     if (state.titleRuntime.swordsmanChargeReady) {
       const chargeMul = Math.max(1, Number(state.titleEffects.swordsmanChargeDamageMultiplier || 2));
       damage = Math.max(1, Math.floor(damage * chargeMul));
@@ -6283,10 +7174,23 @@ function handleFieldBossClear(stageId) {
     checkTitleUnlocks("afterGameClear");
     prepareLoopResult();
     state.screen = "clearResult";
+  } else if (stageId === "5-10") {
+    addItem("controlBoard", 2);
+    addItem("overclockCircuit", 2);
+    addItem("collapseArmorShard", 2);
+    addItem("skyFurnaceCore", 1);
+    state.neverendBossClearFlags = { ...(state.neverendBossClearFlags || {}), protocol3: true };
+    state.worldStateFlags = { ...(state.worldStateFlags || {}), protocol3Slayer: true };
+    state.neverendVipUnlocked = true;
+    addLog("Protocol3撃破報酬: 制御基板x2 / オーバークロック回路x2 / 崩壊装甲片x2 / 天空炉心x1");
+    addLog("称号獲得: Protocol3撃破者");
+    showCenterPopup({ text: "Protocol3撃破: VIP解放", type: "important" });
   }
   if (!state.player.subJobId) {
     state.stats.subJoblessBossClears += 1;
   }
+  syncStoryProgress();
+  updateBoardThreadsFromProgress();
   applyLoopUnlocks();
   checkEndgameTitleConditions();
   autoSaveIfNeeded("bossClear");
@@ -6327,6 +7231,8 @@ function handleUniqueVictory(enemy) {
   }
   addLog(`ユニーク撃破: ${enemy.name} / 特別報酬 EXP+${uniqueBonusExp}, GOLD+${uniqueBonusGold}`);
   showToast(`ユニーク撃破: ${enemy.name}`, "important");
+  syncStoryProgress();
+  updateBoardThreadsFromProgress();
   checkTitleUnlocks("afterUniqueKill");
 }
 
@@ -9283,7 +10189,272 @@ function renderActiveEffectsPanel() {
   `;
 }
 
+function getNeverendFacilityLabel(id, fallback) {
+  if (!isNeverendTownActive()) {
+    return fallback;
+  }
+  return NEVEREND_TOWN_MODE_DATA[id] || fallback;
+}
+
+function exchangeGoldToChips(goldAmount) {
+  ensureNeverendState();
+  const amount = Math.max(0, Math.floor(Number(goldAmount || 0)));
+  if (amount <= 0) {
+    addLog("交換失敗: 交換額が不正です。");
+    return;
+  }
+  if (state.player.gold < amount) {
+    addLog("交換失敗: GOLD不足。");
+    return;
+  }
+  const chips = Math.max(1, Math.floor(amount / Math.max(1e-9, NEVEREND_CHIP_EXCHANGE_DATA.buyRateGoldPerChip)));
+  state.player.gold -= amount;
+  state.chips += chips;
+  addLog(`カジノ交換: ${amount}G -> ${chips}チップ`);
+  render();
+}
+
+function exchangeChipsToGold(chipAmount) {
+  ensureNeverendState();
+  const amount = Math.max(0, Math.floor(Number(chipAmount || 0)));
+  if (amount <= 0) {
+    addLog("交換失敗: 交換額が不正です。");
+    return;
+  }
+  if (state.chips < amount) {
+    addLog("交換失敗: チップ不足。");
+    return;
+  }
+  const gold = Math.max(1, Math.floor(amount * NEVEREND_CHIP_EXCHANGE_DATA.sellRateGoldPerChip));
+  state.chips -= amount;
+  state.player.gold += gold;
+  addLog(`カジノ交換: ${amount}チップ -> ${gold}G`);
+  render();
+}
+
+function getAuctionItemById(auctionId) {
+  return NEVEREND_AUCTION_ITEM_TABLE.find((row) => row.id === auctionId);
+}
+
+function calculateAuctionSellPrice(itemId) {
+  const parsed = parseQualityItemId(itemId);
+  const baseId = parsed.baseId;
+  const quality = parsed.quality || "normal";
+  const item = ITEM_DATA[baseId] || ITEM_DATA[itemId];
+  const eq = EQUIPMENT_DATA[baseId] || EQUIPMENT_DATA[itemId];
+  const baseSell = Math.max(1, Number(item?.sellPrice || eq?.sellPrice || 1));
+  let multiplier = 3.4;
+  if (item?.category === "crafted") multiplier += 0.6;
+  if (quality === "great") multiplier += 0.9;
+  if (quality === "high") multiplier += 1.5;
+  if (quality === "god") multiplier += 2.8;
+  const tags = eq?.specialTags || [];
+  if (tags.includes("god_quality")) multiplier += 1.6;
+  if (tags.includes("high_quality")) multiplier += 0.8;
+  if (tags.includes("neverend")) multiplier += 0.9;
+  if (tags.includes("boss_series")) multiplier += 0.7;
+  return Math.max(50, Math.floor(baseSell * multiplier));
+}
+
+function canAuctionSellItem(itemId) {
+  const parsed = parseQualityItemId(itemId);
+  const baseId = parsed.baseId;
+  const quality = parsed.quality || "normal";
+  const item = ITEM_DATA[baseId] || ITEM_DATA[itemId];
+  if (!item) return false;
+  if (quality !== "normal") return true;
+  if (item.category === "crafted") return true;
+  const eq = EQUIPMENT_DATA[baseId] || EQUIPMENT_DATA[itemId];
+  if (!eq) return false;
+  const tags = eq.specialTags || [];
+  return tags.includes("crafted_bonus") || tags.includes("god_quality") || tags.includes("high_quality") || tags.includes("great_success") || tags.includes("neverend");
+}
+
+function buyAuctionItem(auctionId) {
+  ensureNeverendState();
+  const row = getAuctionItemById(auctionId);
+  if (!row) return;
+  if (state.chips < row.chipPrice) {
+    addLog(`オークション購入失敗: ${ITEM_DATA[row.itemId]?.name || row.itemId} のチップ不足。`);
+    return;
+  }
+  state.chips -= row.chipPrice;
+  addItem(row.itemId, 1);
+  addLog(`オークション落札: ${ITEM_DATA[row.itemId]?.name || row.itemId} x1 (-${row.chipPrice}チップ)`);
+  render();
+}
+
+function sellAuctionItem(itemId) {
+  ensureNeverendState();
+  if (!canAuctionSellItem(itemId) || getInventoryCount(itemId) <= 0) {
+    addLog("オークション売却失敗: 売却対象外です。");
+    return;
+  }
+  if (!removeItem(itemId, 1)) {
+    return;
+  }
+  const price = calculateAuctionSellPrice(itemId);
+  state.chips += price;
+  addLog(`オークション売却: ${ITEM_DATA[itemId]?.name || itemId} x1 (+${price}チップ)`);
+  render();
+}
+
+function setRouletteNumber(number, vip = false) {
+  ensureNeverendState();
+  const n = Math.min(5, Math.max(1, Math.floor(Number(number || 1))));
+  if (vip) {
+    state.neverendUi.vipRouletteNumber = n;
+  } else {
+    state.neverendUi.rouletteNumber = n;
+  }
+  renderPreservingWindowScroll();
+}
+
+function spinNeverendRoulette(vip = false) {
+  ensureNeverendState();
+  const rules = vip ? NEVEREND_VIP_ROULETTE_RULES : NEVEREND_ROULETTE_RULES;
+  if (vip && !state.neverendVipUnlocked) {
+    addLog("VIP未解放: Protocol3を撃破すると解放されます。");
+    return;
+  }
+  const betInputId = vip ? "vip-roulette-bet-input" : "roulette-bet-input";
+  const betInput = document.getElementById(betInputId);
+  const bet = Math.max(rules.minBet, Math.min(rules.maxBet, Math.floor(Number(betInput?.value || rules.minBet))));
+  if (state.chips < bet) {
+    addLog("ルーレット失敗: チップ不足。");
+    return;
+  }
+  const selected = vip ? state.neverendUi.vipRouletteNumber : state.neverendUi.rouletteNumber;
+  const rolled = 1 + Math.floor(Math.random() * 5);
+  state.chips -= bet;
+  let totalGain = 0;
+  let won = false;
+  const hit = rolled === selected && Math.random() < rules.hitChance;
+  if (hit) {
+    totalGain = Math.floor(bet * rules.payoutMultiplier);
+    state.chips += totalGain;
+    won = true;
+  }
+  if (vip && !won && Math.random() < rules.crashChance) {
+    const extraLoss = Math.min(state.chips, Math.floor(bet * rules.crashLossRate));
+    state.chips -= extraLoss;
+    state.rouletteStats.chipsLost += extraLoss;
+    addLog(`VIP暴落: 追加で${extraLoss}チップを失った。`);
+  }
+  if (vip) {
+    state.rouletteStats.vipSpins += 1;
+    if (won) state.rouletteStats.vipWins += 1;
+  } else {
+    state.rouletteStats.spins += 1;
+    if (won) state.rouletteStats.wins += 1;
+  }
+  state.rouletteStats.chipsLost += bet;
+  state.rouletteStats.chipsWon += totalGain;
+  addLog(`${vip ? "VIP" : "ルーレット"}: 予想${selected} / 結果${rolled} / ${won ? `的中 +${totalGain}チップ` : `ハズレ -${bet}チップ`}`);
+  render();
+}
+
+function renderNeverendCasinoView() {
+  ensureNeverendState();
+  const rates = `購入: 1チップ=${NEVEREND_CHIP_EXCHANGE_DATA.buyRateGoldPerChip}G / 売却: 1チップ=${NEVEREND_CHIP_EXCHANGE_DATA.sellRateGoldPerChip.toFixed(2)}G`;
+  return `
+    <h3>カジノ</h3>
+    <p class="tiny">所持GOLD: ${state.player.gold} / 所持チップ: ${state.chips}</p>
+    <p class="tiny">${rates}</p>
+    <div class="shop-grid">
+      ${[1000, 10000, 50000].map((gold) => `<div class="shop-card"><h4>${gold}G -> チップ交換</h4><button class="btn casino-buy-chip-btn" data-gold="${gold}" ${state.player.gold >= gold ? "" : "disabled"}>交換</button></div>`).join("")}
+      ${[1000, 10000, 50000].map((chip) => `<div class="shop-card"><h4>${chip}チップ -> GOLD換金</h4><button class="btn casino-sell-chip-btn" data-chip="${chip}" ${state.chips >= chip ? "" : "disabled"}>換金</button></div>`).join("")}
+    </div>
+  `;
+}
+
+function renderNeverendAuctionView() {
+  ensureNeverendState();
+  const activeMode = state.guild.shopMode === "sell" ? "sell" : "buy";
+  const modeButtons = `
+    <button class="btn shop-mode-tab-btn ${activeMode === "buy" ? "active" : ""}" data-shop-mode="buy">落札</button>
+    <button class="btn shop-mode-tab-btn ${activeMode === "sell" ? "active" : ""}" data-shop-mode="sell">出品</button>
+  `;
+  const buyCards = NEVEREND_AUCTION_ITEM_TABLE
+    .map((row) => {
+      const item = ITEM_DATA[row.itemId];
+      const name = item?.name || row.itemId;
+      return `
+        <div class="shop-card">
+          <h4>${escapeHtml(name)}</h4>
+          <p class="tiny">${escapeHtml(item?.description || "説明なし")}</p>
+          <p class="tiny">価格: ${row.chipPrice}チップ</p>
+          <button class="btn auction-buy-chip-btn" data-auction-id="${row.id}" ${state.chips >= row.chipPrice ? "" : "disabled"}>落札</button>
+        </div>
+      `;
+    })
+    .join("");
+  const sellCards = state.player.inventory
+    .filter((slot) => canAuctionSellItem(slot.itemId) && slot.quantity > 0)
+    .map((slot) => {
+      const item = ITEM_DATA[slot.itemId];
+      const price = calculateAuctionSellPrice(slot.itemId);
+      return `
+        <div class="shop-card">
+          <h4>${escapeHtml(item?.name || slot.itemId)}</h4>
+          <p class="tiny">${escapeHtml(item?.description || "説明なし")}</p>
+          <p class="tiny">所持: ${slot.quantity} / 売却額: ${price}チップ</p>
+          <button class="btn auction-sell-chip-btn" data-item-id="${slot.itemId}">出品売却</button>
+        </div>
+      `;
+    })
+    .join("");
+  return `
+    <div class="title-row"><h3>オークション</h3><div class="status-tabs">${modeButtons}</div></div>
+    <p class="tiny">所持チップ: ${state.chips} / 通常ショップとは別経済です。</p>
+    <div class="shop-grid">${activeMode === "buy" ? (buyCards || "<p class='tiny'>出品なし</p>") : (sellCards || "<p class='tiny'>売却可能なクラフト品がありません。</p>")}</div>
+  `;
+}
+
+function renderNeverendRouletteView() {
+  ensureNeverendState();
+  const selected = state.neverendUi.rouletteNumber;
+  const stat = state.rouletteStats;
+  const winRate = stat.spins > 0 ? Math.floor((stat.wins / stat.spins) * 1000) / 10 : 0;
+  return `
+    <h3>ルーレット</h3>
+    <p class="tiny">所持チップ: ${state.chips}</p>
+    <p class="tiny">的中率20% / 的中配当${NEVEREND_ROULETTE_RULES.payoutMultiplier}倍（元手込み） / ベット${NEVEREND_ROULETTE_RULES.minBet}-${NEVEREND_ROULETTE_RULES.maxBet}</p>
+    <div class="status-tabs">${[1, 2, 3, 4, 5].map((n) => `<button class="btn roulette-number-btn ${selected === n ? "active" : ""}" data-number="${n}" data-vip="0">${n}</button>`).join("")}</div>
+    <div class="title-row">
+      <input id="roulette-bet-input" type="number" min="${NEVEREND_ROULETTE_RULES.minBet}" max="${NEVEREND_ROULETTE_RULES.maxBet}" step="1000" value="${NEVEREND_ROULETTE_RULES.minBet}" />
+      <button class="btn" id="roulette-spin-btn">回す</button>
+    </div>
+    <p class="tiny">通常統計: ${stat.spins}回 / 勝利${stat.wins}回 / 勝率${winRate}%</p>
+  `;
+}
+
+function renderNeverendVipView() {
+  ensureNeverendState();
+  if (!state.neverendVipUnlocked) {
+    return `
+      <h3>VIP</h3>
+      <p class="tiny">VIPは未解放です。Protocol3を撃破すると解放されます。</p>
+    `;
+  }
+  const selected = state.neverendUi.vipRouletteNumber;
+  const stat = state.rouletteStats;
+  const winRate = stat.vipSpins > 0 ? Math.floor((stat.vipWins / stat.vipSpins) * 1000) / 10 : 0;
+  return `
+    <h3>VIP</h3>
+    <p class="tiny">所持チップ: ${state.chips}</p>
+    <p class="tiny">VIP配当${NEVEREND_VIP_ROULETTE_RULES.payoutMultiplier}倍 / 的中率16% / 暴落率12% / ベット${NEVEREND_VIP_ROULETTE_RULES.minBet}-${NEVEREND_VIP_ROULETTE_RULES.maxBet}</p>
+    <div class="status-tabs">${[1, 2, 3, 4, 5].map((n) => `<button class="btn roulette-number-btn ${selected === n ? "active" : ""}" data-number="${n}" data-vip="1">${n}</button>`).join("")}</div>
+    <div class="title-row">
+      <input id="vip-roulette-bet-input" type="number" min="${NEVEREND_VIP_ROULETTE_RULES.minBet}" max="${NEVEREND_VIP_ROULETTE_RULES.maxBet}" step="10000" value="${NEVEREND_VIP_ROULETTE_RULES.minBet}" />
+      <button class="btn btn-primary" id="vip-spin-btn">VIPベット</button>
+    </div>
+    <p class="tiny">VIP統計: ${stat.vipSpins}回 / 勝利${stat.vipWins}回 / 勝率${winRate}%</p>
+  `;
+}
+
 function renderGuildView(container) {
+  ensureNeverendState();
   const rankInfo = getGuildRankDisplayInfo();
   const nextLine = rankInfo.nextRank
     ? `次ランク ${rankInfo.nextRank}: ${rankInfo.nextRequiredPoints}GP（あと${rankInfo.pointsToNext}GP）`
@@ -9292,22 +10463,34 @@ function renderGuildView(container) {
     ? `地域制限中: ${MAP_DATA[rankInfo.unlockRegionId]?.name || rankInfo.unlockRegionId} 到達で ${rankInfo.nextRank} 解放`
     : `地域上限: ${rankInfo.currentRegionCap}（現在到達上限 ${rankInfo.progressCap}）`;
   const facilityButtons = [["reception", "受付"], ["shop", "ショップ"], ["temple", "神殿"], ["workshop", "工房"]]
-    .map(([id, label]) => `<button class="btn guild-menu-btn ${state.guild.selectedFacility === id ? "active" : ""}" data-facility="${id}">${label}</button>`)
+    .map(([id, label]) => `<button class="btn guild-menu-btn ${state.guild.selectedFacility === id ? "active" : ""}" data-facility="${id}">${getNeverendFacilityLabel(id, label)}</button>`)
     .join("");
 
   let content = "";
-  if (state.guild.selectedFacility === "reception") {
-    content = renderQuestBoard();
-  } else if (state.guild.selectedFacility === "shop") {
-    content = renderShopView();
-  } else if (state.guild.selectedFacility === "temple") {
-    content = renderTempleView();
+  if (isNeverendTownActive()) {
+    if (state.guild.selectedFacility === "reception") {
+      content = renderNeverendCasinoView();
+    } else if (state.guild.selectedFacility === "shop") {
+      content = renderNeverendAuctionView();
+    } else if (state.guild.selectedFacility === "temple") {
+      content = renderNeverendRouletteView();
+    } else {
+      content = renderNeverendVipView();
+    }
   } else {
-    content = renderWorkshopLayout();
+    if (state.guild.selectedFacility === "reception") {
+      content = renderQuestBoard();
+    } else if (state.guild.selectedFacility === "shop") {
+      content = renderShopView();
+    } else if (state.guild.selectedFacility === "temple") {
+      content = renderTempleView();
+    } else {
+      content = renderWorkshopLayout();
+    }
   }
 
   container.innerHTML = `
-    <div class="main-header"><h2>ギルド</h2><span class="tiny">ランク ${state.guild.rank} / GP ${state.guild.points}</span></div>
+    <div class="main-header"><h2>${isNeverendTownActive() ? "天空都市ネバーエンド" : "ギルド"}</h2><span class="tiny">ランク ${state.guild.rank} / GP ${state.guild.points}</span></div>
     <div class="card" style="margin-bottom:10px;">
       <p class="tiny">${escapeHtml(nextLine)}</p>
       <p class="tiny">${escapeHtml(capLine)}</p>
@@ -9375,7 +10558,7 @@ function buildQuestFromTemplate(templateId, params) {
   const rankScore = guildRankScore(rank);
   const repeatLevel = Math.max(0, Number(params.repeatLevel || 0));
   const mapId = template.mapId === "all" ? (params.mapId || state.currentMap || "grassland") : template.mapId;
-  const mapDepth = Math.max(0, ["grassland", "desert", "sea", "volcano"].indexOf(mapId));
+  const mapDepth = Math.max(0, ["grassland", "desert", "sea", "volcano", "neverend"].indexOf(mapId));
   const mapScale = 1 + mapDepth * 0.22;
   const rankScale = 1 + rankScore * 0.16;
   const suffix = formatQuestTierSuffix(repeatLevel);
@@ -9794,21 +10977,24 @@ function renderShopBuyView(activeRegion) {
       const own = getInventoryCount(itemId);
       const reqTown = getItemRequiredTown(itemId);
       const reqBossStage = getItemRequiredFieldBossStage(itemId);
+      const buyPrice = itemId === NEVEREND_ACCESS_DATA.ticketItemId ? getNeverendTicketPrice() : item.buyPrice;
       const reqText = [
         reqTown ? `町解放: ${TOWN_DATA[reqTown]?.name || reqTown}` : null,
-        reqBossStage ? `ボス解放: ${reqBossStage}` : null
+        reqBossStage ? `ボス解放: ${reqBossStage}` : null,
+        itemId === NEVEREND_ACCESS_DATA.ticketItemId && hasClearedVolcano() ? "火山突破割引: 有効" : null
       ].filter(Boolean).join(" / ");
       const lockText = unlocked ? "購入可" : "未解放";
-      const canBuy = unlocked && item.buyPrice > 0;
+      const alreadyOwned = itemId === NEVEREND_ACCESS_DATA.ticketItemId && canEnterNeverend();
+      const canBuy = unlocked && buyPrice > 0 && !alreadyOwned;
       return `
         <div class="shop-card">
           <h4>${item.name}</h4>
           <p class="tiny">${item.description}</p>
           <p class="tiny">カテゴリ: ${item.category}${reqText ? ` / ${reqText}` : ""}</p>
-          <p class="tiny">買値: ${item.buyPrice} / 売値: ${Math.floor(getSellPrice(item))} / 所持: ${own}</p>
-          <p class="tiny">状態: ${lockText}</p>
+          <p class="tiny">買値: ${buyPrice} / 売値: ${Math.floor(getSellPrice(item))} / 所持: ${own}</p>
+          <p class="tiny">状態: ${alreadyOwned ? "解放済み" : lockText}</p>
           <div class="title-row">
-            <button class="btn shop-buy-btn" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>購入</button>
+            <button class="btn shop-buy-btn" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>${alreadyOwned ? "解放済み" : "購入"}</button>
           </div>
         </div>
       `;
@@ -9892,8 +11078,14 @@ function renderShopView() {
 }
 
 function buyItem(itemId) {
+  ensureNeverendState();
   const item = ITEM_DATA[itemId];
-  if (!item || item.buyPrice <= 0) {
+  const buyPrice = itemId === NEVEREND_ACCESS_DATA.ticketItemId ? getNeverendTicketPrice() : item?.buyPrice;
+  if (!item || buyPrice <= 0) {
+    return;
+  }
+  if (itemId === NEVEREND_ACCESS_DATA.ticketItemId && canEnterNeverend()) {
+    addLog("天空都市ネバーエンド入場券はすでに所持しています。");
     return;
   }
   const requiredTown = getItemRequiredTown(itemId);
@@ -9906,12 +11098,15 @@ function buyItem(itemId) {
     addLog(`この商品は ${requiredBossStage} のボス撃破後に購入できます。`);
     return;
   }
-  if (state.player.gold < item.buyPrice) {
+  if (state.player.gold < buyPrice) {
     addLog(`購入失敗: ${item.name} の所持GOLDが不足。`);
     return;
   }
-  state.player.gold -= item.buyPrice;
+  state.player.gold -= buyPrice;
   addItem(itemId, 1);
+  if (itemId === NEVEREND_ACCESS_DATA.ticketItemId) {
+    unlockNeverendAccess({ fromTicket: true });
+  }
   state.stats.totalShopTrades += 1;
   addLog(`ショップ購入: ${item.name} x1`);
   checkTitleUnlocks("afterShopTrade");
@@ -10074,6 +11269,7 @@ function isProductionWorkshopContext() {
   return (
     state.currentTab === "guild" &&
     state.guild.selectedFacility === "workshop" &&
+    !isNeverendTownActive() &&
     !!PRODUCTION_JOB_PATHS[state.player.productionJob]
   );
 }
@@ -10723,6 +11919,12 @@ function evaluateBoardCondition(condition) {
   if (condition.worldStateFlag && !state.worldStateFlags?.[condition.worldStateFlag]) {
     return false;
   }
+  if (condition.storyFragment) {
+    const flagKey = `story_fragment_${condition.storyFragment}`;
+    if (!state.worldStateFlags?.[flagKey]) {
+      return false;
+    }
+  }
   if (condition.unlockedEnding && !state.unlockedEndings.includes(condition.unlockedEnding)) {
     return false;
   }
@@ -10744,6 +11946,53 @@ function evaluateBoardCondition(condition) {
     return false;
   }
   return true;
+}
+
+function getStoryFragmentFlagKey(fragmentId) {
+  return `story_fragment_${fragmentId}`;
+}
+
+function getUnlockedStoryFragmentIds() {
+  return Object.keys(STORY_FRAGMENTS).filter((id) => !!state.worldStateFlags?.[getStoryFragmentFlagKey(id)]);
+}
+
+function unlockStoryFragment(fragmentId, options = {}) {
+  const fragment = STORY_FRAGMENTS[fragmentId];
+  if (!fragment) return false;
+  const flagKey = getStoryFragmentFlagKey(fragmentId);
+  if (state.worldStateFlags?.[flagKey]) {
+    return false;
+  }
+  state.worldStateFlags = { ...(state.worldStateFlags || {}), [flagKey]: true };
+  if (!options.silent) {
+    addLog(`物語断片解放: ${fragment.title} / ${fragment.logText}`, "important", { important: true });
+  }
+  return true;
+}
+
+function syncStoryProgress(options = {}) {
+  const silent = !!options.silent;
+  const skipBoardRefresh = !!options.skipBoardRefresh;
+  let unlockedAny = false;
+  Object.entries(STORY_UNLOCK_CONDITIONS).forEach(([fragmentId, condition]) => {
+    if (evaluateBoardCondition(condition)) {
+      if (unlockStoryFragment(fragmentId, { silent })) {
+        unlockedAny = true;
+      }
+    }
+  });
+  if ((state.uniqueDefeatedIds || []).length >= 7 && !state.worldStateFlags?.otherworldThreatAwakened) {
+    state.worldStateFlags = { ...(state.worldStateFlags || {}), otherworldThreatAwakened: true };
+    if (!silent) {
+      addLog("異変: 世界の均衡が崩壊し、異界由来の脈動が観測された。", "important", { important: true });
+      showCenterPopup({ text: "異変発生: 異界の怪物の兆候", type: "important" });
+    }
+  }
+  if (unlockedAny && !skipBoardRefresh) {
+    unlockBoardThreadsFromProgress();
+    state.board.threads = getVisibleBoardThreads();
+  }
+  return unlockedAny;
 }
 
 function resolveThreadVariant(thread, currentState = state) {
@@ -10879,6 +12128,8 @@ function unlockBoardThreadsFromProgress() {
 }
 
 function updateBoardThreadsFromProgress() {
+  syncOtherworldUnlockState({ silent: true });
+  syncStoryProgress({ skipBoardRefresh: true });
   applyLoopUnlocks();
   updateBoardThreadsFromEndingProgress();
   unlockBoardThreadsFromProgress();
@@ -11845,6 +13096,14 @@ function splitRunAndPersistentState() {
     currentStageTargetKills: state.currentStageTargetKills,
     autoUseItems: deepCopyPlain(state.autoUseItems),
     unlockedTowns: deepCopyPlain(state.unlockedTowns),
+    hasNeverendTicket: !!state.hasNeverendTicket,
+    neverendUnlocked: !!state.neverendUnlocked,
+    neverendVipUnlocked: !!state.neverendVipUnlocked,
+    chips: Math.max(0, Math.floor(Number(state.chips || 0))),
+    neverendBossClearFlags: deepCopyPlain(state.neverendBossClearFlags || {}),
+    auctionRefreshState: deepCopyPlain(state.auctionRefreshState || createDefaultAuctionRefreshState()),
+    rouletteStats: deepCopyPlain(state.rouletteStats || createDefaultRouletteStats()),
+    neverendUi: deepCopyPlain(state.neverendUi || createDefaultNeverendUiState()),
     clearedStages: deepCopyPlain(state.clearedStages),
     fieldBossCleared: deepCopyPlain(state.fieldBossCleared),
     stageProgressById: deepCopyPlain(state.stageProgressById),
@@ -11987,6 +13246,20 @@ function applyLoadedState(payload) {
   state.currentStageTargetKills = run.currentStageTargetKills || STAGE_DATA[state.currentStage]?.targetKills || 10;
   state.autoUseItems = normalizeAutoUseItems(run.autoUseItems || state.autoUseItems);
   state.unlockedTowns = Array.isArray(run.unlockedTowns) ? run.unlockedTowns : state.unlockedTowns;
+  state.hasNeverendTicket = !!run.hasNeverendTicket;
+  state.neverendUnlocked = !!run.neverendUnlocked;
+  state.neverendVipUnlocked = !!run.neverendVipUnlocked;
+  state.chips = Math.max(0, Math.floor(Number(run.chips || 0)));
+  state.neverendBossClearFlags = run.neverendBossClearFlags && typeof run.neverendBossClearFlags === "object" ? run.neverendBossClearFlags : {};
+  state.auctionRefreshState = run.auctionRefreshState && typeof run.auctionRefreshState === "object"
+    ? { ...createDefaultAuctionRefreshState(), ...run.auctionRefreshState }
+    : createDefaultAuctionRefreshState();
+  state.rouletteStats = run.rouletteStats && typeof run.rouletteStats === "object"
+    ? { ...createDefaultRouletteStats(), ...run.rouletteStats }
+    : createDefaultRouletteStats();
+  state.neverendUi = run.neverendUi && typeof run.neverendUi === "object"
+    ? { ...createDefaultNeverendUiState(), ...run.neverendUi }
+    : createDefaultNeverendUiState();
   state.clearedStages = Array.isArray(run.clearedStages) ? run.clearedStages : state.clearedStages;
   state.fieldBossCleared = Array.isArray(run.fieldBossCleared) ? run.fieldBossCleared : state.fieldBossCleared;
   state.stageProgressById = run.stageProgressById || state.stageProgressById;
@@ -12079,6 +13352,14 @@ function applyLoadedState(payload) {
   state.guild.lastRankCapNoticeKey = typeof state.guild.lastRankCapNoticeKey === "string" ? state.guild.lastRankCapNoticeKey : "";
   state.guild.shopRegionTab = SHOP_REGION_TABS.some((tab) => tab.id === state.guild.shopRegionTab) ? state.guild.shopRegionTab : "grassland";
   state.guild.shopMode = state.guild.shopMode === "sell" ? "sell" : "buy";
+  ensureNeverendState();
+  if (state.hasNeverendTicket || state.neverendUnlocked) {
+    unlockNeverendAccess({ silent: true });
+  }
+  if (state.currentTown === "neverend" && !canEnterNeverend()) {
+    state.currentTown = "balladore";
+    state.currentMap = TOWN_DATA.balladore.mapId;
+  }
 
   state.loop.loopCount = persistent.loop?.loopCount || 0;
   state.loop.carriedTitles = persistent.loop?.carriedTitles || [];
@@ -12136,6 +13417,7 @@ function applyLoadedState(payload) {
   updateGuildRank({ silent: true, refreshOnChange: false });
   ensureTitleSlotState();
   normalizeEquippedTitleSlots({ logOnTrim: false });
+  syncStoryProgress({ silent: true, skipBoardRefresh: true });
   updateBoardThreadsFromProgress();
   initializeJobEvolutionState({ silent: true });
   recalculateTitleEffects();
@@ -12508,6 +13790,37 @@ function useInventoryItem(itemId) {
   } else if (baseId === "failedDish") {
     addLog("焦げた料理を食べた。何も起きなかった。");
     used = true;
+  } else if (baseId === "kingsElixir") {
+    const heal = calculateHpConsumableHeal(baseId, Math.max(1.35, qualityMul));
+    const result = applyHealing(heal, getItemNameJa(baseId), true);
+    addLog(`アイテム使用: 王の秘薬でHP+${result.actualHeal}`);
+    used = true;
+  } else if (baseId === "angelElixir") {
+    const heal = calculateHpConsumableHeal(baseId, Math.max(1.8, qualityMul));
+    const result = applyHealing(heal, getItemNameJa(baseId), true);
+    if (state.battle.isActive) {
+      const mp = Math.max(30, Math.floor(maxMp * 0.45));
+      state.battle.playerCurrentMp = Math.min(maxMp, state.battle.playerCurrentMp + mp);
+      state.player.mp = Math.min(maxMp, state.player.mp + mp);
+      addLog(`アイテム使用: 天使の霊薬でHP+${result.actualHeal}, MP+${mp}`);
+    } else {
+      addLog(`アイテム使用: 天使の霊薬でHP+${result.actualHeal}`);
+    }
+    used = true;
+  } else if (baseId === "berserkStim") {
+    applyEffect("player", `item_${baseId}_atk`, { stat: "attack", multiplier: 1.28, durationMs: 90000 });
+    applyEffect("player", `item_${baseId}_def`, { stat: "defense", multiplier: 0.84, durationMs: 90000 });
+    addLog("アイテム使用: 暴走促進剤で攻撃上昇 / 防御低下");
+    used = true;
+  } else if (baseId === "fullRebootDrug") {
+    const heal = Math.max(1, Math.floor(getEffectivePlayerStat("maxHp") * 0.95));
+    const result = applyHealing(heal, getItemNameJa(baseId), true);
+    if (state.battle.isActive) {
+      state.battle.playerCurrentMp = getEffectivePlayerStat("maxMp");
+    }
+    state.player.mp = getEffectivePlayerStat("maxMp");
+    addLog(`アイテム使用: 完全再起動薬でHP+${result.actualHeal}, MP全快`);
+    used = true;
   }
 
   if (!used) {
@@ -12805,6 +14118,29 @@ function bindGameEvents() {
         recordProductionWorkshopButtonPress();
         gatherMaterials(state.currentMap);
       });
+    }
+    document.querySelectorAll(".casino-buy-chip-btn").forEach((btn) =>
+      btn.addEventListener("click", () => exchangeGoldToChips(Number(btn.dataset.gold || 0)))
+    );
+    document.querySelectorAll(".casino-sell-chip-btn").forEach((btn) =>
+      btn.addEventListener("click", () => exchangeChipsToGold(Number(btn.dataset.chip || 0)))
+    );
+    document.querySelectorAll(".auction-buy-chip-btn").forEach((btn) =>
+      btn.addEventListener("click", () => buyAuctionItem(btn.dataset.auctionId))
+    );
+    document.querySelectorAll(".auction-sell-chip-btn").forEach((btn) =>
+      btn.addEventListener("click", () => sellAuctionItem(btn.dataset.itemId))
+    );
+    document.querySelectorAll(".roulette-number-btn").forEach((btn) =>
+      btn.addEventListener("click", () => setRouletteNumber(Number(btn.dataset.number || 1), btn.dataset.vip === "1"))
+    );
+    const rouletteSpinBtn = document.getElementById("roulette-spin-btn");
+    if (rouletteSpinBtn) {
+      rouletteSpinBtn.addEventListener("click", () => spinNeverendRoulette(false));
+    }
+    const vipSpinBtn = document.getElementById("vip-spin-btn");
+    if (vipSpinBtn) {
+      vipSpinBtn.addEventListener("click", () => spinNeverendRoulette(true));
     }
   }
 
@@ -13554,6 +14890,14 @@ function resetForNewLoop() {
   state.titleCatalogPageNormal = 1;
   state.titleCatalogPageCheat = 1;
   state.unlockedTowns = ["balladore"];
+  state.hasNeverendTicket = false;
+  state.neverendUnlocked = false;
+  state.neverendVipUnlocked = false;
+  state.chips = 0;
+  state.neverendBossClearFlags = {};
+  state.auctionRefreshState = createDefaultAuctionRefreshState();
+  state.rouletteStats = createDefaultRouletteStats();
+  state.neverendUi = createDefaultNeverendUiState();
   state.currentTown = "balladore";
   state.currentMap = TOWN_DATA.balladore.mapId;
   state.currentStage = "1-1";
