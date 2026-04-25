@@ -8134,10 +8134,12 @@ function calculateWeightInfo(attackForCapacity = state.player.attack) {
   const totalWeight = Math.floor(equip.totalWeight);
   const capacity = state.player.weightCapacityBase + Math.floor(Math.max(0, attackForCapacity) / 5);
   const overBy = Math.max(0, totalWeight - capacity);
-  const rule = WEIGHT_RULES.find((row) => totalWeight >= row.min && totalWeight <= row.max) || WEIGHT_RULES[WEIGHT_RULES.length - 1];
+  const loadPercent = capacity > 0 ? Math.floor((totalWeight / capacity) * 100) : (totalWeight > 0 ? Infinity : 0);
+  const rule = WEIGHT_RULES.find((row) => loadPercent >= row.min && loadPercent <= row.max) || WEIGHT_RULES[WEIGHT_RULES.length - 1];
   return {
     totalWeight,
     capacity,
+    loadPercent,
     overBy,
     rank: rule.rank,
     rankLabel: rule.label,
@@ -8160,8 +8162,9 @@ function getWeightPenaltyModifiers(weightInfo) {
   }
   if (weightInfo.overBy > 0) {
     const extra = Math.min(0.4, weightInfo.overBy * 0.01);
-    mods.speedMultiplier -= extra;
-    mods.evasionBonus -= extra * 0.5;
+    const reducedExtra = extra * (1 - reduction);
+    mods.speedMultiplier -= reducedExtra;
+    mods.evasionBonus -= reducedExtra * 0.5;
   }
   return mods;
 }
