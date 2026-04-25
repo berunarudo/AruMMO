@@ -5686,8 +5686,9 @@ function enemyAction() {
   }
   const uniqueProfile = getCurrentUniqueCombatProfile();
   const effective = getEffectivePlayerStats();
-  const evadeBonus = state.titleEffects.evadeByRegion[STAGE_DATA[state.battle.stageId].mapId] || 0;
-  let hitChance = (0.92 * getEnemyAccuracyMultiplier()) - evadeBonus - effective.evasion;
+  const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "grassland";
+  const effectiveEvasion = getCappedEffectiveEvasion(effective, regionId);
+  let hitChance = (0.92 * getEnemyAccuracyMultiplier()) - effectiveEvasion;
   if (uniqueProfile?.hitBonus) {
     hitChance += uniqueProfile.hitBonus;
   }
@@ -5700,7 +5701,6 @@ function enemyAction() {
   }
   let reduction = getDamageReductionMultiplier();
   reduction *= effective.damageReductionMultiplier || 1;
-  const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "grassland";
   const regionReduction = state.titleEffects.regionDamageReduction?.[regionId] || 0;
   if (regionReduction > 0) {
     reduction *= 1 - regionReduction;
@@ -5791,7 +5791,7 @@ function useSkill(skill) {
     if (state.titleEffects.comboEvasionHealScaling > 0) {
       const effective = getEffectivePlayerStats();
       const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "grassland";
-      const evasion = Math.max(0, (effective.evasion || 0) + (state.titleEffects.evadeByRegion?.[regionId] || 0));
+      const evasion = getCappedEffectiveEvasion(effective, regionId);
       heal = Math.max(1, Math.floor(heal * (1 + evasion * state.titleEffects.comboEvasionHealScaling)));
     }
     if (state.titleEffects.priestHealDoubleChance > 0 && Math.random() < state.titleEffects.priestHealDoubleChance) {
@@ -9137,7 +9137,7 @@ function renderBattleView() {
   const stats = getEffectivePlayerStats();
   const classes = `${state.battle.isFieldBossBattle ? "boss-encounter" : ""} ${state.battle.isUniqueBattle ? "unique-encounter" : ""}`;
   const mapId = stage?.mapId || state.currentMap || "grassland";
-  const effectiveEvasion = Math.max(0, stats.evasion + (state.titleEffects.evadeByRegion?.[mapId] || 0));
+  const effectiveEvasion = getCappedEffectiveEvasion(stats, mapId);
   const effectiveCritRate = Math.max(0, stats.critRate);
 
   return `
@@ -13952,6 +13952,12 @@ function toPercent(value, max) {
     return 0;
   }
   return clamp(0, 100, (value / max) * 100);
+}
+
+function getCappedEffectiveEvasion(stats, regionId) {
+  const base = Number(stats?.evasion || 0);
+  const regionBonus = Number(state.titleEffects.evadeByRegion?.[regionId] || 0);
+  return clamp(0, 0.75, base + regionBonus);
 }
 
 function clamp(min, max, value) {
