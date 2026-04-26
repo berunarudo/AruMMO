@@ -1568,12 +1568,24 @@ normalizeItemData();
 
 const AUTO_USE_SLOT_COUNT = 3;
 const AUTO_USE_HP_THRESHOLD_OPTIONS = [90, 75, 50, 40, 30, 25, 20, 10];
+const AUTO_USE_TRIGGER_OPTIONS = ["hp_mp", "battle_start", "boss_start"];
+const AUTO_USE_START_TRIGGER_WINDOW_MS = 1800;
+
+function getAutoUseTriggerLabel(triggerType) {
+  if (triggerType === "battle_start") {
+    return "戦闘開始時";
+  }
+  if (triggerType === "boss_start") {
+    return "ボス戦開始時";
+  }
+  return "HP/MP閾値";
+}
 
 function createDefaultAutoUseItems() {
   return [
-    { slot: 0, itemId: "potion", hpThresholdPercent: 50, isEnabled: true, cooldownRemaining: 0, cooldownUntil: 0, lastUsedAt: 0 },
-    { slot: 1, itemId: "hiPotion", hpThresholdPercent: 25, isEnabled: true, cooldownRemaining: 0, cooldownUntil: 0, lastUsedAt: 0 },
-    { slot: 2, itemId: null, hpThresholdPercent: 10, isEnabled: false, cooldownRemaining: 0, cooldownUntil: 0, lastUsedAt: 0 }
+    { slot: 0, itemId: "potion", triggerType: "hp_mp", hpThresholdPercent: 50, isEnabled: true, cooldownRemaining: 0, cooldownUntil: 0, lastUsedAt: 0 },
+    { slot: 1, itemId: "hiPotion", triggerType: "hp_mp", hpThresholdPercent: 25, isEnabled: true, cooldownRemaining: 0, cooldownUntil: 0, lastUsedAt: 0 },
+    { slot: 2, itemId: null, triggerType: "hp_mp", hpThresholdPercent: 10, isEnabled: false, cooldownRemaining: 0, cooldownUntil: 0, lastUsedAt: 0 }
   ];
 }
 
@@ -1583,11 +1595,13 @@ function normalizeAutoUseItems(value) {
   return defaults.map((base, idx) => {
     const row = rows[idx] || {};
     const threshold = Number(row.hpThresholdPercent);
+    const triggerType = AUTO_USE_TRIGGER_OPTIONS.includes(row.triggerType) ? row.triggerType : base.triggerType;
     return {
       ...base,
       ...row,
       slot: idx,
       itemId: row.itemId || base.itemId,
+      triggerType,
       hpThresholdPercent: AUTO_USE_HP_THRESHOLD_OPTIONS.includes(threshold) ? threshold : base.hpThresholdPercent,
       isEnabled: typeof row.isEnabled === "boolean" ? row.isEnabled : base.isEnabled,
       cooldownRemaining: Number(row.cooldownRemaining) > 0 ? Number(row.cooldownRemaining) : 0,
@@ -3718,14 +3732,14 @@ const CHEAT_TITLES = [
 ];
 
 const UNIQUE_TITLES = [
-  { id: "unique_fenrir", name: "神狼狩り", conditionDescription: "フェンリルを撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "fenrir" },
-  { id: "unique_jormungand", name: "大蛇殺し", conditionDescription: "ヨルムンガンドを撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "jormungand" },
-  { id: "unique_cerberus", name: "三頭魔犬討伐者", conditionDescription: "ケルベロスを撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "cerberus" },
-  { id: "unique_griffon", name: "神速の翼折り", conditionDescription: "グリフォンを撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "griffon" },
-  { id: "unique_minotauros", name: "迷宮の破壊者", conditionDescription: "ミノタウロスを撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "minotauros" },
-  { id: "unique_phoenix", name: "輪廻断ち", conditionDescription: "鳳凰を撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "phoenix" },
-  { id: "unique_kirin", name: "天雷踏破者", conditionDescription: "麒麟を撃破", effectDescription: "ユニーク特攻+5%", effect: { damageToUnique: 0.05 }, trigger: ["afterUniqueKill"], uniqueId: "kirin" },
-  { id: "god_slayer", name: "神殺し", conditionDescription: "ユニーク7体を全撃破", effectDescription: "全能力+25%/ユニーク特攻+50%/遭遇率上昇", effect: { allStatsMultiplier: 0.25, damageToUnique: 0.5, uniqueEncounterRateBonus: 0.004 }, trigger: ["afterUniqueKill"], isHidden: true }
+  { id: "unique_fenrir", name: "神狼の足跡", conditionDescription: "フェンリルを撃破", effectDescription: "速度+15% / HP50%以下で速度+10% / 戦闘開始10秒 回避+10%", effect: { speedMultiplier: 0.15, lowHpAttackSpeedBonus: { hpThreshold: 0.5, attackMultiplier: 0, speedMultiplier: 0.1 }, battleStartBuff: { evadeBonus: 0.1, durationSec: 10 } }, trigger: ["afterUniqueKill"], uniqueId: "fenrir" },
+  { id: "unique_jormungand", name: "世界蛇の毒環", conditionDescription: "ヨルムンガンドを撃破", effectDescription: "攻撃時低確率で毒付与 / 状態異常中の敵への与ダメ+15% / 毒・麻痺・火傷耐性+10%", effect: { onHitPoison: { chance: 0.18, durationSec: 6, damageRatePerSec: 0.03 }, damageToAilmentEnemy: 0.15, statusResistByType: { poison: 0.1, paralyze: 0.1, burn: 0.1 } }, trigger: ["afterUniqueKill"], uniqueId: "jormungand" },
+  { id: "unique_cerberus", name: "冥府の三牙", conditionDescription: "ケルベロスを撃破", effectDescription: "通常攻撃時 低確率で追加攻撃 / 3回目の攻撃ごとに与ダメ+20% / 火傷耐性+15%", effect: { comboDoubleStrikeChance: 0.15, everyThirdHitDamageBonus: 0.2, statusResistByType: { burn: 0.15 } }, trigger: ["afterUniqueKill"], uniqueId: "cerberus" },
+  { id: "unique_griffon", name: "天空の翼折り", conditionDescription: "グリフォンを撃破", effectDescription: "回避+10% / 会心率+10% / 回避成功後 次の攻撃ダメージ+20%", effect: { evasionBonus: 0.1, critRateBonus: 0.1, evadeCounterDamageBonus: 0.2 }, trigger: ["afterUniqueKill"], uniqueId: "griffon" },
+  { id: "unique_minotauros", name: "迷宮王の剛腕", conditionDescription: "ミノタウロスを撃破", effectDescription: "攻撃+20% / 速度-5% / ボス与ダメ+10% / 重量80%以上で防御+10%", effect: { attackMultiplier: 0.2, speedMultiplier: -0.05, bossDamageBonus: 0.1, heavyWeightDefenseBonus: 0.1 }, trigger: ["afterUniqueKill"], uniqueId: "minotauros" },
+  { id: "unique_phoenix", name: "不死鳥の余火", conditionDescription: "鳳凰を撃破", effectDescription: "戦闘不能時1回だけHP20%で復帰 / 復帰後30秒 回復量+20% / 火傷耐性+20%", effect: { reviveOnce: { hpRate: 0.2, healBoostRate: 0.2, durationSec: 30 }, statusResistByType: { burn: 0.2 } }, trigger: ["afterUniqueKill"], uniqueId: "phoenix" },
+  { id: "unique_kirin", name: "天雷の聖角", conditionDescription: "麒麟を撃破", effectDescription: "攻撃速度+10% / 光・雷系スキル威力+20% / 状態異常耐性+15% / 戦闘開始10秒 速度+10%", effect: { speedMultiplier: 0.1, lightningHolySkillDamageBonus: 0.2, statusAilmentResist: 0.15, battleStartBuff: { speedMultiplier: 0.1, durationSec: 10 } }, trigger: ["afterUniqueKill"], uniqueId: "kirin" },
+  { id: "god_slayer", name: "神殺し", conditionDescription: "ユニークモンスター七体すべて撃破", effectDescription: "全能力+20% / ボス与ダメ+20% / 状態異常耐性+20% / 戦闘開始時にランダム神話バフ1種", effect: { allStatsMultiplier: 0.2, bossDamageBonus: 0.2, statusAilmentResist: 0.2, mythicBattleStartBuff: true }, trigger: ["afterUniqueKill"], isHidden: true }
 ];
 
 const OTHERWORLD_TITLES = [
@@ -5169,7 +5183,7 @@ function applyPhase10TitleBalance() {
   patch("anti_first_trap", { bossDamageBonus: 0.3, battleStartBuff: { damageReduction: 0.7, durationSec: 18 } });
   patch("carry_beyond", { ignoreWeightPenalty: true, slotFillAttackDefenseBonus: 0.03, overweightBonus: 0.1 });
   patch("beyond_death", { reviveBuff: { damageReduction: 0.35, durationSec: 10 }, allStatsMultiplier: 0.08 });
-  patch("god_slayer", { allStatsMultiplier: 0.25, uniqueDamageBonus: 0.5, uniqueEncounterRateBonus: 0.01 });
+  patch("god_slayer", { allStatsMultiplier: 0.2, bossDamageBonus: 0.2, statusAilmentResist: 0.2, mythicBattleStartBuff: true });
   patch("time_keeper_3", { unlockBattleSpeed: [4], speedModeBonus: { expMultiplier: 0.1, minSpeed: 1.5 } });
   patch("time_lord", { unlockBattleSpeed: [5], speedModeBonus: { expMultiplier: 0.25, minSpeed: 1.5 }, speedMultiplier: 0.12 });
   patch("dev_unexpected", { titleLimitBonus: 1, uniqueEncounterRateBonus: 0.015, conditionalBuffByLoop: { perLoopAllStatsMultiplier: 0.02, maxLoopBonus: 0.2 } });
@@ -6466,7 +6480,21 @@ const state = {
     comboInvincibleUntil: 0,
     comboExtraStrikeDepth: 0,
     afterTripleHitDamageBoostReady: false,
-    evadeCounterBoostReady: false
+    evadeCounterBoostReady: false,
+    playerAttackHitCount: 0,
+    reviveOnceUsedThisBattle: false,
+    reviveHealBoostUntil: 0,
+    reviveHealBoostRate: 0,
+    battleStartEvasionBonusUntil: 0,
+    battleStartEvasionBonus: 0,
+    mythicRegenUntil: 0,
+    mythicRegenRatePerSec: 0,
+    mythicExtraStrikeChanceUntil: 0,
+    mythicExtraStrikeChance: 0,
+    mythicAilmentInflictBonusUntil: 0,
+    mythicAilmentInflictBonus: 0,
+    mythicStatusResistBonusUntil: 0,
+    mythicStatusResistBonus: 0
   },
   stats: {
     totalBattles: 0,
@@ -7026,6 +7054,13 @@ function createDefaultTitleEffects() {
     lightWeightEvasionBonus: 0,
     lightWeightSpeedBonus: 0,
     evadeCounterDamageBonus: 0,
+    everyThirdHitDamageBonus: 0,
+    damageToAilmentEnemy: 0,
+    lightningHolySkillDamageBonus: 0,
+    onHitPoison: null,
+    reviveOnce: null,
+    statusInflictChanceBonus: 0,
+    mythicBattleStartBuff: false,
     highDifficultyBossDamageBonus: 0,
     productionExpRateBonus: 0,
     qualityMaterialRefundChance: 0,
@@ -8104,6 +8139,20 @@ function startStageBattle() {
   state.titleRuntime.comboExtraStrikeDepth = 0;
   state.titleRuntime.afterTripleHitDamageBoostReady = false;
   state.titleRuntime.evadeCounterBoostReady = false;
+  state.titleRuntime.playerAttackHitCount = 0;
+  state.titleRuntime.reviveOnceUsedThisBattle = false;
+  state.titleRuntime.reviveHealBoostUntil = 0;
+  state.titleRuntime.reviveHealBoostRate = 0;
+  state.titleRuntime.battleStartEvasionBonusUntil = 0;
+  state.titleRuntime.battleStartEvasionBonus = 0;
+  state.titleRuntime.mythicRegenUntil = 0;
+  state.titleRuntime.mythicRegenRatePerSec = 0;
+  state.titleRuntime.mythicExtraStrikeChanceUntil = 0;
+  state.titleRuntime.mythicExtraStrikeChance = 0;
+  state.titleRuntime.mythicAilmentInflictBonusUntil = 0;
+  state.titleRuntime.mythicAilmentInflictBonus = 0;
+  state.titleRuntime.mythicStatusResistBonusUntil = 0;
+  state.titleRuntime.mythicStatusResistBonus = 0;
   state.titleRuntime.comboReflectReady = false;
   state.titleRuntime.comboInvincibleUntil = 0;
   state.titleRuntime.comboExtraStrikeDepth = 0;
@@ -8159,6 +8208,11 @@ function startStageBattle() {
     }
     if (buff.damageReduction) {
       applyEffect("player", "title_start_reduction", { stat: "damageReduction", multiplier: buff.damageReduction, durationMs: buff.durationSec * 1000 });
+    }
+    if (buff.evadeBonus) {
+      state.titleRuntime.battleStartEvasionBonus = Number(buff.evadeBonus || 0);
+      state.titleRuntime.battleStartEvasionBonusUntil = Date.now() + Math.max(1000, Math.floor((buff.durationSec || 10) * 1000));
+      addLog(`称号効果: 戦闘開始回避+${Math.floor(Number(buff.evadeBonus || 0) * 100)}%`);
     }
   }
   if (state.titleEffects.randomBattleStartBuff) {
@@ -8320,6 +8374,11 @@ function updateBattle() {
   }
   const now = Date.now();
   applyPassiveStageRegen();
+  if ((state.titleRuntime.mythicRegenUntil || 0) > now && (state.titleRuntime.mythicRegenRatePerSec || 0) > 0) {
+    const maxHp = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
+    const perTick = maxHp * Number(state.titleRuntime.mythicRegenRatePerSec || 0) * (BATTLE_TICK_MS / 1000);
+    state.battle.playerCurrentHp = Math.min(maxHp, state.battle.playerCurrentHp + perTick);
+  }
 
   if (state.titleRuntime.reviveAttackBuffUntil > 0 && now >= state.titleRuntime.reviveAttackBuffUntil) {
     state.titleRuntime.reviveAttackBuffUntil = 0;
@@ -8340,6 +8399,10 @@ function updateBattle() {
   checkAutoUseItems();
   handleBossGimmickPhase();
   handleUniqueGimmickPhase();
+  applyTitleEnemyPoisonTick();
+  if (!state.battle.isActive || !state.battle.enemy || state.battle.enemy.hp <= 0) {
+    return;
+  }
 
   if (now >= state.battle.playerNextActionAt && state.battle.enemy.hp > 0) {
     playerAction();
@@ -8371,6 +8434,52 @@ function applyPassiveStageRegen() {
   const maxHp = getEffectivePlayerStat("maxHp");
   const perTick = (maxHp * totalRegenPerMinute) / (60 * (1000 / BATTLE_TICK_MS));
   state.battle.playerCurrentHp = Math.min(maxHp, state.battle.playerCurrentHp + perTick);
+}
+
+function isEnemyAilmentedByTitle() {
+  if (!state.battle?.enemy || !state.battle.isActive) {
+    return false;
+  }
+  const now = Date.now();
+  const extra = state.battle.gimmick?.extra || {};
+  if ((extra.titlePoisonUntil || 0) > now) {
+    return true;
+  }
+  return state.activeEffects.some((effect) => effect.target === "enemy" && effect.expiresAt > now && effect.kind === "debuff");
+}
+
+function applyTitleEnemyPoisonTick() {
+  if (!state.battle?.isActive || !state.battle.enemy || state.battle.enemy.hp <= 0) {
+    return;
+  }
+  const extra = state.battle.gimmick?.extra || {};
+  const now = Date.now();
+  if ((extra.titlePoisonUntil || 0) <= now) {
+    return;
+  }
+  const nextAt = Number(extra.titlePoisonNextTickAt || 0);
+  if (nextAt > now) {
+    return;
+  }
+  extra.titlePoisonNextTickAt = now + 1000;
+  const damageRate = Math.max(0.003, Number(extra.titlePoisonDamageRate || 0.02));
+  const poisonDamage = Math.max(1, Math.floor(Number(state.battle.enemy.maxHp || 1) * damageRate));
+  state.battle.enemy.hp = Math.max(0, state.battle.enemy.hp - poisonDamage);
+  addLog(`世界蛇の毒環: 毒ダメージ ${poisonDamage}`);
+  if (state.battle.enemy.hp <= 0) {
+    handleEnemyDefeated();
+  }
+}
+
+function isHolyOrLightningSkill(skill) {
+  if (!skill || !skill.id) {
+    return false;
+  }
+  const id = String(skill.id);
+  if (id.includes("holy") || id.includes("lightning")) {
+    return true;
+  }
+  return id === "holy" || id === "holy_ray" || id === "holy_punish" || id === "last_holy_light" || id === "lightning_chain";
 }
 
 function handleBossGimmickPhase() {
@@ -8592,9 +8701,12 @@ function triggerBossGimmick(gimmick) {
       state.battle.gimmick.triggered = true;
       addLog("[ギミック] Protocol3がコア過熱状態へ。後半フェーズが開始。");
       emitStoryDirectionEvent("protocol3_rage");
+      }
     }
   }
-}
+  if (state.titleEffects.mythicBattleStartBuff) {
+    applyGodSlayerMythicBuffOnce();
+  }
 
 function playerAction() {
   if (!state.battle.enemy || state.battle.enemy.hp <= 0) {
@@ -9208,6 +9320,11 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     const isPhysicalHit =
       hitMeta.source === "normal" ||
       (hitMeta.source === "skill" && ["attack", "multiAttack", "attackDebuff"].includes(hitMeta.skillType));
+    state.titleRuntime.playerAttackHitCount = (state.titleRuntime.playerAttackHitCount || 0) + 1;
+    if (state.titleEffects.everyThirdHitDamageBonus > 0 && state.titleRuntime.playerAttackHitCount % 3 === 0) {
+      damage = Math.max(1, Math.floor(damage * (1 + Number(state.titleEffects.everyThirdHitDamageBonus || 0))));
+      addLog("冥府の三牙: 三連刻印の一撃が発動");
+    }
     if (state.battle.enemy.id === "protocol3") {
       const mul = Number(state.battle.gimmick?.extra?.protocol3DamageTakenMultiplier || 1);
       damage = Math.max(1, Math.floor(damage * mul));
@@ -9262,7 +9379,29 @@ function applyDamage(source, amount, actionName, isCrit = false) {
       state.titleRuntime.comboReflectReady = true;
       addLog("剣狼2: 反射準備完了");
     }
-    const extraStrikeChance = clamp(0, 0.95, Number(state.titleEffects.comboDoubleStrikeChance || 0));
+    if (state.titleEffects.onHitPoison && state.battle.enemy.hp > 0) {
+      const poison = state.titleEffects.onHitPoison;
+      let chance = Number(poison.chance || 0) + Number(state.titleEffects.statusInflictChanceBonus || 0);
+      if (Date.now() < (state.titleRuntime.mythicAilmentInflictBonusUntil || 0)) {
+        chance += Number(state.titleRuntime.mythicAilmentInflictBonus || 0);
+      }
+      chance = clamp(0, 0.95, chance);
+      if (chance > 0 && Math.random() < chance) {
+        const extra = state.battle.gimmick.extra;
+        const until = Date.now() + Math.max(1000, Math.floor(Number(poison.durationSec || 6) * 1000));
+        extra.titlePoisonUntil = Math.max(Number(extra.titlePoisonUntil || 0), until);
+        extra.titlePoisonDamageRate = Math.max(Number(extra.titlePoisonDamageRate || 0), Number(poison.damageRatePerSec || 0.02));
+        if (!extra.titlePoisonNextTickAt || Number(extra.titlePoisonNextTickAt || 0) < Date.now()) {
+          extra.titlePoisonNextTickAt = Date.now() + 1000;
+        }
+        addLog("世界蛇の毒環: 毒を付与");
+      }
+    }
+    let extraStrikeChance = Number(state.titleEffects.comboDoubleStrikeChance || 0);
+    if (Date.now() < (state.titleRuntime.mythicExtraStrikeChanceUntil || 0)) {
+      extraStrikeChance += Number(state.titleRuntime.mythicExtraStrikeChance || 0);
+    }
+    extraStrikeChance = clamp(0, 0.95, extraStrikeChance);
     if (extraStrikeChance > 0 && state.battle.enemy.hp > 0 && (state.titleRuntime.comboExtraStrikeDepth || 0) <= 0 && Math.random() < extraStrikeChance) {
       state.titleRuntime.comboExtraStrikeDepth = 1;
       addLog("複合称号: 追加攻撃が発動");
@@ -9339,6 +9478,17 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     state.battle.playerCurrentHp = 1;
     addLog("運命に贖う者: HP1で踏みとどまった。", "important", { important: true });
     pushOtherworldSupportLog(true);
+    return;
+  }
+  if (state.battle.playerCurrentHp <= 0 && state.titleEffects.reviveOnce && !state.titleRuntime.reviveOnceUsedThisBattle) {
+    const revive = state.titleEffects.reviveOnce;
+    const maxHp = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
+    const hpRate = clamp(0.05, 1, Number(revive.hpRate || 0.2));
+    state.battle.playerCurrentHp = Math.max(1, Math.floor(maxHp * hpRate));
+    state.titleRuntime.reviveOnceUsedThisBattle = true;
+    state.titleRuntime.reviveHealBoostRate = Math.max(0, Number(revive.healBoostRate || 0));
+    state.titleRuntime.reviveHealBoostUntil = Date.now() + Math.max(1000, Math.floor(Number(revive.durationSec || 30) * 1000));
+    addLog("不死鳥の余火: 一度だけ戦線復帰した", "important", { important: true });
     return;
   }
   state.battle.stageDamageTaken = (state.battle.stageDamageTaken || 0) + amount;
@@ -9947,6 +10097,20 @@ function handleDefeat() {
   state.titleRuntime.comboExtraStrikeDepth = 0;
   state.titleRuntime.afterTripleHitDamageBoostReady = false;
   state.titleRuntime.evadeCounterBoostReady = false;
+  state.titleRuntime.playerAttackHitCount = 0;
+  state.titleRuntime.reviveOnceUsedThisBattle = false;
+  state.titleRuntime.reviveHealBoostUntil = 0;
+  state.titleRuntime.reviveHealBoostRate = 0;
+  state.titleRuntime.battleStartEvasionBonusUntil = 0;
+  state.titleRuntime.battleStartEvasionBonus = 0;
+  state.titleRuntime.mythicRegenUntil = 0;
+  state.titleRuntime.mythicRegenRatePerSec = 0;
+  state.titleRuntime.mythicExtraStrikeChanceUntil = 0;
+  state.titleRuntime.mythicExtraStrikeChance = 0;
+  state.titleRuntime.mythicAilmentInflictBonusUntil = 0;
+  state.titleRuntime.mythicAilmentInflictBonus = 0;
+  state.titleRuntime.mythicStatusResistBonusUntil = 0;
+  state.titleRuntime.mythicStatusResistBonus = 0;
   state.titleRuntime.reviveBuffPending = true;
   state.battle.isActive = false;
   state.battle.status = "敗北";
@@ -11307,6 +11471,35 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.evadeCounterDamageBonus === "number") {
     target.evadeCounterDamageBonus += effect.evadeCounterDamageBonus;
   }
+  if (typeof effect.everyThirdHitDamageBonus === "number") {
+    target.everyThirdHitDamageBonus += effect.everyThirdHitDamageBonus;
+  }
+  if (typeof effect.damageToAilmentEnemy === "number") {
+    target.damageToAilmentEnemy += effect.damageToAilmentEnemy;
+  }
+  if (typeof effect.lightningHolySkillDamageBonus === "number") {
+    target.lightningHolySkillDamageBonus += effect.lightningHolySkillDamageBonus;
+  }
+  if (effect.onHitPoison) {
+    target.onHitPoison = {
+      chance: Math.max(Number(target.onHitPoison?.chance || 0), Number(effect.onHitPoison.chance || 0)),
+      durationSec: Math.max(Number(target.onHitPoison?.durationSec || 0), Number(effect.onHitPoison.durationSec || 0)),
+      damageRatePerSec: Math.max(Number(target.onHitPoison?.damageRatePerSec || 0), Number(effect.onHitPoison.damageRatePerSec || 0))
+    };
+  }
+  if (effect.reviveOnce) {
+    target.reviveOnce = {
+      hpRate: Math.max(Number(target.reviveOnce?.hpRate || 0), Number(effect.reviveOnce.hpRate || 0)),
+      healBoostRate: Math.max(Number(target.reviveOnce?.healBoostRate || 0), Number(effect.reviveOnce.healBoostRate || 0)),
+      durationSec: Math.max(Number(target.reviveOnce?.durationSec || 0), Number(effect.reviveOnce.durationSec || 0))
+    };
+  }
+  if (typeof effect.statusInflictChanceBonus === "number") {
+    target.statusInflictChanceBonus += effect.statusInflictChanceBonus;
+  }
+  if (typeof effect.mythicBattleStartBuff === "boolean") {
+    target.mythicBattleStartBuff = target.mythicBattleStartBuff || effect.mythicBattleStartBuff;
+  }
   if (typeof effect.highDifficultyBossDamageBonus === "number") {
     target.highDifficultyBossDamageBonus += effect.highDifficultyBossDamageBonus;
   }
@@ -12184,7 +12377,10 @@ function getCurrentCombatRegionId() {
 function getStatusResistBonus(type) {
   const generic = state.titleEffects.statusAilmentResist || 0;
   const typed = state.titleEffects.statusResistByType?.[type] || 0;
-  return clamp(0, 0.9, generic + typed);
+  const mythic = Date.now() < (state.titleRuntime.mythicStatusResistBonusUntil || 0)
+    ? Number(state.titleRuntime.mythicStatusResistBonus || 0)
+    : 0;
+  return clamp(0, 0.9, generic + typed + mythic);
 }
 
 function getEffectivePlayerStats() {
@@ -12346,6 +12542,9 @@ function getEffectivePlayerStats() {
     if (state.battle.playerCurrentHp <= stats.maxHp * (cond.hpThreshold || 0.2)) {
       stats.critRate += Number(cond.critRateBonus || 0);
     }
+  }
+  if (Date.now() < (state.titleRuntime.battleStartEvasionBonusUntil || 0)) {
+    stats.evasion += Number(state.titleRuntime.battleStartEvasionBonus || 0);
   }
   if (state.titleEffects.ninjaLowEvasionConditional && getCurrentMainBattleLineId() === "ninja_line") {
     const cond = state.titleEffects.ninjaLowEvasionConditional;
@@ -12614,6 +12813,9 @@ function applyPlayerDamageBonuses(baseDamage, enemy) {
   if (state.titleEffects.machineDamageBonus > 0 && isMechanicalEnemy(enemy)) {
     damage = Math.floor(damage * (1 + state.titleEffects.machineDamageBonus));
   }
+  if (state.titleEffects.damageToAilmentEnemy > 0 && isEnemyAilmentedByTitle()) {
+    damage = Math.floor(damage * (1 + state.titleEffects.damageToAilmentEnemy));
+  }
   if (state.titleRuntime.evadeCounterBoostReady && state.titleEffects.evadeCounterDamageBonus > 0) {
     damage = Math.floor(damage * (1 + state.titleEffects.evadeCounterDamageBonus));
     state.titleRuntime.evadeCounterBoostReady = false;
@@ -12700,6 +12902,49 @@ function applyRandomBattleStartBuffOnce(effect, sourceLabel = "称号効果") {
   applyEffect("player", "title_random_speed", { stat: "speed", multiplier: 1 + (effect.power || 0.15), durationMs: (effect.durationSec || 15) * 1000 });
   addLog(`${sourceLabel}: ランダム速度バフ発動`);
   return true;
+}
+
+function applyGodSlayerMythicBuffOnce() {
+  const durationSec = 20;
+  const durationMs = durationSec * 1000;
+  const pick = Math.floor(Math.random() * 7);
+  const now = Date.now();
+  if (pick === 0) {
+    applyEffect("player", "god_slayer_fenrir", { stat: "speed", multiplier: 1.15, durationMs, displayNameJa: "神話バフ: 神狼" });
+    addLog("神殺し: 神話バフ『神狼』(速度+15%) 発動");
+    return;
+  }
+  if (pick === 1) {
+    state.titleRuntime.mythicAilmentInflictBonus = Math.max(state.titleRuntime.mythicAilmentInflictBonus || 0, 0.15);
+    state.titleRuntime.mythicAilmentInflictBonusUntil = now + durationMs;
+    addLog("神殺し: 神話バフ『世界蛇』(状態異常付与率+15%) 発動");
+    return;
+  }
+  if (pick === 2) {
+    state.titleRuntime.mythicExtraStrikeChance = Math.max(state.titleRuntime.mythicExtraStrikeChance || 0, 0.1);
+    state.titleRuntime.mythicExtraStrikeChanceUntil = now + durationMs;
+    addLog("神殺し: 神話バフ『冥府犬』(追加攻撃率+10%) 発動");
+    return;
+  }
+  if (pick === 3) {
+    applyEffect("player", "god_slayer_griffon", { stat: "evasion", multiplier: 1.15, durationMs, displayNameJa: "神話バフ: 天空獣" });
+    addLog("神殺し: 神話バフ『天空獣』(回避+15%) 発動");
+    return;
+  }
+  if (pick === 4) {
+    applyEffect("player", "god_slayer_minotaur", { stat: "attack", multiplier: 1.15, durationMs, displayNameJa: "神話バフ: 迷宮王" });
+    addLog("神殺し: 神話バフ『迷宮王』(攻撃+15%) 発動");
+    return;
+  }
+  if (pick === 5) {
+    state.titleRuntime.mythicRegenRatePerSec = Math.max(state.titleRuntime.mythicRegenRatePerSec || 0, 0.012);
+    state.titleRuntime.mythicRegenUntil = now + durationMs;
+    addLog("神殺し: 神話バフ『不死鳥』(継続回復) 発動");
+    return;
+  }
+  state.titleRuntime.mythicStatusResistBonus = Math.max(state.titleRuntime.mythicStatusResistBonus || 0, 0.2);
+  state.titleRuntime.mythicStatusResistBonusUntil = now + durationMs;
+  addLog("神殺し: 神話バフ『麒麟』(状態異常耐性+20%) 発動");
 }
 
 function getEquippedWeaponCount() {
@@ -12905,7 +13150,11 @@ function applyHealing(healAmount, sourceName, enableOverhealDefenseBuff = true) 
   const maxHp = getEffectivePlayerStat("maxHp");
   const before = state.battle.isActive ? state.battle.playerCurrentHp : state.player.hp;
   const safeBefore = Math.max(0, Math.min(maxHp, Number(before || 0)));
-  const afterRaw = safeBefore + Math.max(0, Math.floor(healAmount));
+  let adjustedHeal = Math.max(0, Math.floor(healAmount));
+  if (Date.now() < (state.titleRuntime.reviveHealBoostUntil || 0) && (state.titleRuntime.reviveHealBoostRate || 0) > 0) {
+    adjustedHeal = Math.max(1, Math.floor(adjustedHeal * (1 + Number(state.titleRuntime.reviveHealBoostRate || 0))));
+  }
+  const afterRaw = safeBefore + adjustedHeal;
   const after = Math.min(maxHp, afterRaw);
   const actualHeal = Math.max(0, after - safeBefore);
   const overflow = Math.max(0, afterRaw - maxHp);
@@ -13171,6 +13420,9 @@ function calculateSkillDamage(skill) {
   if (state.runtime.lastSkillUsedHpCast && state.titleEffects.hpCastSkillPowerBonus > 0) {
     skillMul *= 1 + state.titleEffects.hpCastSkillPowerBonus;
   }
+  if (state.titleEffects.lightningHolySkillDamageBonus > 0 && isHolyOrLightningSkill(skill)) {
+    skillMul *= 1 + state.titleEffects.lightningHolySkillDamageBonus;
+  }
   if (skill.type === "magicAttack") {
     const jobMul = getEffectivePlayerStats().magicPowerMultiplier || 1;
     return Math.max(1, Math.floor((getEffectivePlayerStat("intelligence") * skill.power + state.player.level - enemyDef * 0.35) * jobMul * skillMul));
@@ -13283,13 +13535,17 @@ function renderBattleAutoItemPanel() {
     const s = getAutoUseItemState(idx);
     const itemName = s.item ? getItemNameJa(s.item.id) : "未設定";
     const cooldownSec = s.cooldownMs > 0 ? (s.cooldownMs / 1000).toFixed(1) : "0.0";
+    const triggerLabel = getAutoUseTriggerLabel(s.slot?.triggerType || "hp_mp");
+    const conditionLabel = (s.slot?.triggerType || "hp_mp") === "hp_mp"
+      ? `${triggerLabel} / ${s.item?.effectType === "heal_mp" ? "MP" : "HP"} ${s.threshold}%以下`
+      : triggerLabel;
     return `
       <div class="auto-item-card ${escapeHtml(s.code)}">
         <div class="title-row">
           <strong>Slot ${idx + 1}: ${escapeHtml(itemName)}</strong>
           <span class="tiny">${s.slot?.isEnabled ? "有効" : "無効"}</span>
         </div>
-        <p class="tiny">発動条件: HP ${s.threshold}%以下</p>
+        <p class="tiny">発動条件: ${escapeHtml(conditionLabel)}</p>
         <p class="tiny">残り個数: ${s.count}</p>
         <p class="tiny">CT: ${cooldownSec}s</p>
         <p class="tiny auto-item-state">${escapeHtml(s.label)}</p>
@@ -16411,6 +16667,9 @@ function renderAutoUseItemSetupView() {
     const thresholdOptions = AUTO_USE_HP_THRESHOLD_OPTIONS
       .map((value) => `<option value="${value}" ${slot.hpThresholdPercent === value ? "selected" : ""}>${value}%</option>`)
       .join("");
+    const triggerOptions = AUTO_USE_TRIGGER_OPTIONS
+      .map((triggerType) => `<option value="${triggerType}" ${slot.triggerType === triggerType ? "selected" : ""}>${escapeHtml(getAutoUseTriggerLabel(triggerType))}</option>`)
+      .join("");
     const itemOptions = [`<option value="">未設定</option>`]
       .concat(options.map((row) => `<option value="${row.id}" ${slot.itemId === row.id ? "selected" : ""}>${escapeHtml(getItemNameJa(row.id))}</option>`))
       .join("");
@@ -16428,13 +16687,18 @@ function renderAutoUseItemSetupView() {
           </select>
         </label>
         <label class="tiny">発動条件
+          <select class="title-sort-select auto-item-trigger-select" data-auto-slot-index="${idx}">
+            ${triggerOptions}
+          </select>
+        </label>
+        <label class="tiny">閾値（HP/MPトリガー時）
           <select class="title-sort-select auto-item-threshold-select" data-auto-slot-index="${idx}">
             ${thresholdOptions}
           </select>
         </label>
         <p class="tiny">セット中: ${item ? escapeHtml(getItemNameJa(item.id)) : "未設定"} / 所持 ${count}</p>
         <p class="tiny">回復量: ${item ? `${item.healAmount || 0}` : "-"} / CT: ${item ? `${item.cooldown || 0}s` : "-"}</p>
-        <p class="tiny">状態: ${slot.isEnabled ? "有効" : "無効"} / 発動条件 HP/MP ${slot.hpThresholdPercent}%以下</p>
+        <p class="tiny">状態: ${slot.isEnabled ? "有効" : "無効"} / トリガー ${escapeHtml(getAutoUseTriggerLabel(slot.triggerType || "hp_mp"))}${(slot.triggerType || "hp_mp") === "hp_mp" ? ` / ${slot.hpThresholdPercent}%以下` : ""}</p>
       </div>
     `;
   }).join("");
@@ -17115,8 +17379,47 @@ function consumeItem(itemId) {
   return removeItem(itemId, 1);
 }
 
+const AUTO_USE_SUPPORTED_BASE_ITEM_IDS = new Set([
+  "potion",
+  "hiPotion",
+  "ether",
+  "hiEther",
+  "attackTonic",
+  "defenseTonic",
+  "speedTonic",
+  "grilledMeat",
+  "vegeSoup",
+  "gourmetMeat",
+  "failedDish",
+  "kingsElixir",
+  "angelElixir",
+  "berserkStim",
+  "fullRebootDrug"
+]);
+
+function isAutoUseSelectableItem(itemId) {
+  if (!itemId) {
+    return false;
+  }
+  const baseId = parseQualityItemId(itemId).baseId;
+  const item = ITEM_DATA[baseId] || ITEM_DATA[itemId];
+  if (!item) {
+    return false;
+  }
+  if (!["consumable", "crafted"].includes(item.category)) {
+    return false;
+  }
+  if (item.autoUsable) {
+    return true;
+  }
+  if (item.effectType === "heal_hp" || item.effectType === "heal_mp") {
+    return true;
+  }
+  return AUTO_USE_SUPPORTED_BASE_ITEM_IDS.has(baseId);
+}
+
 function getAutoUsableItemList() {
-  return Object.values(ITEM_DATA).filter((item) => item.autoUsable);
+  return Object.values(ITEM_DATA).filter((item) => isAutoUseSelectableItem(item.id));
 }
 
 function calculateHpConsumableHeal(baseId, qualityMul = 1) {
@@ -17152,6 +17455,7 @@ function getAutoUseItemState(slotIndex) {
   const item = slot.itemId ? ITEM_DATA[slot.itemId] : null;
   const count = slot.itemId ? getRemainingItemCount(slot.itemId) : 0;
   const cooldownMs = getAutoItemCooldownRemaining(slotIndex);
+  const triggerType = slot.triggerType || "hp_mp";
   const hpRate = state.battle?.isActive
     ? (state.battle.playerCurrentHp / Math.max(1, getEffectivePlayerStat("maxHp"))) * 100
     : 100;
@@ -17178,6 +17482,34 @@ function getAutoUseItemState(slotIndex) {
   if (!state.battle?.isActive) {
     return { code: "standby", label: "待機中", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
   }
+  if (triggerType === "battle_start") {
+    const spawnedAt = Number(state.battle.enemySpawnedAt || 0);
+    if (spawnedAt <= 0) {
+      return { code: "condition_not_met", label: "敵出現待ち", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+    }
+    if (Date.now() - spawnedAt > AUTO_USE_START_TRIGGER_WINDOW_MS) {
+      return { code: "condition_not_met", label: "開始タイミング外", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+    }
+    return { code: "usable", label: "使用可能", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+  }
+  if (triggerType === "boss_start") {
+    const spawnedAt = Number(state.battle.enemySpawnedAt || 0);
+    const isBoss = !!(
+      state.battle.isFieldBossBattle ||
+      state.battle.isUniqueBattle ||
+      ["fieldBoss", "loopBoss", "finalBoss"].includes(state.battle.enemy?.rarity)
+    );
+    if (!isBoss) {
+      return { code: "condition_not_met", label: "ボス戦ではない", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+    }
+    if (spawnedAt <= 0) {
+      return { code: "condition_not_met", label: "敵出現待ち", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+    }
+    if (Date.now() - spawnedAt > AUTO_USE_START_TRIGGER_WINDOW_MS) {
+      return { code: "condition_not_met", label: "開始タイミング外", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+    }
+    return { code: "usable", label: "使用可能", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
+  }
   if (conditionRate > slot.hpThresholdPercent) {
     return { code: "condition_not_met", label: "条件未達", slot, item, count, threshold: slot.hpThresholdPercent, cooldownMs };
   }
@@ -17197,7 +17529,7 @@ function setAutoUseItem(slotIndex, itemId) {
     return;
   }
   const row = state.autoUseItems[idx];
-  const value = itemId && ITEM_DATA[itemId]?.autoUsable ? itemId : null;
+  const value = itemId && isAutoUseSelectableItem(itemId) ? itemId : null;
   row.itemId = value;
   row.cooldownRemaining = 0;
   row.cooldownUntil = 0;
@@ -17218,6 +17550,16 @@ function setAutoUseThreshold(slotIndex, percent) {
   addLog(`自動使用設定: スロット${idx + 1} の条件をHP${p}%以下に変更`);
 }
 
+function setAutoUseTrigger(slotIndex, triggerType) {
+  const idx = Number(slotIndex);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= AUTO_USE_SLOT_COUNT) {
+    return;
+  }
+  const next = AUTO_USE_TRIGGER_OPTIONS.includes(triggerType) ? triggerType : "hp_mp";
+  state.autoUseItems[idx].triggerType = next;
+  addLog(`自動使用設定: スロット${idx + 1} のトリガーを ${getAutoUseTriggerLabel(next)} に変更`);
+}
+
 function toggleAutoUseItem(slotIndex) {
   const idx = Number(slotIndex);
   if (!Number.isInteger(idx) || idx < 0 || idx >= AUTO_USE_SLOT_COUNT) {
@@ -17235,22 +17577,14 @@ function tryUseAutoItem(slotIndex) {
   }
   const slot = state.autoUseItems[idx];
   const item = stateData.item;
-  if (!slot || !item || !consumeItem(item.id)) {
+  if (!slot || !item || !isAutoUseSelectableItem(item.id)) {
     return false;
   }
-  if (item.effectType === "heal_mp") {
-    const maxMp = getEffectivePlayerStat("maxMp");
-    const mp = item.id === "hiEther"
-      ? Math.max(20, Math.floor(maxMp * 0.5))
-      : Math.max(10, Math.floor(maxMp * 0.25));
-    if (state.battle.isActive) state.battle.playerCurrentMp = Math.min(maxMp, state.battle.playerCurrentMp + mp);
-    state.player.mp = Math.min(maxMp, state.player.mp + mp);
-    addLog(`${getItemNameJa(item.id)}を自動使用した！ MPが${mp}回復した`);
-  } else {
-    const heal = calculateHpConsumableHeal(item.id, 1);
-    const result = applyHealing(heal, getItemNameJa(item.id), true);
-    addLog(`${getItemNameJa(item.id)}を自動使用した！ HPが${Math.floor(result.actualHeal)}回復した`);
+  const used = useInventoryItem(item.id, { suppressRender: true, fromAutoUse: true });
+  if (!used) {
+    return false;
   }
+  addLog(`自動使用: ${getItemNameJa(item.id)}`);
   const cooldownSec = Number(item.cooldown || 0);
   slot.cooldownUntil = Date.now() + cooldownSec * 1000;
   slot.cooldownRemaining = cooldownSec;
@@ -17276,9 +17610,10 @@ function checkAutoUseItems() {
   return false;
 }
 
-function useInventoryItem(itemId) {
+function useInventoryItem(itemId, options = {}) {
+  const suppressRender = !!options.suppressRender;
   if (!removeItem(itemId, 1)) {
-    return;
+    return false;
   }
   const parsed = parseQualityItemId(itemId);
   const baseId = parsed.baseId;
@@ -17375,7 +17710,10 @@ function useInventoryItem(itemId) {
   } else if (state.battle.isActive) {
     state.battle.itemUsedInStage = true;
   }
-  renderPreservingWindowScroll();
+  if (!suppressRender) {
+    renderPreservingWindowScroll();
+  }
+  return used;
 }
 
 function handleSecondTick() {
@@ -17985,6 +18323,13 @@ function bindGameEvents() {
       select.addEventListener("change", () => {
         const idx = Number(select.dataset.autoSlotIndex || -1);
         setAutoUseThreshold(idx, Number(select.value || 0));
+        renderPreservingWindowScroll();
+      })
+    );
+    document.querySelectorAll(".auto-item-trigger-select").forEach((select) =>
+      select.addEventListener("change", () => {
+        const idx = Number(select.dataset.autoSlotIndex || -1);
+        setAutoUseTrigger(idx, String(select.value || "hp_mp"));
         renderPreservingWindowScroll();
       })
     );
@@ -18923,6 +19268,12 @@ function resetForNewLoop() {
   state.titleRuntime.swordsmanChargeReady = false;
   state.titleRuntime.swordsmanReflectReady = false;
   state.titleRuntime.flashSwordsmanEvasionUntil = 0;
+  state.titleRuntime.playerAttackHitCount = 0;
+  state.titleRuntime.reviveOnceUsedThisBattle = false;
+  state.titleRuntime.reviveHealBoostUntil = 0;
+  state.titleRuntime.reviveHealBoostRate = 0;
+  state.titleRuntime.battleStartEvasionBonusUntil = 0;
+  state.titleRuntime.battleStartEvasionBonus = 0;
 
   if (!state.loop.carryUniqueRecords) {
     state.uniqueDefeatedIds = [];
