@@ -632,17 +632,28 @@ function isOtherworldNonKingEnemy(enemy) {
   return e.region === "otherworld" && e.id !== "otherworldKing";
 }
 
-function isEnemyDamageNullifiedByTitle(enemy = state.battle?.enemy) {
-  if (!enemy) return false;
+function hasGodsCradleRescue() {
   const unlockedTitles = Array.isArray(state.unlockedTitles) ? state.unlockedTitles : [];
-  const hasGodsCradle =
+  return (
     !!state.titleEffects.nullifyMachineBossDamage ||
     unlockedTitles.includes("cheat_gods_cradle") ||
-    (state.stats.neverendMachineBossDefeatCount || 0) >= 100;
-  const hasGodsBlessing =
+    (state.stats.neverendMachineBossDefeatCount || 0) >= 100
+  );
+}
+
+function hasGodsBlessingRescue() {
+  const unlockedTitles = Array.isArray(state.unlockedTitles) ? state.unlockedTitles : [];
+  return (
     !!state.titleEffects.nullifyOtherworldNonKingDamage ||
     unlockedTitles.includes("cheat_gods_blessing") ||
-    (state.stats.otherworldNonKingDefeatCount || 0) >= 100;
+    (state.stats.otherworldNonKingDefeatCount || 0) >= 100
+  );
+}
+
+function isEnemyDamageNullifiedByTitle(enemy = state.battle?.enemy) {
+  if (!enemy) return false;
+  const hasGodsCradle = hasGodsCradleRescue();
+  const hasGodsBlessing = hasGodsBlessingRescue();
   if (hasGodsCradle && isMachineBossEnemy(enemy)) return true;
   if (hasGodsBlessing && isOtherworldNonKingEnemy(enemy)) return true;
   return false;
@@ -5360,9 +5371,10 @@ const PHASE22_OTHERWORLD_RESCUE_TITLES = [
     category: "cheat",
     description: "百の敗北を越え、機械の神域に守られた者。",
     conditionDescription: "機械系ボスに累計100回敗北",
-    effectDescription: "機械系ボスからの攻撃を無効化",
+    effectDescription: "機械系ボスからの攻撃を無効化 / 該当戦闘中に毎秒HP3%再生",
     effect: {
-      nullifyMachineBossDamage: true
+      nullifyMachineBossDamage: true,
+      stageRegenPerMinute: 0.3
     },
     trigger: ["afterDefeat", "afterBattle"],
     customCheckerId: "cheat_gods_cradle",
@@ -5376,9 +5388,10 @@ const PHASE22_OTHERWORLD_RESCUE_TITLES = [
     category: "cheat",
     description: "異界に百度拒まれ、なお帰還した者への加護。",
     conditionDescription: "異界の王を除く異界モンスターに累計100回敗北",
-    effectDescription: "異界の王を除く異界モンスターからの攻撃を無効化",
+    effectDescription: "異界の王を除く異界モンスターからの攻撃を無効化 / 該当戦闘中に毎秒HP3%再生",
     effect: {
-      nullifyOtherworldNonKingDamage: true
+      nullifyOtherworldNonKingDamage: true,
+      stageRegenPerMinute: 0.3
     },
     trigger: ["afterDefeat", "afterBattle"],
     customCheckerId: "cheat_gods_blessing",
@@ -8682,6 +8695,20 @@ function updateBattle() {
     const maxHp = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
     const perTick = maxHp * Number(state.titleRuntime.otherworldEntryRegenRatePerSec || 0) * (BATTLE_TICK_MS / 1000);
     state.battle.playerCurrentHp = Math.min(maxHp, state.battle.playerCurrentHp + perTick);
+  }
+  if (state.battle.enemy) {
+    const maxHp = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
+    let rescueRegenRatePerSec = 0;
+    if (hasGodsCradleRescue() && isMachineBossEnemy(state.battle.enemy)) {
+      rescueRegenRatePerSec += 0.03;
+    }
+    if (hasGodsBlessingRescue() && isOtherworldNonKingEnemy(state.battle.enemy)) {
+      rescueRegenRatePerSec += 0.03;
+    }
+    if (rescueRegenRatePerSec > 0) {
+      const perTick = maxHp * rescueRegenRatePerSec * (BATTLE_TICK_MS / 1000);
+      state.battle.playerCurrentHp = Math.min(maxHp, state.battle.playerCurrentHp + perTick);
+    }
   }
 
   if (state.titleRuntime.reviveAttackBuffUntil > 0 && now >= state.titleRuntime.reviveAttackBuffUntil) {
