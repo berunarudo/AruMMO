@@ -505,6 +505,49 @@ function canEnterOtherworld(current = state) {
   return !!(current.otherworldUnlocked || hasOtherworldKey(current) || hasAllUniqueDefeated(current) || (Array.isArray(current.unlockedTowns) && current.unlockedTowns.includes("otherworld")));
 }
 
+const OTHERWORLD_THREE_SACRED_IDS = {
+  weapon: "excalibur",
+  armor: "kamui",
+  accessory: "courageProof"
+};
+
+const OTHERWORLD_THREE_SACRED_ITEM_SET = new Set(Object.values(OTHERWORLD_THREE_SACRED_IDS));
+
+function isOtherworldEnteredForShop(current = state) {
+  return !!(current.otherworldUnlocked || current.otherworldEntered || current.worldStateFlags?.otherworldArrived);
+}
+
+function getOtherworldThreeSacredEquipState() {
+  const slots = state.player?.equipmentSlots || {};
+  let weapon = false;
+  let armor = false;
+  let accessory = false;
+  Object.entries(slots).forEach(([slotId, itemId]) => {
+    if (!itemId) return;
+    const inst = createEquipmentInstanceFromItemId(itemId);
+    const baseId = inst?.baseItemId || itemId;
+    if (slotId.startsWith("weapon") && baseId === OTHERWORLD_THREE_SACRED_IDS.weapon) weapon = true;
+    if (slotId.startsWith("armor") && baseId === OTHERWORLD_THREE_SACRED_IDS.armor) armor = true;
+    if (slotId.startsWith("accessory") && baseId === OTHERWORLD_THREE_SACRED_IDS.accessory) accessory = true;
+  });
+  const count = (weapon ? 1 : 0) + (armor ? 1 : 0) + (accessory ? 1 : 0);
+  return {
+    weapon,
+    armor,
+    accessory,
+    count,
+    isComplete: weapon && armor && accessory
+  };
+}
+
+function isOtherworldThreeSacredSetActive() {
+  return getOtherworldThreeSacredEquipState().isComplete;
+}
+
+function isOtherworldThreeSacredSinglePurchaseItem(itemId) {
+  return OTHERWORLD_THREE_SACRED_ITEM_SET.has(itemId);
+}
+
 function isOtherworldStage(stageId = state?.battle?.stageId) {
   const stage = STAGE_DATA?.[stageId];
   return !!stage && stage.mapId === "otherworld";
@@ -1535,6 +1578,68 @@ const NEVEREND_AUCTION_EQUIPMENT_DEFS = [
 ];
 
 registerRegionalEquipment(NEVEREND_AUCTION_EQUIPMENT_DEFS, { addToShop: false });
+
+const OTHERWORLD_THREE_SACRED_EQUIPMENT_DEFS = [
+  {
+    id: "excalibur",
+    name: "エクスカリバー",
+    category: "weapon",
+    unlockTown: "otherworld",
+    rarity: "mythic",
+    attack: 0,
+    defense: 0,
+    speed: 0,
+    intelligence: 0,
+    luck: 0,
+    hp: 0,
+    mp: 0,
+    weight: 18,
+    price: 1,
+    sellPrice: 0,
+    specialTags: ["otherworld", "three_sacred", "three_sacred_weapon"],
+    description: "異界の果てに置かれた救済の剣。英雄に与えられるものではない。それでも立ち上がる者のために残された剣。"
+  },
+  {
+    id: "kamui",
+    name: "神威",
+    category: "armor",
+    unlockTown: "otherworld",
+    rarity: "mythic",
+    attack: 0,
+    defense: 0,
+    speed: 0,
+    intelligence: 0,
+    luck: 0,
+    hp: 0,
+    mp: 0,
+    weight: 20,
+    price: 1,
+    sellPrice: 0,
+    specialTags: ["otherworld", "three_sacred", "three_sacred_armor"],
+    description: "神の威を纏う防具。それは守りではなく、敗北を越えるための器。"
+  },
+  {
+    id: "courageProof",
+    name: "勇気の証",
+    category: "accessory",
+    unlockTown: "otherworld",
+    rarity: "mythic",
+    attack: 0,
+    defense: 0,
+    speed: 0,
+    intelligence: 0,
+    luck: 0,
+    hp: 0,
+    mp: 0,
+    weight: 2,
+    price: 1,
+    sellPrice: 0,
+    specialTags: ["otherworld", "three_sacred", "three_sacred_accessory"],
+    description: "恐怖を知らぬ者の証ではない。恐怖を知り、それでも進んだ者の証。"
+  }
+];
+
+registerRegionalEquipment(OTHERWORLD_THREE_SACRED_EQUIPMENT_DEFS);
 
 const NEVEREND_AUCTION_ITEM_TABLE = [
   { id: "auction_reversalGreatsword", itemId: "reversalGreatsword", chipPrice: 30000, category: "weapon", neverendExclusive: true },
@@ -9684,7 +9789,11 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     addLog("因果の片鱗: 被ダメージを無効化");
     return;
   }
-  state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - amount);
+  let finalIncomingDamage = amount;
+  if (state.battle.enemy?.id === "otherworldKing" && isOtherworldThreeSacredSetActive()) {
+    finalIncomingDamage = Math.max(1, Math.floor(finalIncomingDamage * 0.8));
+  }
+  state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - finalIncomingDamage);
   if (state.battle.playerCurrentHp <= 0 && canPlayerStayAtOneHpInOtherworldKingBattle()) {
     state.battle.playerCurrentHp = 1;
     addLog("運命に贖う者: HP1で踏みとどまった。", "important", { important: true });
@@ -9702,10 +9811,10 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     addLog("不死鳥の余火: 一度だけ戦線復帰した", "important", { important: true });
     return;
   }
-  state.battle.stageDamageTaken = (state.battle.stageDamageTaken || 0) + amount;
-  state.stats.damageTakenTotal += amount;
+  state.battle.stageDamageTaken = (state.battle.stageDamageTaken || 0) + finalIncomingDamage;
+  state.stats.damageTakenTotal += finalIncomingDamage;
   if (state.titleRuntime.swordsmanReflectReady && state.titleEffects.swordsmanReflectRate > 0 && state.battle.enemy?.hp > 0) {
-    const reflected = Math.max(1, Math.floor(amount * state.titleEffects.swordsmanReflectRate));
+    const reflected = Math.max(1, Math.floor(finalIncomingDamage * state.titleEffects.swordsmanReflectRate));
     state.titleRuntime.swordsmanReflectReady = false;
     state.battle.enemy.hp = Math.max(0, state.battle.enemy.hp - reflected);
     addLog(`剣狼: 反射ダメージ ${reflected}`);
@@ -9715,7 +9824,7 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     }
   }
   if (state.titleRuntime.comboReflectReady && state.titleEffects.comboReflectRate > 0 && state.battle.enemy?.hp > 0) {
-    const reflected = Math.max(1, Math.floor(amount * state.titleEffects.comboReflectRate));
+    const reflected = Math.max(1, Math.floor(finalIncomingDamage * state.titleEffects.comboReflectRate));
     state.titleRuntime.comboReflectReady = false;
     state.battle.enemy.hp = Math.max(0, state.battle.enemy.hp - reflected);
     addLog(`剣狼2: 反射ダメージ ${reflected}`);
@@ -12707,6 +12816,27 @@ function getEffectivePlayerStats() {
     evasion: afterEquip.evasion,
     critRate: afterEquip.critRate + state.titleEffects.critRateBonus
   };
+  const otherworldSacredState = getOtherworldThreeSacredEquipState();
+  if (otherworldSacredState.count > 0) {
+    const equipmentMul = 1 + otherworldSacredState.count * 0.3;
+    stats.maxHp *= equipmentMul;
+    stats.maxMp *= equipmentMul;
+    stats.attack *= equipmentMul;
+    stats.defense *= equipmentMul;
+    stats.speed *= equipmentMul;
+    stats.intelligence *= equipmentMul;
+    stats.luck *= equipmentMul;
+  }
+  if (otherworldSacredState.isComplete) {
+    const setMul = 1.3;
+    stats.maxHp *= setMul;
+    stats.maxMp *= setMul;
+    stats.attack *= setMul;
+    stats.defense *= setMul;
+    stats.speed *= setMul;
+    stats.intelligence *= setMul;
+    stats.luck *= setMul;
+  }
   if (state.titleEffects.evasionBonus > 0) {
     stats.evasion += state.titleEffects.evasionBonus;
   }
@@ -13078,6 +13208,9 @@ function applyPlayerDamageBonuses(baseDamage, enemy) {
   }
   if (state.titleEffects.damageToAilmentEnemy > 0 && isEnemyAilmentedByTitle()) {
     damage = Math.floor(damage * (1 + state.titleEffects.damageToAilmentEnemy));
+  }
+  if (enemy.id === "otherworldKing" && isOtherworldThreeSacredSetActive()) {
+    damage = Math.floor(damage * 1.3);
   }
   if (state.titleRuntime.evadeCounterBoostReady && state.titleEffects.evadeCounterDamageBonus > 0) {
     damage = Math.floor(damage * (1 + state.titleEffects.evadeCounterDamageBonus));
@@ -14767,6 +14900,9 @@ function getItemRequiredFieldBossStage(itemId) {
 }
 
 function isItemShopUnlocked(itemId) {
+  if (OTHERWORLD_THREE_SACRED_ITEM_SET.has(itemId) && !isOtherworldEnteredForShop()) {
+    return false;
+  }
   const townOk = isTownUnlockedForContent(getItemRequiredTown(itemId));
   if (!townOk) {
     return false;
@@ -14791,6 +14927,7 @@ function renderShopBuyView(activeRegion) {
       const reqTown = getItemRequiredTown(itemId);
       const reqBossStage = getItemRequiredFieldBossStage(itemId);
       const buyPrice = itemId === NEVEREND_ACCESS_DATA.ticketItemId ? getNeverendTicketPrice() : item.buyPrice;
+      const isThreeSacred = OTHERWORLD_THREE_SACRED_ITEM_SET.has(itemId);
       const reqText = [
         reqTown ? `町解放: ${TOWN_DATA[reqTown]?.name || reqTown}` : null,
         reqBossStage ? `ボス解放: ${reqBossStage}` : null,
@@ -14798,16 +14935,26 @@ function renderShopBuyView(activeRegion) {
       ].filter(Boolean).join(" / ");
       const lockText = unlocked ? "購入可" : "未解放";
       const alreadyOwned = itemId === NEVEREND_ACCESS_DATA.ticketItemId && canEnterNeverend();
-      const canBuy = unlocked && buyPrice > 0 && !alreadyOwned;
+      const alreadyPossessedForSinglePurchase = isThreeSacred && own > 0;
+      const canBuy = unlocked && buyPrice > 0 && !alreadyOwned && !alreadyPossessedForSinglePurchase;
+      const stateText = alreadyOwned
+        ? "解放済み"
+        : alreadyPossessedForSinglePurchase
+          ? "所持済み"
+          : lockText;
+      const threeSacredEffectText = isThreeSacred
+        ? `<p class="tiny">効果: 全能力+30%</p>`
+        : "";
       return `
         <div class="shop-card">
           <h4>${item.name}</h4>
           <p class="tiny">${item.description}</p>
           <p class="tiny">カテゴリ: ${item.category}${reqText ? ` / ${reqText}` : ""}</p>
+          ${threeSacredEffectText}
           <p class="tiny">買値: ${buyPrice} / 売値: ${Math.floor(getSellPrice(item))} / 所持: ${own}</p>
-          <p class="tiny">状態: ${alreadyOwned ? "解放済み" : lockText}</p>
+          <p class="tiny">状態: ${stateText}</p>
           <div class="title-row">
-            <button class="btn shop-buy-btn" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>${alreadyOwned ? "解放済み" : "購入"}</button>
+            <button class="btn shop-buy-btn" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>${alreadyOwned || alreadyPossessedForSinglePurchase ? "所持済み" : "購入"}</button>
           </div>
         </div>
       `;
@@ -14834,7 +14981,18 @@ function renderShopBuyView(activeRegion) {
       `;
     })
     .join("");
-  const cards = `${itemCards}${cheatSlotCards}`;
+  const threeSacredSetInfo = activeRegion === "otherworld"
+    ? `
+      <div class="shop-card">
+        <h4>異界三神器セット</h4>
+        <p class="tiny">エクスカリバー / 神威 / 勇気の証 をすべて装備で発動</p>
+        <p class="tiny">・全能力さらに+30%</p>
+        <p class="tiny">・異界の王への与ダメージ+30%</p>
+        <p class="tiny">・異界の王からの被ダメージ-20%</p>
+      </div>
+    `
+    : "";
+  const cards = `${itemCards}${cheatSlotCards}${threeSacredSetInfo}`;
   return `<div class="shop-grid">${cards || "<p class='tiny'>この地域で販売中の商品はありません。</p>"}</div>`;
 }
 
@@ -14892,6 +15050,7 @@ function renderShopView() {
 
 function buyItem(itemId) {
   ensureNeverendState();
+  ensureOtherworldState();
   const item = ITEM_DATA[itemId];
   const buyPrice = itemId === NEVEREND_ACCESS_DATA.ticketItemId ? getNeverendTicketPrice() : item?.buyPrice;
   if (!item || buyPrice <= 0) {
@@ -14913,6 +15072,10 @@ function buyItem(itemId) {
   }
   if (state.player.gold < buyPrice) {
     addLog(`購入失敗: ${item.name} の所持GOLDが不足。`);
+    return;
+  }
+  if (isOtherworldThreeSacredSinglePurchaseItem(itemId) && getInventoryCount(itemId) > 0) {
+    addLog(`購入失敗: ${item.name} はすでに所持済みです。`);
     return;
   }
   state.player.gold -= buyPrice;
@@ -16227,6 +16390,10 @@ function renderStatusView(container) {
   const weightPenaltyReductionRate = clamp(0, 0.9, Number(state.titleEffects.weightPenaltyReduction || 0));
   const displayTitle = getDisplayTitleData();
   const profileName = getPlayerDisplayName();
+  const otherworldSacredState = getOtherworldThreeSacredEquipState();
+  const otherworldSacredLabel = otherworldSacredState.isComplete
+    ? "発動中（全能力+120% / 対王 与ダメ+30%・被ダメ-20%）"
+    : `${otherworldSacredState.count}/3（1部位ごとに全能力+30%）`;
   const fameRank = getCurrentFameRank();
   const fameAlias = getFameAlias();
   const fameRankLabel = formatFameRankLabel(fameRank);
@@ -16263,6 +16430,7 @@ function renderStatusView(container) {
     ["チート称号取得数", `${getUnlockedTitleCountByCategory("cheat")} (30/60/120で+1)`],
     ["VIP禁断枠購入", `${Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.vipForbiddenCheatSlotBuys || 0)))} / ${VIP_FORBIDDEN_TITLE_SLOT_RULE.maxBuys}`],
     ["異界素材枠拡張", `${Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.otherworldForgeCheatSlotBuys || 0)))} / ${OTHERWORLD_TITLE_SLOT_FORGE_RULE.maxBuys}`],
+    ["異界三神器", otherworldSacredLabel],
     ["称号装備上限(互換)", `${getCurrentTitleLimit()}`],
     ["次上限条件", `${getNextTitleLimitCondition()}`],
     ["周回挑戦クリア", `${state.stats.loopChallengeClearCount}`],
