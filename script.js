@@ -575,6 +575,27 @@ function isMechanicalEnemy(enemy) {
   return species.includes("machine") || e.region === "neverend";
 }
 
+function isMachineBossEnemy(enemy) {
+  const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
+  if (!e) return false;
+  if (["protocol3", "awakenedProtocol3", "overloadFrame"].includes(e.id)) return true;
+  if (!isMechanicalEnemy(e)) return false;
+  return ["fieldBoss", "boss", "loopBoss", "finalBoss"].includes(String(e.rarity || ""));
+}
+
+function isOtherworldNonKingEnemy(enemy) {
+  const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
+  if (!e) return false;
+  return e.region === "otherworld" && e.id !== "otherworldKing";
+}
+
+function isEnemyDamageNullifiedByTitle(enemy = state.battle?.enemy) {
+  if (!enemy) return false;
+  if (state.titleEffects.nullifyMachineBossDamage && isMachineBossEnemy(enemy)) return true;
+  if (state.titleEffects.nullifyOtherworldNonKingDamage && isOtherworldNonKingEnemy(enemy)) return true;
+  return false;
+}
+
 function isGlassCannonEnemy(enemy) {
   const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
   if (!e) return false;
@@ -5142,6 +5163,119 @@ const PHASE21_REQUESTED_MIXED_TITLES = [
 
 TITLE_DATA.push(...PHASE21_REQUESTED_MIXED_TITLES);
 
+const PHASE22_OTHERWORLD_RESCUE_TITLES = [
+  {
+    id: "cheat_terminal_adapter",
+    name: "終端適応者",
+    category: "cheat",
+    description: "終端の都市で壊れ、終端の戦いに適応した者。",
+    conditionDescription: "天空都市で機械系300体撃破 + Protocol3に1回以上敗北",
+    effectDescription: "機械/異界への与ダメ+25% / 三連撃以上の2発目以降被ダメ-35% / ボス戦開始30秒 防御+20% / Protocol3戦 被ダメ-10%",
+    effect: {
+      machineDamageBonus: 0.25,
+      regionDamageBonus: { otherworld: 0.25 },
+      multiHitFromSecondDamageReduction: 0.35,
+      battleStartBuff: { defenseMultiplier: 0.2, durationSec: 30 },
+      protocol3DamageReduction: 0.1
+    },
+    trigger: ["afterBattle", "afterDefeat", "afterFieldBossClear"],
+    customCheckerId: "cheat_terminal_adapter",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_boundary_crosser",
+    name: "境界を越えし者",
+    category: "cheat",
+    description: "異界の空気に身体が慣れ始めた者。",
+    conditionDescription: "異界到達 + 異界の怪物100体撃破",
+    effectDescription: "異界への与ダメ+30% / 異界被ダメ-20% / 状態異常耐性+25% / 異界で戦闘開始時ランダムバフ",
+    effect: {
+      regionDamageBonus: { otherworld: 0.3 },
+      regionDamageReduction: { otherworld: 0.2 },
+      statusAilmentResist: 0.25,
+      otherworldBattleStartRandomBuff: { durationSec: 20 }
+    },
+    trigger: ["afterBattle", "afterFieldBossClear"],
+    customCheckerId: "cheat_boundary_crosser",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_trampled_by_otherworld",
+    name: "異界に踏まれた者",
+    category: "cheat",
+    description: "異界の理不尽を最初に知った者。",
+    conditionDescription: "異界の通常モンスターに初めて敗北",
+    effectDescription: "異界被ダメ-15% / 異界で最大HP+15% / 異界で状態異常耐性+10%",
+    effect: {
+      regionDamageReduction: { otherworld: 0.15 },
+      regionStatMultiplier: { otherworld: { maxHp: 1.15 } },
+      regionStatusAilmentResist: { otherworld: 0.1 }
+    },
+    trigger: ["afterDefeat"],
+    customCheckerId: "cheat_trampled_by_otherworld",
+    tier: "epic",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_accustomed_to_backside",
+    name: "裏側に慣れた者",
+    category: "cheat",
+    description: "何度も拒まれ、それでも戻ってきた者。",
+    conditionDescription: "異界の通常モンスターに累計10回敗北",
+    effectDescription: "異界への与ダメ+20% / 異界被ダメ-20% / 異界戦闘開始10秒 防御+20% / 異界通常敗北時 低確率で素材持ち帰り",
+    effect: {
+      regionDamageBonus: { otherworld: 0.2 },
+      regionDamageReduction: { otherworld: 0.2 },
+      otherworldBattleStartBuff: { defenseMultiplier: 0.2, durationSec: 10 },
+      otherworldNormalDefeatMaterialCarryChance: 0.2
+    },
+    trigger: ["afterDefeat", "afterBattle"],
+    customCheckerId: "cheat_accustomed_to_backside",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_gods_cradle",
+    name: "神の揺り籠",
+    category: "cheat",
+    description: "百の敗北を越え、機械の神域に守られた者。",
+    conditionDescription: "機械系ボスに累計100回敗北",
+    effectDescription: "機械系ボスからの攻撃を無効化",
+    effect: {
+      nullifyMachineBossDamage: true
+    },
+    trigger: ["afterDefeat", "afterBattle"],
+    customCheckerId: "cheat_gods_cradle",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_gods_blessing",
+    name: "神の加護",
+    category: "cheat",
+    description: "異界に百度拒まれ、なお帰還した者への加護。",
+    conditionDescription: "異界の王を除く異界モンスターに累計100回敗北",
+    effectDescription: "異界の王を除く異界モンスターからの攻撃を無効化",
+    effect: {
+      nullifyOtherworldNonKingDamage: true
+    },
+    trigger: ["afterDefeat", "afterBattle"],
+    customCheckerId: "cheat_gods_blessing",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  }
+];
+
+TITLE_DATA.push(...PHASE22_OTHERWORLD_RESCUE_TITLES);
+
 Object.assign(TITLE_CHECKERS, {
   deep_sea_slayer: () => (state.stats.seaMonsterKillCount || 0) >= 200,
   inferno_hunter: () => (state.stats.volcanoMonsterKillCount || 0) >= 200,
@@ -5168,6 +5302,15 @@ Object.assign(TITLE_CHECKERS, {
     (state.stats.rouletteLossCount || 0) >= 20,
   the_last_victor: () => (state.stats.hpTenPercentWins || 0) >= 30,
   fragment_of_causality: () => (state.stats.rouletteSameNumberBest || 0) >= 30
+});
+
+Object.assign(TITLE_CHECKERS, {
+  cheat_terminal_adapter: () => (state.stats.mechanicalEnemyKillCount || 0) >= 300 && ((state.stats.defeatsByStage?.["5-10"] || 0) >= 1),
+  cheat_boundary_crosser: () => !!state.otherworldUnlocked && (state.stats.otherworldMonsterKillCount || 0) >= 100,
+  cheat_trampled_by_otherworld: () => (state.stats.otherworldNormalDefeatCount || 0) >= 1,
+  cheat_accustomed_to_backside: () => (state.stats.otherworldNormalDefeatCount || 0) >= 10,
+  cheat_gods_cradle: () => (state.stats.neverendMachineBossDefeatCount || 0) >= 100,
+  cheat_gods_blessing: () => (state.stats.otherworldNonKingDefeatCount || 0) >= 100
 });
 
 function applyPhase10TitleBalance() {
@@ -6494,7 +6637,10 @@ const state = {
     mythicAilmentInflictBonusUntil: 0,
     mythicAilmentInflictBonus: 0,
     mythicStatusResistBonusUntil: 0,
-    mythicStatusResistBonus: 0
+    mythicStatusResistBonus: 0,
+    otherworldEntryRegenUntil: 0,
+    otherworldEntryRegenRatePerSec: 0,
+    damageNullifyLogUntil: 0
   },
   stats: {
     totalBattles: 0,
@@ -6591,6 +6737,10 @@ const state = {
     seaMonsterKillCount: 0,
     volcanoMonsterKillCount: 0,
     otherworldMonsterKillCount: 0,
+    otherworldNormalDefeatCount: 0,
+    otherworldNormalDefeatCarryCount: 0,
+    neverendMachineBossDefeatCount: 0,
+    otherworldNonKingDefeatCount: 0,
     displayTitleBossKillCount: 0,
     aboveRecommendedBossKillCount: 0,
     zeroMpWinCount: 0,
@@ -6929,6 +7079,7 @@ function createDefaultTitleEffects() {
     statusResistByType: {},
     regionDamageBonus: {},
     regionDamageReduction: {},
+    regionStatusAilmentResist: {},
     uniqueDamageReduction: 0,
     regionAccuracyBonus: {},
     regionStageRegenPerMinute: {},
@@ -7061,6 +7212,12 @@ function createDefaultTitleEffects() {
     reviveOnce: null,
     statusInflictChanceBonus: 0,
     mythicBattleStartBuff: false,
+    protocol3DamageReduction: 0,
+    otherworldBattleStartBuff: null,
+    otherworldBattleStartRandomBuff: null,
+    otherworldNormalDefeatMaterialCarryChance: 0,
+    nullifyMachineBossDamage: false,
+    nullifyOtherworldNonKingDamage: false,
     highDifficultyBossDamageBonus: 0,
     productionExpRateBonus: 0,
     qualityMaterialRefundChance: 0,
@@ -8153,6 +8310,10 @@ function startStageBattle() {
   state.titleRuntime.mythicAilmentInflictBonus = 0;
   state.titleRuntime.mythicStatusResistBonusUntil = 0;
   state.titleRuntime.mythicStatusResistBonus = 0;
+  state.titleRuntime.otherworldEntryRegenUntil = 0;
+  state.titleRuntime.otherworldEntryRegenRatePerSec = 0;
+  state.titleRuntime.damageNullifyLogUntil = 0;
+  state.titleRuntime.damageNullifyLogUntil = 0;
   state.titleRuntime.comboReflectReady = false;
   state.titleRuntime.comboInvincibleUntil = 0;
   state.titleRuntime.comboExtraStrikeDepth = 0;
@@ -8250,6 +8411,30 @@ function startStageBattle() {
         });
       }
       addLog("応援バフ発動: ファンの声援が戦闘力を底上げした。", "important", { important: true });
+    }
+  }
+  if (state.titleEffects.mythicBattleStartBuff) {
+    applyGodSlayerMythicBuffOnce();
+  }
+  if (stage.mapId === "otherworld") {
+    if (state.titleEffects.otherworldBattleStartBuff) {
+      const buff = state.titleEffects.otherworldBattleStartBuff;
+      const durationMs = Math.max(1000, Math.floor(Number(buff.durationSec || 10) * 1000));
+      if (Number(buff.attackMultiplier || 0) > 0) {
+        applyEffect("player", "title_otherworld_start_attack", { stat: "attack", multiplier: 1 + Number(buff.attackMultiplier || 0), durationMs });
+      }
+      if (Number(buff.defenseMultiplier || 0) > 0) {
+        applyEffect("player", "title_otherworld_start_defense", { stat: "defense", multiplier: 1 + Number(buff.defenseMultiplier || 0), durationMs });
+      }
+      if (Number(buff.speedMultiplier || 0) > 0) {
+        applyEffect("player", "title_otherworld_start_speed", { stat: "speed", multiplier: 1 + Number(buff.speedMultiplier || 0), durationMs });
+      }
+      if (Number(buff.evadeBonus || 0) > 0) {
+        applyEffect("player", "title_otherworld_start_evasion", { stat: "evasion", multiplier: 1 + Number(buff.evadeBonus || 0), durationMs });
+      }
+    }
+    if (state.titleEffects.otherworldBattleStartRandomBuff) {
+      applyOtherworldEntryRandomBuffOnce(state.titleEffects.otherworldBattleStartRandomBuff, "称号効果");
     }
   }
 
@@ -8377,6 +8562,11 @@ function updateBattle() {
   if ((state.titleRuntime.mythicRegenUntil || 0) > now && (state.titleRuntime.mythicRegenRatePerSec || 0) > 0) {
     const maxHp = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
     const perTick = maxHp * Number(state.titleRuntime.mythicRegenRatePerSec || 0) * (BATTLE_TICK_MS / 1000);
+    state.battle.playerCurrentHp = Math.min(maxHp, state.battle.playerCurrentHp + perTick);
+  }
+  if ((state.titleRuntime.otherworldEntryRegenUntil || 0) > now && (state.titleRuntime.otherworldEntryRegenRatePerSec || 0) > 0) {
+    const maxHp = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
+    const perTick = maxHp * Number(state.titleRuntime.otherworldEntryRegenRatePerSec || 0) * (BATTLE_TICK_MS / 1000);
     state.battle.playerCurrentHp = Math.min(maxHp, state.battle.playerCurrentHp + perTick);
   }
 
@@ -8704,9 +8894,6 @@ function triggerBossGimmick(gimmick) {
       }
     }
   }
-  if (state.titleEffects.mythicBattleStartBuff) {
-    applyGodSlayerMythicBuffOnce();
-  }
 
 function playerAction() {
   if (!state.battle.enemy || state.battle.enemy.hp <= 0) {
@@ -8798,6 +8985,9 @@ function enemyAction() {
   }
   if (Date.now() < state.titleRuntime.reviveProtectionUntil) {
     reduction *= 0.4;
+  }
+  if (state.battle.enemy?.id === "awakenedProtocol3" && state.titleEffects.protocol3DamageReduction > 0) {
+    reduction *= 1 - clamp(0, 0.9, Number(state.titleEffects.protocol3DamageReduction || 0));
   }
   const raw = Math.max(1, Math.floor(state.battle.enemy.attack - effective.defense * 0.55));
   const isCrit = !!uniqueProfile && Math.random() < (uniqueProfile.critRate || 0);
@@ -8978,6 +9168,9 @@ function protocol3Strike(options) {
   reduction *= effective.damageReductionMultiplier || 1;
   const regionReduction = state.titleEffects.regionDamageReduction?.[regionId] || 0;
   if (regionReduction > 0) reduction *= 1 - regionReduction;
+  if (state.titleEffects.protocol3DamageReduction > 0) {
+    reduction *= 1 - clamp(0, 0.9, Number(state.titleEffects.protocol3DamageReduction || 0));
+  }
   const hits = Math.max(1, Math.floor(options.hits || 1));
   const multiHitReduction = hits >= 3 ? clamp(0, 0.9, Number(state.titleEffects.multiHitFromSecondDamageReduction || 0)) : 0;
   for (let i = 0; i < hits; i += 1) {
@@ -9005,8 +9198,12 @@ function protocol3Strike(options) {
     }
     applyDamage("enemy", damage, isCrit ? `${options.label} 会心` : `${options.label} ${i + 1}段`);
     if (options.applyDefenseBreakChance && Math.random() < options.applyDefenseBreakChance) {
-      applyEffect("player", "protocol3_break", { stat: "defense", multiplier: 0.88, durationMs: 4200, displayNameJa: "防御破壊" });
-      addLog("Protocol3の破壊信号で防御が低下した。");
+      if (!isEnemyDamageNullifiedByTitle(enemy)) {
+        applyEffect("player", "protocol3_break", { stat: "defense", multiplier: 0.88, durationMs: 4200, displayNameJa: "防御破壊" });
+        addLog("Protocol3の破壊信号で防御が低下した。");
+      } else {
+        addLog("神の揺り籠: 破壊信号を無効化");
+      }
     }
   }
   if (hits >= 3 && state.titleEffects.afterTripleHitDamageBonus > 0 && state.battle.playerCurrentHp > 0) {
@@ -9462,6 +9659,13 @@ function applyDamage(source, amount, actionName, isCrit = false) {
         state.stats.bossCritFinishCount += 1;
       }
       handleEnemyDefeated();
+    }
+    return;
+  }
+  if (isEnemyDamageNullifiedByTitle(state.battle.enemy)) {
+    if (Date.now() >= (state.titleRuntime.damageNullifyLogUntil || 0)) {
+      addLog("救済称号: 攻撃を無効化");
+      state.titleRuntime.damageNullifyLogUntil = Date.now() + 1200;
     }
     return;
   }
@@ -10076,6 +10280,26 @@ function handleDefeat() {
     state.stats.defeatsByStage = state.stats.defeatsByStage || {};
     state.stats.defeatsByStage[defeatStageId] = (state.stats.defeatsByStage[defeatStageId] || 0) + 1;
   }
+  const defeatedEnemy = enemyId ? (ENEMY_DATA[enemyId] || state.battle?.enemy || null) : (state.battle?.enemy || null);
+  if (defeatedEnemy && isMachineBossEnemy(defeatedEnemy)) {
+    state.stats.neverendMachineBossDefeatCount = (state.stats.neverendMachineBossDefeatCount || 0) + 1;
+  }
+  if (defeatedEnemy && isOtherworldNonKingEnemy(defeatedEnemy)) {
+    state.stats.otherworldNonKingDefeatCount = (state.stats.otherworldNonKingDefeatCount || 0) + 1;
+  }
+  if (stage?.mapId === "otherworld" && !stage?.isFieldBossStage) {
+    state.stats.otherworldNormalDefeatCount = (state.stats.otherworldNormalDefeatCount || 0) + 1;
+    const carryChance = clamp(0, 0.95, Number(state.titleEffects.otherworldNormalDefeatMaterialCarryChance || 0));
+    if (carryChance > 0 && Math.random() < carryChance) {
+      const pool = ["deepShard", "warpedCore", "rebirthSeal"];
+      const itemId = pool[Math.floor(Math.random() * pool.length)];
+      if (ITEM_DATA[itemId]) {
+        addItem(itemId, 1);
+        state.stats.otherworldNormalDefeatCarryCount = (state.stats.otherworldNormalDefeatCarryCount || 0) + 1;
+        addLog(`異界敗北救済: ${getItemNameJa(itemId)} を持ち帰った。`, "important", { important: true });
+      }
+    }
+  }
   if (mainLineId === "ninja_line" && stage?.isFieldBossStage && (effective.evasion || 0) <= 0.1) {
     state.stats.ninjaLowEvasionBossDefeatCount = (state.stats.ninjaLowEvasionBossDefeatCount || 0) + 1;
   }
@@ -10111,6 +10335,9 @@ function handleDefeat() {
   state.titleRuntime.mythicAilmentInflictBonus = 0;
   state.titleRuntime.mythicStatusResistBonusUntil = 0;
   state.titleRuntime.mythicStatusResistBonus = 0;
+  state.titleRuntime.otherworldEntryRegenUntil = 0;
+  state.titleRuntime.otherworldEntryRegenRatePerSec = 0;
+  state.titleRuntime.damageNullifyLogUntil = 0;
   state.titleRuntime.reviveBuffPending = true;
   state.battle.isActive = false;
   state.battle.status = "敗北";
@@ -11500,6 +11727,24 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.mythicBattleStartBuff === "boolean") {
     target.mythicBattleStartBuff = target.mythicBattleStartBuff || effect.mythicBattleStartBuff;
   }
+  if (typeof effect.protocol3DamageReduction === "number") {
+    target.protocol3DamageReduction += effect.protocol3DamageReduction;
+  }
+  if (effect.otherworldBattleStartBuff) {
+    target.otherworldBattleStartBuff = effect.otherworldBattleStartBuff;
+  }
+  if (effect.otherworldBattleStartRandomBuff) {
+    target.otherworldBattleStartRandomBuff = effect.otherworldBattleStartRandomBuff;
+  }
+  if (typeof effect.otherworldNormalDefeatMaterialCarryChance === "number") {
+    target.otherworldNormalDefeatMaterialCarryChance += effect.otherworldNormalDefeatMaterialCarryChance;
+  }
+  if (typeof effect.nullifyMachineBossDamage === "boolean") {
+    target.nullifyMachineBossDamage = target.nullifyMachineBossDamage || effect.nullifyMachineBossDamage;
+  }
+  if (typeof effect.nullifyOtherworldNonKingDamage === "boolean") {
+    target.nullifyOtherworldNonKingDamage = target.nullifyOtherworldNonKingDamage || effect.nullifyOtherworldNonKingDamage;
+  }
   if (typeof effect.highDifficultyBossDamageBonus === "number") {
     target.highDifficultyBossDamageBonus += effect.highDifficultyBossDamageBonus;
   }
@@ -11737,6 +11982,11 @@ function mergeTitleEffect(target, effect) {
   if (effect.regionDamageReduction) {
     Object.entries(effect.regionDamageReduction).forEach(([key, bonus]) => {
       target.regionDamageReduction[key] = (target.regionDamageReduction[key] || 0) + bonus;
+    });
+  }
+  if (effect.regionStatusAilmentResist) {
+    Object.entries(effect.regionStatusAilmentResist).forEach(([key, bonus]) => {
+      target.regionStatusAilmentResist[key] = (target.regionStatusAilmentResist[key] || 0) + bonus;
     });
   }
   if (effect.regionAccuracyBonus) {
@@ -12377,10 +12627,12 @@ function getCurrentCombatRegionId() {
 function getStatusResistBonus(type) {
   const generic = state.titleEffects.statusAilmentResist || 0;
   const typed = state.titleEffects.statusResistByType?.[type] || 0;
+  const regionId = getCurrentCombatRegionId();
+  const regional = state.titleEffects.regionStatusAilmentResist?.[regionId] || 0;
   const mythic = Date.now() < (state.titleRuntime.mythicStatusResistBonusUntil || 0)
     ? Number(state.titleRuntime.mythicStatusResistBonus || 0)
     : 0;
-  return clamp(0, 0.9, generic + typed + mythic);
+  return clamp(0, 0.9, generic + typed + regional + mythic);
 }
 
 function getEffectivePlayerStats() {
@@ -12945,6 +13197,37 @@ function applyGodSlayerMythicBuffOnce() {
   state.titleRuntime.mythicStatusResistBonus = Math.max(state.titleRuntime.mythicStatusResistBonus || 0, 0.2);
   state.titleRuntime.mythicStatusResistBonusUntil = now + durationMs;
   addLog("神殺し: 神話バフ『麒麟』(状態異常耐性+20%) 発動");
+}
+
+function applyOtherworldEntryRandomBuffOnce(effect, sourceLabel = "称号効果") {
+  const durationSec = Math.max(10, Number(effect?.durationSec || 20));
+  const durationMs = Math.floor(durationSec * 1000);
+  const pick = Math.floor(Math.random() * 5);
+  const now = Date.now();
+  if (pick === 0) {
+    applyEffect("player", "title_otherworld_random_attack", { stat: "attack", multiplier: 1.15, durationMs, displayNameJa: "異界順応: 攻撃強化" });
+    addLog(`${sourceLabel}: 異界ランダムバフ(攻撃+15%)`);
+    return true;
+  }
+  if (pick === 1) {
+    applyEffect("player", "title_otherworld_random_defense", { stat: "defense", multiplier: 1.15, durationMs, displayNameJa: "異界順応: 防御強化" });
+    addLog(`${sourceLabel}: 異界ランダムバフ(防御+15%)`);
+    return true;
+  }
+  if (pick === 2) {
+    applyEffect("player", "title_otherworld_random_speed", { stat: "speed", multiplier: 1.1, durationMs, displayNameJa: "異界順応: 速度強化" });
+    addLog(`${sourceLabel}: 異界ランダムバフ(速度+10%)`);
+    return true;
+  }
+  if (pick === 3) {
+    applyEffect("player", "title_otherworld_random_evasion", { stat: "evasion", multiplier: 1.1, durationMs, displayNameJa: "異界順応: 回避強化" });
+    addLog(`${sourceLabel}: 異界ランダムバフ(回避+10%)`);
+    return true;
+  }
+  state.titleRuntime.otherworldEntryRegenRatePerSec = Math.max(Number(state.titleRuntime.otherworldEntryRegenRatePerSec || 0), 0.012);
+  state.titleRuntime.otherworldEntryRegenUntil = Math.max(Number(state.titleRuntime.otherworldEntryRegenUntil || 0), now + durationMs);
+  addLog(`${sourceLabel}: 異界ランダムバフ(継続回復)`);
+  return true;
 }
 
 function getEquippedWeaponCount() {
@@ -17112,6 +17395,10 @@ function applyLoadedState(payload) {
   if (typeof state.stats.tripleAttackEnemyWinCount !== "number") state.stats.tripleAttackEnemyWinCount = 0;
   if (typeof state.stats.enragedBossKillCount !== "number") state.stats.enragedBossKillCount = 0;
   if (typeof state.stats.mechanicalEnemyKillCount !== "number") state.stats.mechanicalEnemyKillCount = 0;
+  if (typeof state.stats.otherworldNormalDefeatCount !== "number") state.stats.otherworldNormalDefeatCount = 0;
+  if (typeof state.stats.otherworldNormalDefeatCarryCount !== "number") state.stats.otherworldNormalDefeatCarryCount = 0;
+  if (typeof state.stats.neverendMachineBossDefeatCount !== "number") state.stats.neverendMachineBossDefeatCount = 0;
+  if (typeof state.stats.otherworldNonKingDefeatCount !== "number") state.stats.otherworldNonKingDefeatCount = 0;
   if (typeof state.stats.quickKill10sCount !== "number") state.stats.quickKill10sCount = 0;
   if (typeof state.stats.glassCannonWinCount !== "number") state.stats.glassCannonWinCount = 0;
   if (typeof state.stats.bossDefeatCount !== "number") state.stats.bossDefeatCount = 0;
@@ -19205,6 +19492,10 @@ function resetForNewLoop() {
   state.stats.tripleAttackEnemyWinCount = 0;
   state.stats.enragedBossKillCount = 0;
   state.stats.mechanicalEnemyKillCount = 0;
+  state.stats.otherworldNormalDefeatCount = 0;
+  state.stats.otherworldNormalDefeatCarryCount = 0;
+  state.stats.neverendMachineBossDefeatCount = 0;
+  state.stats.otherworldNonKingDefeatCount = 0;
   state.stats.quickKill10sCount = 0;
   state.stats.glassCannonWinCount = 0;
   state.stats.bossDefeatCount = 0;
@@ -19274,6 +19565,16 @@ function resetForNewLoop() {
   state.titleRuntime.reviveHealBoostRate = 0;
   state.titleRuntime.battleStartEvasionBonusUntil = 0;
   state.titleRuntime.battleStartEvasionBonus = 0;
+  state.titleRuntime.mythicRegenUntil = 0;
+  state.titleRuntime.mythicRegenRatePerSec = 0;
+  state.titleRuntime.mythicExtraStrikeChanceUntil = 0;
+  state.titleRuntime.mythicExtraStrikeChance = 0;
+  state.titleRuntime.mythicAilmentInflictBonusUntil = 0;
+  state.titleRuntime.mythicAilmentInflictBonus = 0;
+  state.titleRuntime.mythicStatusResistBonusUntil = 0;
+  state.titleRuntime.mythicStatusResistBonus = 0;
+  state.titleRuntime.otherworldEntryRegenUntil = 0;
+  state.titleRuntime.otherworldEntryRegenRatePerSec = 0;
 
   if (!state.loop.carryUniqueRecords) {
     state.uniqueDefeatedIds = [];
