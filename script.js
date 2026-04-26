@@ -6071,11 +6071,46 @@ function render() {
   refreshSceneBgm();
 }
 
+const SCROLL_PRESERVE_SELECTORS = [
+  "#main-view",
+  ".shop-grid",
+  ".title-grid",
+  ".board-thread-list",
+  ".board-post-list",
+  ".carry-grid",
+  ".log-list"
+];
+
+function captureScrollablePositions() {
+  return SCROLL_PRESERVE_SELECTORS.flatMap((selector) =>
+    Array.from(document.querySelectorAll(selector)).map((element, index) => ({
+      selector,
+      index,
+      top: element.scrollTop || 0,
+      left: element.scrollLeft || 0
+    }))
+  );
+}
+
+function restoreScrollablePositions(snapshots) {
+  (snapshots || []).forEach((snapshot) => {
+    const nodes = document.querySelectorAll(snapshot.selector);
+    const node = nodes?.[snapshot.index];
+    if (!node) {
+      return;
+    }
+    node.scrollTop = snapshot.top || 0;
+    node.scrollLeft = snapshot.left || 0;
+  });
+}
+
 function renderPreservingWindowScroll() {
   const scrollY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+  const snapshots = captureScrollablePositions();
   render();
   requestAnimationFrame(() => {
     window.scrollTo(0, scrollY);
+    restoreScrollablePositions(snapshots);
   });
 }
 
@@ -11569,7 +11604,7 @@ function exchangeGoldToChips(goldAmount) {
   state.stats.casinoExchangeCount = (state.stats.casinoExchangeCount || 0) + 1;
   addLog(`カジノ交換: ${amount}G -> ${chips}チップ`);
   checkTitleUnlocks("afterCasinoPlay");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function exchangeChipsToGold(chipAmount) {
@@ -11589,7 +11624,7 @@ function exchangeChipsToGold(chipAmount) {
   state.stats.casinoExchangeCount = (state.stats.casinoExchangeCount || 0) + 1;
   addLog(`カジノ交換: ${amount}チップ -> ${gold}G`);
   checkTitleUnlocks("afterCasinoPlay");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function getAuctionItemById(auctionId) {
@@ -11686,7 +11721,7 @@ function buyAuctionItem(auctionId) {
   state.stats.totalShopTrades = (state.stats.totalShopTrades || 0) + 1;
   addLog(`オークション落札: ${ITEM_DATA[row.itemId]?.name || row.itemId} x1 (-${buyPrice}チップ)`);
   checkTitleUnlocks("afterShopTrade");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function sellAuctionItem(itemId) {
@@ -11704,7 +11739,7 @@ function sellAuctionItem(itemId) {
   state.stats.totalShopTrades = (state.stats.totalShopTrades || 0) + 1;
   addLog(`オークション売却: ${ITEM_DATA[itemId]?.name || itemId} x1 (+${price}チップ)`);
   checkTitleUnlocks("afterShopTrade");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function setRouletteNumber(number, vip = false) {
@@ -12295,7 +12330,7 @@ function claimLoopQuestReward(loopQuestId) {
   updateGuildRank();
   addLog(`周回依頼報酬: ${quest.name} / +${quest.reward.gold}G, +${gp}GP, ${ITEM_DATA[quest.reward.itemId]?.name || quest.reward.itemId} x1`);
   checkLoopOnlyTitles("afterLoopProgress");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function acceptQuest(questId) {
@@ -12314,7 +12349,7 @@ function acceptQuest(questId) {
   quest.progressStart = createQuestProgressSnapshot(quest);
   state.guild.activeGuildQuests = [...state.guild.activeQuestIds];
   addLog(`依頼受注: ${quest.name}`);
-  render();
+  renderPreservingWindowScroll();
 }
 
 function claimQuestReward(questId) {
@@ -12336,7 +12371,7 @@ function claimQuestReward(questId) {
   updateGuildRank();
   completeQuestAndRegenerate(questId);
   checkTitleUnlocks("afterQuestClaim");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function checkQuestCompletion() {
@@ -12560,7 +12595,7 @@ function buyItem(itemId) {
   state.stats.totalShopTrades += 1;
   addLog(`ショップ購入: ${item.name} x1`);
   checkTitleUnlocks("afterShopTrade");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function sellItem(itemId, quantity = 1, options = {}) {
@@ -12582,7 +12617,7 @@ function sellItem(itemId, quantity = 1, options = {}) {
   state.stats.totalShopTrades += 1;
   addLog(`ショップ売却: ${item.name} x${qty} (+${sell}G)`);
   checkTitleUnlocks("afterShopTrade");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function getSellPrice(item) {
@@ -13752,7 +13787,7 @@ function openBoardThread(threadId) {
   markThreadAsRead(threadId);
   state.stats.boardReactionFlags = { ...(state.stats.boardReactionFlags || {}), [`opened_${threadId}`]: true };
   checkTitleUnlocks("afterBoardView");
-  render();
+  renderPreservingWindowScroll();
 }
 
 function renderStatusView(container) {
@@ -15390,7 +15425,7 @@ function useInventoryItem(itemId) {
   } else if (state.battle.isActive) {
     state.battle.itemUsedInStage = true;
   }
-  render();
+  renderPreservingWindowScroll();
 }
 
 function handleSecondTick() {
@@ -15613,7 +15648,7 @@ function bindGameEvents() {
         }
         pushNavigationHistory();
         state.guild.shopMode = mode;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".shop-region-tab-btn").forEach((btn) =>
@@ -15624,7 +15659,7 @@ function bindGameEvents() {
         }
         pushNavigationHistory();
         state.guild.shopRegionTab = region;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".mainjob-select-btn").forEach((btn) => btn.addEventListener("click", () => selectMainJobFromTemple(btn.dataset.mainJobId)));
@@ -15647,7 +15682,7 @@ function bindGameEvents() {
         }
         pushNavigationHistory();
         state.guild.workshopTab = tab;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".craft-btn").forEach((btn) =>
@@ -15716,28 +15751,28 @@ function bindGameEvents() {
         pushNavigationHistory();
         state.board.selectedCategory = category;
         state.stats.boardCategoryViewCounts[category] = (state.stats.boardCategoryViewCounts[category] || 0) + 1;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     const sortSelect = document.getElementById("board-sort-select");
     if (sortSelect) {
       sortSelect.addEventListener("change", () => {
         state.board.sortMode = sortSelect.value || "new";
-        render();
+        renderPreservingWindowScroll();
       });
     }
     const unreadToggle = document.getElementById("board-unread-toggle");
     if (unreadToggle) {
       unreadToggle.addEventListener("change", () => {
         state.board.unreadOnly = !!unreadToggle.checked;
-        render();
+        renderPreservingWindowScroll();
       });
     }
     const searchInput = document.getElementById("board-search-input");
     if (searchInput) {
       searchInput.addEventListener("input", () => {
         state.board.searchText = searchInput.value || "";
-        render();
+        renderPreservingWindowScroll();
       });
     }
     document.querySelectorAll(".board-thread-btn").forEach((btn) => btn.addEventListener("click", () => openBoardThread(btn.dataset.threadId)));
@@ -15755,7 +15790,7 @@ function bindGameEvents() {
         if (tab === "titles") {
           openTitleCatalog();
         }
-        render();
+        renderPreservingWindowScroll();
       });
     });
     document.querySelectorAll(".title-toggle-btn").forEach((btn) => btn.addEventListener("click", () => toggleTitle(btn.dataset.titleId)));
@@ -15792,7 +15827,7 @@ function bindGameEvents() {
         state.titleCatalogFilter = filter;
         state.titleCatalogPageNormal = 1;
         state.titleCatalogPageCheat = 1;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".title-status-filter-btn").forEach((btn) =>
@@ -15804,7 +15839,7 @@ function bindGameEvents() {
         state.titleCatalogStatusFilter = filter;
         state.titleCatalogPageNormal = 1;
         state.titleCatalogPageCheat = 1;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".title-effect-filter-btn").forEach((btn) =>
@@ -15816,7 +15851,7 @@ function bindGameEvents() {
         state.titleCatalogEffectFilter = filter;
         state.titleCatalogPageNormal = 1;
         state.titleCatalogPageCheat = 1;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     const sortSelect = document.getElementById("title-sort-select");
@@ -15825,7 +15860,7 @@ function bindGameEvents() {
         state.titleCatalogSortMode = sortSelect.value || "default";
         state.titleCatalogPageNormal = 1;
         state.titleCatalogPageCheat = 1;
-        render();
+        renderPreservingWindowScroll();
       });
     }
     const searchInput = document.getElementById("title-search-input");
@@ -15834,7 +15869,7 @@ function bindGameEvents() {
         state.titleCatalogSearch = searchInput.value || "";
         state.titleCatalogPageNormal = 1;
         state.titleCatalogPageCheat = 1;
-        render();
+        renderPreservingWindowScroll();
       });
     }
     document.querySelectorAll(".equipment-slot-btn").forEach((btn) =>
@@ -15880,21 +15915,21 @@ function bindGameEvents() {
       btn.addEventListener("click", () => {
         const idx = Number(btn.dataset.skillSlotIndex || 0);
         state.ui.selectedSkillSlot = idx;
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".skill-equip-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
         const skillId = btn.dataset.skillId;
         equipSkill(skillId, state.ui.selectedSkillSlot || 0);
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".skill-unequip-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
         const idx = Number(btn.dataset.skillSlotIndex || 0);
         unequipSkill(idx);
-        render();
+        renderPreservingWindowScroll();
       })
     );
   }
@@ -15913,21 +15948,21 @@ function bindGameEvents() {
       select.addEventListener("change", () => {
         const idx = Number(select.dataset.autoSlotIndex || -1);
         setAutoUseItem(idx, select.value || null);
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".auto-item-threshold-select").forEach((select) =>
       select.addEventListener("change", () => {
         const idx = Number(select.dataset.autoSlotIndex || -1);
         setAutoUseThreshold(idx, Number(select.value || 0));
-        render();
+        renderPreservingWindowScroll();
       })
     );
     document.querySelectorAll(".auto-item-toggle-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
         const idx = Number(btn.dataset.autoSlotIndex || -1);
         toggleAutoUseItem(idx);
-        render();
+        renderPreservingWindowScroll();
       })
     );
   }
