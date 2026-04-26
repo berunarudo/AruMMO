@@ -3474,11 +3474,11 @@ const PRODUCTION_JOB_PATHS = {
 };
 
 const PRODUCTION_STAGE_REQUIREMENTS = [
-  { level: 1, crafts: 0 },
-  { level: 20, crafts: 40 },
-  { level: 45, crafts: 120 },
-  { level: 75, crafts: 260 },
-  { level: 100, crafts: 500 }
+  { level: 1 },
+  { level: 20 },
+  { level: 45 },
+  { level: 75 },
+  { level: 100 }
 ];
 
 const RECIPE_DATA = [
@@ -15526,7 +15526,7 @@ function renderProductionJobInfo() {
       <p>進化段階: Tier ${state.player.productionJobTier || 1} / 次進化条件: 生産Lv ${getProductionJobEvolutionInfo().nextJob?.requiredProductionLevel || "-"}</p>
       <p>段階: ${stageName} (${state.player.productionJobStage + 1}/${path.stages.length})</p>
       <p>生産Lv: ${state.player.productionJobLevel} / EXP: ${state.player.productionJobExp} / 次Lv: ${productionExpToNextLevel()}</p>
-      <p class="tiny">次段階条件: Lv${nextReq?.level ?? "-"} / 生産回数${nextReq?.crafts ?? "-"}回</p>
+      <p class="tiny">次段階条件: 生産Lv ${nextReq?.level ?? "-"}</p>
       <p class="tiny">この職の生産回数: ${currentCrafts}</p>
       <p class="tiny">累計生産EXP: ${state.stats.totalCraftExp}</p>
       <p class="tiny">品質統計: 成功 ${state.stats.craftSuccessCount} / 失敗 ${state.stats.craftFailureCount} / 大成功 ${state.stats.craftGreatSuccessCount} / 高品質 ${state.stats.craftHighQualityCount} / 神品質 ${state.stats.craftGodQualityCount}</p>
@@ -15732,14 +15732,13 @@ function checkProductionStageUp() {
   if (!path) {
     return;
   }
-  const currentCrafts = state.player.productionProgress[state.player.productionJob]?.crafts || 0;
   while (state.player.productionJobStage < path.stages.length - 1) {
     const nextStage = state.player.productionJobStage + 1;
     const req = PRODUCTION_STAGE_REQUIREMENTS[nextStage];
     if (!req) {
       break;
     }
-    if (state.player.productionJobLevel >= req.level && currentCrafts >= req.crafts) {
+    if (state.player.productionJobLevel >= req.level) {
       state.player.productionJobStage = nextStage;
       addLog(`生産職段階アップ: ${path.stages[nextStage]}`);
     } else {
@@ -15880,7 +15879,6 @@ function enhanceItem(itemId) {
   } else if (enhanceCategory === "armor") {
     state.stats.armorEnhanceCount = (state.stats.armorEnhanceCount || 0) + 1;
   }
-  const isSmith = PRODUCTION_JOB_PATHS[state.player.productionJob]?.type === "smith";
   let success = Math.random() <= getEnhanceSuccessRate(itemId);
   if (!success && state.titleEffects.failureRetryChance > 0 && Math.random() < clamp(0, 0.9, state.titleEffects.failureRetryChance)) {
     success = Math.random() <= getEnhanceSuccessRate(itemId);
@@ -15909,9 +15907,8 @@ function enhanceItem(itemId) {
     state.stats.enhanceFailureCount = (state.stats.enhanceFailureCount || 0) + 1;
     addLog(`強化失敗: ${ITEM_DATA[itemId]?.name || itemId} の強化に失敗しました。`);
   }
-  if (isSmith) {
-    gainProductionExp(6);
-  }
+  // 強化でも生産と同等効率で生産EXPを得られるよう統一
+  gainProductionExp(8);
   checkProductionRelatedTitles();
   refreshPlayerDerivedStats();
   renderPreservingWindowScroll();
