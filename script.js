@@ -1699,6 +1699,27 @@ const CHEAT_TITLE_SLOT_SHOP_OFFERS = [
   { id: "cheat_slot_plus_3", label: "チート称号枠増加3", requiredTownId: "rulacia", requiredMapId: "volcano", price: 100000, bonus: 1 }
 ];
 
+const TITLE_COLLECTION_SLOT_THRESHOLDS = {
+  normal: [30, 60, 100],
+  cheat: [30, 60, 120]
+};
+
+const VIP_FORBIDDEN_TITLE_SLOT_RULE = {
+  costChips: 1000000,
+  maxBuys: 3,
+  bonusPerBuy: 1
+};
+
+const OTHERWORLD_TITLE_SLOT_FORGE_RULE = {
+  goldCost: 1000000,
+  maxBuys: 10,
+  bonusPerBuy: 1,
+  materialNeed: [
+    { itemId: "deepShard", qty: 10 },
+    { itemId: "warpedCore", qty: 1 }
+  ]
+};
+
 function createDefaultRegionBossSlotRewardState() {
   const base = {};
   Object.keys(REGION_BOSS_TITLE_SLOT_REWARD_DATA).forEach((regionId) => {
@@ -1742,6 +1763,103 @@ function getCheatTitleShopSlotBonus() {
     }
     return acc + Number(offer.bonus || 0);
   }, 0);
+}
+
+function getUnlockedTitleCountByCategory(category) {
+  const target = category === "cheat" ? "cheat" : "normal";
+  return (state.unlockedTitles || []).reduce((acc, id) => {
+    const title = getTitleById(id);
+    if (!title) return acc;
+    return title.category === target ? acc + 1 : acc;
+  }, 0);
+}
+
+function getTitleCollectionSlotBonus() {
+  const normalCount = getUnlockedTitleCountByCategory("normal");
+  const cheatCount = getUnlockedTitleCountByCategory("cheat");
+  const normal = TITLE_COLLECTION_SLOT_THRESHOLDS.normal.filter((threshold) => normalCount >= threshold).length;
+  const cheat = TITLE_COLLECTION_SLOT_THRESHOLDS.cheat.filter((threshold) => cheatCount >= threshold).length;
+  return { normal, cheat, normalCount, cheatCount };
+}
+
+function getFameRankTitleSlotBonus() {
+  const rank = getCurrentFameRank();
+  if (rank === FAME_HALL_OF_FAME || state.guild?.hallOfFame) {
+    return { normal: 999, cheat: 999, hallUnlimited: true };
+  }
+  if (typeof rank !== "number" || !Number.isFinite(rank)) {
+    return { normal: 0, cheat: 0, hallUnlimited: false };
+  }
+  let bonus = 0;
+  if (rank <= 50) bonus += 1;
+  if (rank <= 20) bonus += 1;
+  if (rank <= 10) bonus += 1;
+  if (rank <= 5) bonus += 1;
+  if (rank <= 1) bonus += 2;
+  return { normal: bonus, cheat: bonus, hallUnlimited: false };
+}
+
+function getVipForbiddenTitleSlotBonus() {
+  const buys = Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.vipForbiddenCheatSlotBuys || 0)));
+  return Math.min(VIP_FORBIDDEN_TITLE_SLOT_RULE.maxBuys, buys) * VIP_FORBIDDEN_TITLE_SLOT_RULE.bonusPerBuy;
+}
+
+function getOtherworldMaterialTitleSlotBonus() {
+  const buys = Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.otherworldForgeCheatSlotBuys || 0)));
+  return Math.min(OTHERWORLD_TITLE_SLOT_FORGE_RULE.maxBuys, buys) * OTHERWORLD_TITLE_SLOT_FORGE_RULE.bonusPerBuy;
+}
+
+function purchaseVipForbiddenTitleSlot() {
+  ensureTitleSlotState();
+  ensureNeverendState();
+  const currentBuys = Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.vipForbiddenCheatSlotBuys || 0)));
+  if (currentBuys >= VIP_FORBIDDEN_TITLE_SLOT_RULE.maxBuys) {
+    addLog("禁断の称号枠: これ以上は購入できません。");
+    return;
+  }
+  if (!state.neverendVipUnlocked || !state.neverendBossClearFlags?.protocol3) {
+    addLog("禁断の称号枠は Protocol3撃破後かつVIP解放後に購入できます。");
+    return;
+  }
+  if (state.chips < VIP_FORBIDDEN_TITLE_SLOT_RULE.costChips) {
+    addLog(`チップ不足: 禁断の称号枠には ${VIP_FORBIDDEN_TITLE_SLOT_RULE.costChips} チップ必要です。`);
+    return;
+  }
+  state.chips -= VIP_FORBIDDEN_TITLE_SLOT_RULE.costChips;
+  state.titleSlotUnlocks.vipForbiddenCheatSlotBuys = currentBuys + 1;
+  recalculateTitleSlotCaps();
+  normalizeEquippedTitleSlots({ logOnTrim: true });
+  addLog(`VIP購入: 禁断の称号枠を購入。チート称号枠 +${VIP_FORBIDDEN_TITLE_SLOT_RULE.bonusPerBuy}`);
+  renderPreservingWindowScroll();
+}
+
+function forgeOtherworldCheatTitleSlot() {
+  ensureTitleSlotState();
+  const currentBuys = Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.otherworldForgeCheatSlotBuys || 0)));
+  if (currentBuys >= OTHERWORLD_TITLE_SLOT_FORGE_RULE.maxBuys) {
+    addLog("異界素材拡張: これ以上は拡張できません。");
+    return;
+  }
+  if (!canEnterOtherworld()) {
+    addLog("異界素材拡張は異界解放後に利用できます。");
+    return;
+  }
+  if (state.player.gold < OTHERWORLD_TITLE_SLOT_FORGE_RULE.goldCost) {
+    addLog(`GOLD不足: 異界素材拡張には ${OTHERWORLD_TITLE_SLOT_FORGE_RULE.goldCost}G 必要です。`);
+    return;
+  }
+  const lacks = OTHERWORLD_TITLE_SLOT_FORGE_RULE.materialNeed.find((row) => getInventoryCount(row.itemId) < row.qty);
+  if (lacks) {
+    addLog(`素材不足: ${ITEM_DATA[lacks.itemId]?.name || lacks.itemId} が ${lacks.qty} 個必要です。`);
+    return;
+  }
+  OTHERWORLD_TITLE_SLOT_FORGE_RULE.materialNeed.forEach((row) => removeItem(row.itemId, row.qty));
+  state.player.gold -= OTHERWORLD_TITLE_SLOT_FORGE_RULE.goldCost;
+  state.titleSlotUnlocks.otherworldForgeCheatSlotBuys = currentBuys + 1;
+  recalculateTitleSlotCaps();
+  normalizeEquippedTitleSlots({ logOnTrim: true });
+  addLog("異界鍛造: チート称号枠を拡張した。");
+  renderPreservingWindowScroll();
 }
 
 function purchaseCheatTitleSlotOffer(offerId) {
@@ -2962,7 +3080,13 @@ function setMinimumFameRank(rank, reason = "") {
 
 function addFame(amount, reason = "") {
   ensureGuildFameState();
-  const delta = Math.max(0, Math.floor(Number(amount || 0)));
+  let delta = Math.max(0, Math.floor(Number(amount || 0)));
+  if (delta > 0 && (state.titleEffects.perEquippedFameGainBonus || 0) > 0) {
+    const equippedCount = Math.max(0, (state.activeTitles || []).filter((id) => !!getTitleById(id)).length);
+    const cap = Number(state.titleEffects.perEquippedFameGainBonusCap || 0.2);
+    const bonus = Math.min(cap, equippedCount * Number(state.titleEffects.perEquippedFameGainBonus || 0));
+    delta = Math.max(1, Math.floor(delta * (1 + bonus)));
+  }
   if (delta <= 0) return { changed: false, fame: state.guild.fame };
   state.guild.fame += delta;
   addLog(`名声が上昇しました！ +${delta}${reason ? ` (${reason})` : ""}`, "important", { important: true });
@@ -4857,7 +4981,7 @@ const PHASE18_NEVEREND_OTHERWORLD_CHEAT_TITLES = [
   { id: "cheat_instant_kill_doctrine", name: "瞬殺主義", category: "cheat", description: "10秒決着に全てを賭ける思想", conditionDescription: "10秒以内撃破を100回達成", effectDescription: "開始10秒 攻撃+25%/速度+15% / 以降防御-10%", effect: { quickBattleAttackBonus: 0.25, quickBattleSpeedBonus: 0.15, postQuickBattleDefensePenalty: 0.1 }, trigger: ["afterBattle"], customCheckerId: "cheat_instant_kill_doctrine", tier: "legend", canCarryOver: true, carryOverType: "direct" },
   { id: "cheat_paper_edge_hunter", name: "紙刃狩り", category: "cheat", description: "低HP高火力個体の処理専門家", conditionDescription: "低HP高火力敵に100回勝利", effectDescription: "敵HP70%以下へ与ダメ+20% / 先制会心+12%", effect: { lowHpEnemyDamageBonus: 0.2, firstStrikeCritBonus: 0.12 }, trigger: ["afterBattle"], customCheckerId: "cheat_paper_edge_hunter", tier: "epic", canCarryOver: true, carryOverType: "direct" },
   { id: "cheat_defeat_adapt", name: "敗北適応", category: "cheat", description: "敗北数すら火力へ変換する者", conditionDescription: "ボスに20回敗北", effectDescription: "ボス戦で敗北回数に応じ与ダメ上昇(最大+20%)", effect: { bossDefeatAdaptiveDamageMax: 0.2 }, trigger: ["afterDefeat", "afterBattle"], customCheckerId: "cheat_defeat_adapt", tier: "legend", canCarryOver: true, carryOverType: "direct" },
-  { id: "cheat_build_completer", name: "複合完成者", category: "cheat", description: "称号ビルドの完成形", conditionDescription: "N3+C2以上装備で50勝", effectDescription: "装備中称号1つにつき全能力+2%(最大20%)", effect: { perEquippedAllStatsBonus: 0.02, perEquippedAllStatsBonusCap: 0.2 }, trigger: ["afterBattle"], customCheckerId: "cheat_build_completer", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_build_completer", name: "複合完成者", category: "cheat", description: "称号ビルドの完成形", conditionDescription: "N3+C2以上装備で50勝", effectDescription: "装備中称号1つにつき攻撃+4%/防御+4%(最大20%)", effect: { perEquippedAttackDefenseBonus: 0.04, perEquippedAttackDefenseBonusCap: 0.2 }, trigger: ["afterBattle"], customCheckerId: "cheat_build_completer", tier: "legend", canCarryOver: true, carryOverType: "direct" },
   { id: "cheat_overweight_fortress", name: "超過装甲", category: "cheat", description: "重量で殴る超重装構築", conditionDescription: "重量80%以上で高難易度ボス10体撃破", effectDescription: "重量ペナルティ半減 / 80%以上時 防御+20% 被ダメ-10%", effect: { weightPenaltyReduction: 0.5, heavyWeightDefenseBonus: 0.2, heavyWeightDamageReduction: 0.1 }, trigger: ["afterFieldBossClear"], customCheckerId: "cheat_overweight_fortress", tier: "legend", canCarryOver: true, carryOverType: "direct" },
   { id: "cheat_utsusemi_tactic", name: "空蝉戦法", category: "cheat", description: "軽装回避カウンターの極地", conditionDescription: "重量50%未満で高難易度ボス10体撃破", effectDescription: "50%未満時 回避+15%/速度+12% / 回避成功後 次の一撃+20%", effect: { lightWeightEvasionBonus: 0.15, lightWeightSpeedBonus: 0.12, evadeCounterDamageBonus: 0.2 }, trigger: ["afterFieldBossClear", "afterBattle"], customCheckerId: "cheat_utsusemi_tactic", tier: "legend", canCarryOver: true, carryOverType: "direct" },
   { id: "cheat_end_of_world_solver", name: "終末攻略者", category: "cheat", description: "天空都市と異界を跨ぐ総合攻略者", conditionDescription: "火山ボス/Protocol3/覚醒ボス系 合計10体撃破", effectDescription: "高難易度ボス与ダメ+20% / 状態異常耐性+20%", effect: { highDifficultyBossDamageBonus: 0.2, statusAilmentResist: 0.2 }, trigger: ["afterFieldBossClear"], customCheckerId: "cheat_end_of_world_solver", tier: "legend", canCarryOver: true, carryOverType: "direct" }
@@ -4979,6 +5103,57 @@ TITLE_DATA.push(...PHASE20_FINAL_CHEAT_TITLES);
 
 Object.assign(TITLE_CHECKERS, {
   cheat_causality_exposed: () => (state.stats.rouletteSameNumberBest || 0) >= 100
+});
+
+const PHASE21_REQUESTED_MIXED_TITLES = [
+  { id: "deep_sea_slayer", name: "深海殺し", category: "cheat", description: "海域の強敵を狩り続けた者。リヴァイアサン攻略の準備称号。", conditionDescription: "海系モンスターを200体撃破", effectDescription: "海系への与ダメージ+30% / 感電・麻痺耐性+20%", effect: { regionDamageBonus: { sea: 0.3 }, statusResistByType: { shock: 0.2, paralyze: 0.2 } }, trigger: ["afterBattle"], tier: "epic", canCarryOver: true, carryOverType: "direct" },
+  { id: "inferno_hunter", name: "炎獄狩り", category: "cheat", description: "火山の硬い敵を狩り尽くした者。ヴォルカザード戦向け。", conditionDescription: "火山系モンスターを200体撃破", effectDescription: "火山系への与ダメージ+30% / 火傷耐性+25%", effect: { regionDamageBonus: { volcano: 0.3 }, statusResistByType: { burn: 0.25 } }, trigger: ["afterBattle"], tier: "epic", canCarryOver: true, carryOverType: "direct" },
+  { id: "otherworld_erosor", name: "異界侵食者", category: "cheat", description: "異界を周回し、怪物を削り取る侵食者。", conditionDescription: "異界の怪物を200体撃破", effectDescription: "異界系への与ダメージ+30% / 異界系からの被ダメージ-15%", effect: { regionDamageBonus: { otherworld: 0.3 }, regionDamageReduction: { otherworld: 0.15 } }, trigger: ["afterBattle"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "divine_beast_breaker", name: "神獣崩し", category: "normal", description: "ユニークに挑み続ける者の第一歩。撃破前の救済称号。", conditionDescription: "ユニークモンスターに合計10回挑戦、または1体撃破", effectDescription: "ユニークモンスターへの与ダメージ+25% / 被ダメージ-10%", effect: { uniqueDamageBonus: 0.25, uniqueDamageReduction: 0.1 }, trigger: ["afterBattle", "afterUniqueKill"], tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "name_stacker", name: "名を重ねる者", category: "normal", description: "称号を集め続けた中盤〜終盤向け称号。", conditionDescription: "称号を合計30個取得", effectDescription: "装備中ノーマル称号1つごとに最大HP+3%(最大15%) / チート称号1つごとに攻撃+3%(最大15%)", effect: { perNormalEquippedMaxHpBonus: 0.03, perNormalEquippedMaxHpBonusCap: 0.15, perCheatEquippedAttackBonus: 0.03, perCheatEquippedAttackBonusCap: 0.15 }, trigger: ["afterBattle", "afterBoardView", "afterFameRankChange"], tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "title_dependent", name: "称号依存者", category: "cheat", description: "称号枠を埋めるほど伸びる終盤型。", conditionDescription: "称号枠を合計10枠以上まで増やす", effectDescription: "装備中称号1つごとに全能力+2%(最大20%)。未装備枠があると効果半減", effect: { perEquippedAllStatsBonus: 0.02, perEquippedAllStatsBonusCap: 0.2, perEquippedAllStatsRequireFullSlots: true }, trigger: ["afterBattle", "afterFameRankChange", "afterGameClear"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "epithet_pressure", name: "二つ名の重圧", category: "normal", description: "名乗る称号にふさわしい強さへ。", conditionDescription: "表示称号を設定した状態でボスを30体撃破", effectDescription: "表示称号設定時 攻撃+10%/防御+10% / 称号枠フル装備時 会心率+5%", effect: { displayTitleAttackDefenseBonus: 0.1, displayTitleCritBonusIfSlotsFull: 0.05 }, trigger: ["afterFieldBossClear"], tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "center_of_rumor", name: "噂の中心", category: "cheat", description: "掲示板と名声を結びつける主人公系称号。", conditionDescription: "掲示板の噂系リアクションを一定数解放", effectDescription: "名声が高いほど全能力上昇 / 装備称号1つごとに名声獲得量+3%(最大20%)", effect: { fameScalingBonus: { perFame: 1000, percentPerStep: 0.0015, cap: 0.12 }, perEquippedFameGainBonus: 0.03, perEquippedFameGainBonusCap: 0.2 }, trigger: ["afterFameRankChange", "afterBoardView", "afterFameGain"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "bloodstained_blade", name: "血塗れの刃", category: "cheat", description: "極端な代償と引き換えに火力を得る。", conditionDescription: "HP30%以下の状態でボスを10体撃破", effectDescription: "攻撃力2倍 / 攻撃のたびに現在HPの5%消費(HP1未満にならない)", effect: { attackMultiplier: 1.0, attackCurrentHpCostRate: 0.05 }, trigger: ["afterFieldBossClear"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "life_reaping_strike", name: "命削りの一撃", category: "cheat", description: "高推奨レベル相手を突破する代償火力。", conditionDescription: "自分より推奨レベルが高いボスを5体撃破", effectDescription: "通常攻撃と物理スキル威力+80% / 攻撃ごとに最大HPの3%消費", effect: { physicalAttackMultiplier: 0.8, physicalAttackSelfHpCostRate: 0.03 }, trigger: ["afterFieldBossClear"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "mana_overdrive", name: "魔力暴走", category: "cheat", description: "MP切れを火力へ変換する危険な術者向け称号。", conditionDescription: "MP0の状態で30回勝利", effectDescription: "スキル威力+70% / MP不足時はHP消費でスキル発動可能", effect: { skillDamageMultiplier: 0.7, allowHpCastOnMpShortage: true, hpCostPerMissingMp: 2 }, trigger: ["afterBattle"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "ruin_acceleration", name: "破滅加速", category: "cheat", description: "手数を増やす代わりに自身も削る。", conditionDescription: "速度系バフ中にボスを20体撃破", effectDescription: "攻撃速度+40% / 攻撃ごとにHP消費 / HP50%以下でさらに速度+10%", effect: { speedMultiplier: 0.4, attackSelfHpCostRate: 0.01, lowHpAttackSpeedBonus: { hpThreshold: 0.5, attackMultiplier: 0, speedMultiplier: 0.1 } }, trigger: ["afterFieldBossClear"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "holy_wound_conversion", name: "聖傷変換", category: "normal", description: "過剰回復を攻撃に転換する僧侶向け称号。", conditionDescription: "過剰回復を累計一定量発生させる", effectDescription: "過剰回復バリア中 攻撃+50% / 攻撃時にバリアを一部消費", effect: { overhealAttackWhileBarrier: 0.5, overhealBarrierConsumeOnAttack: 0.15 }, trigger: ["afterBattle", "afterHealSkillUse"], tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "rng_reader", name: "乱数を読む者", category: "normal", description: "確率系全般を底上げする便利称号。", conditionDescription: "会心/回避/ドロップ/ギャンブル勝利をそれぞれ一定回数達成", effectDescription: "会心率+10% / 回避率+10% / レア判定率微増", effect: { critRateBonus: 0.1, evasionBonus: 0.1, uniqueEncounterRateBonus: 0.005 }, trigger: ["afterBattle", "afterCasinoPlay"], tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "sovereign_of_chance", name: "偶然の支配者", category: "cheat", description: "ギャンブルの運を戦闘へ持ち込む。", conditionDescription: "ルーレットで大勝ちを10回達成", effectDescription: "戦闘開始時20%でランダム強化 / 会心率+8% / 回避率+8%", effect: { randomBattleStartBuff: { durationSec: 16, power: 0.2 }, critRateBonus: 0.08, evasionBonus: 0.08 }, trigger: ["afterCasinoPlay", "battleStart"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "never_draw_failure", name: "失敗を引かぬ者", category: "normal", description: "失敗を積んだ者へのリトライ救済。", conditionDescription: "強化失敗・料理失敗・ギャンブル敗北を一定回数経験", effectDescription: "失敗判定の再抽選率+10% / 強化・生産・ギャンブルで低確率リトライ", effect: { failureRetryChance: 0.1 }, trigger: ["afterEnhance", "afterCraft", "afterCasinoPlay"], tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "the_last_victor", name: "最後に勝つ者", category: "cheat", description: "瀕死からの逆転を狙う確率称号。", conditionDescription: "HP10%以下で勝利を30回達成", effectDescription: "HP20%以下で会心率+20% / HP10%以下で低確率追加大ダメージ", effect: { lowHpCritBonus: { hpThreshold: 0.2, critRateBonus: 0.2 }, lowHpBurstProcChance: 0.1, lowHpBurstDamageMultiplier: 0.7 }, trigger: ["afterBattle"], tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "fragment_of_causality", name: "因果の片鱗", category: "cheat", description: "因果晒しへ続く前段階の異常称号。", conditionDescription: "ルーレットで同じ数字を30回連続選ぶ", effectDescription: "ギャンブル勝率微増 / 戦闘中 低確率で被ダメージ無効化 / 低確率で与ダメージ+50%", effect: { gambleHitChanceBonus: 0.05, damageNullifyChance: 0.08, luckyDamageBoostChance: 0.1, luckyDamageBoostMultiplier: 0.5 }, trigger: ["afterCasinoPlay", "afterBattle"], tier: "legend", canCarryOver: true, carryOverType: "direct" }
+];
+
+TITLE_DATA.push(...PHASE21_REQUESTED_MIXED_TITLES);
+
+Object.assign(TITLE_CHECKERS, {
+  deep_sea_slayer: () => (state.stats.seaMonsterKillCount || 0) >= 200,
+  inferno_hunter: () => (state.stats.volcanoMonsterKillCount || 0) >= 200,
+  otherworld_erosor: () => (state.stats.otherworldMonsterKillCount || 0) >= 200,
+  divine_beast_breaker: () => (state.stats.uniqueEncounterCount || 0) >= 10 || (state.stats.uniqueKillCount || 0) >= 1,
+  name_stacker: () => (state.unlockedTitles || []).length >= 30,
+  title_dependent: () => ((state.maxNormalTitleSlots || 0) + (state.maxCheatTitleSlots || 0)) >= 10,
+  epithet_pressure: () => (state.stats.displayTitleBossKillCount || 0) >= 30,
+  center_of_rumor: () => Object.keys(state.guild?.rankingReactionFlags || {}).length >= 5,
+  bloodstained_blade: () => (state.stats.lowHpBossKillCount || 0) >= 10,
+  life_reaping_strike: () => (state.stats.aboveRecommendedBossKillCount || 0) >= 5,
+  mana_overdrive: () => (state.stats.zeroMpWinCount || 0) >= 30,
+  ruin_acceleration: () => (state.stats.speedBuffBossKillCount || 0) >= 20,
+  holy_wound_conversion: () => (state.stats.overhealConvertedTotal || 0) >= 20000,
+  rng_reader: () =>
+    (state.stats.critFinishCountAll || 0) >= 100 &&
+    (state.stats.evadeSuccessCount || 0) >= 200 &&
+    (state.stats.totalGatheredMaterials || 0) >= 200 &&
+    getTotalRouletteWins() >= 50,
+  sovereign_of_chance: () => (state.stats.rouletteBigWinCount || 0) >= 10,
+  never_draw_failure: () =>
+    (state.stats.enhanceFailureCount || 0) >= 20 &&
+    (state.stats.cookingFailureCount || 0) >= 20 &&
+    (state.stats.rouletteLossCount || 0) >= 20,
+  the_last_victor: () => (state.stats.hpTenPercentWins || 0) >= 30,
+  fragment_of_causality: () => (state.stats.rouletteSameNumberBest || 0) >= 30
 });
 
 function applyPhase10TitleBalance() {
@@ -6385,6 +6560,19 @@ const state = {
     boardReactionFlags: {},
     boardHintSeenFlags: {},
     boardDynamicVariantHistory: {},
+    seaMonsterKillCount: 0,
+    volcanoMonsterKillCount: 0,
+    otherworldMonsterKillCount: 0,
+    displayTitleBossKillCount: 0,
+    aboveRecommendedBossKillCount: 0,
+    zeroMpWinCount: 0,
+    speedBuffBossKillCount: 0,
+    hpTenPercentWins: 0,
+    enhanceFailureCount: 0,
+    evadeSuccessCount: 0,
+    rouletteLossCount: 0,
+    rouletteBigWinCount: 0,
+    hpCastSkillCount: 0,
     nearDeathWins: 0,
     currentWinStreak: 0,
     loopClearWithLowTierJob: 0,
@@ -6677,6 +6865,7 @@ function createDefaultTitleEffects() {
     uniqueDamageBonus: 0,
     uniqueEncounterRateBonus: 0,
     critRateBonus: 0,
+    evasionBonus: 0,
     speedMultiplier: 0,
     battleStartBuff: null,
     conditionalBonusNoTitle: null,
@@ -6712,6 +6901,7 @@ function createDefaultTitleEffects() {
     statusResistByType: {},
     regionDamageBonus: {},
     regionDamageReduction: {},
+    uniqueDamageReduction: 0,
     regionAccuracyBonus: {},
     regionStageRegenPerMinute: {},
     regionStatMultiplier: {},
@@ -6728,12 +6918,18 @@ function createDefaultTitleEffects() {
     weightConditionalBonuses: {},
     overhealConversionBonus: 0,
     overhealActiveDefenseMultiplier: 0,
+    overhealAttackWhileBarrier: 0,
+    overhealBarrierConsumeOnAttack: 0,
     skillCooldownRecovery: 0,
     skillPowerIfSkillSlotOpen: 0,
     skillCooldownRecoveryIfSkillSlotOpen: 0,
     critDamageBonus: 0,
     perEquippedAttackDefenseBonus: 0,
     perEquippedAttackDefenseBonusCap: 0.2,
+    perNormalEquippedMaxHpBonus: 0,
+    perNormalEquippedMaxHpBonusCap: 0.15,
+    perCheatEquippedAttackBonus: 0,
+    perCheatEquippedAttackBonusCap: 0.15,
     noReturnCombatBonus: null,
     skillDamageMultiplier: 0,
     swordsmanSkillDamageMultiplier: 0,
@@ -6756,6 +6952,13 @@ function createDefaultTitleEffects() {
     mageBuffSkillAmplify: 0,
     mageSacrificeAttackMultiplier: 1,
     mageSacrificeSelfHpRate: 0,
+    attackSelfHpCostRate: 0,
+    attackCurrentHpCostRate: 0,
+    physicalAttackMultiplier: 0,
+    physicalAttackSelfHpCostRate: 0,
+    allowHpCastOnMpShortage: false,
+    hpCostPerMissingMp: 0,
+    hpCastSkillPowerBonus: 0,
     comboDoubleStrikeChance: 0,
     comboBattleStartRandomBuff: null,
     comboBattleStartRandomBuffCount: 0,
@@ -6794,6 +6997,13 @@ function createDefaultTitleEffects() {
     multiHitFromSecondDamageReduction: 0,
     afterTripleHitDamageBonus: 0,
     lowHpEnemyDamageBonus: 0,
+    lowHpAttackSpeedBonus: null,
+    lowHpCritBonus: null,
+    lowHpBurstProcChance: 0,
+    lowHpBurstDamageMultiplier: 0,
+    damageNullifyChance: 0,
+    luckyDamageBoostChance: 0,
+    luckyDamageBoostMultiplier: 0,
     evasionWhenEnemyEnraged: 0,
     machineDamageBonus: 0,
     machineDefenseIgnore: 0,
@@ -6805,6 +7015,11 @@ function createDefaultTitleEffects() {
     bossDefeatAdaptiveDamageMax: 0,
     perEquippedAllStatsBonus: 0,
     perEquippedAllStatsBonusCap: 0.2,
+    perEquippedAllStatsRequireFullSlots: false,
+    displayTitleAttackDefenseBonus: 0,
+    displayTitleCritBonusIfSlotsFull: 0,
+    perEquippedFameGainBonus: 0,
+    perEquippedFameGainBonusCap: 0.2,
     titleSynergyBoost: 0,
     heavyWeightDefenseBonus: 0,
     heavyWeightDamageReduction: 0,
@@ -6814,6 +7029,7 @@ function createDefaultTitleEffects() {
     highDifficultyBossDamageBonus: 0,
     productionExpRateBonus: 0,
     qualityMaterialRefundChance: 0,
+    failureRetryChance: 0,
     defenseToAttackRatio: 0,
     noWeaponAttackBonus: 0,
     stageRegenPerMinute: 0,
@@ -8443,9 +8659,7 @@ function enemyAction() {
     hitChance += uniqueProfile.hitBonus;
   }
   if (Math.random() > hitChance) {
-    if (STAGE_DATA[state.battle.stageId]?.mapId === "sea") {
-      state.stats.seaEvadeSuccessCount = (state.stats.seaEvadeSuccessCount || 0) + 1;
-    }
+    recordPlayerEvasionSuccess(regionId);
     if (state.titleEffects.evadeCounterDamageBonus > 0) {
       state.titleRuntime.evadeCounterBoostReady = true;
     }
@@ -8457,6 +8671,9 @@ function enemyAction() {
   const regionReduction = state.titleEffects.regionDamageReduction?.[regionId] || 0;
   if (regionReduction > 0) {
     reduction *= 1 - regionReduction;
+  }
+  if (uniqueProfile && state.titleEffects.uniqueDamageReduction > 0) {
+    reduction *= 1 - clamp(0, 0.9, Number(state.titleEffects.uniqueDamageReduction || 0));
   }
   if (state.titleEffects.lowHpDamageReduction > 0 && state.battle.playerCurrentHp <= effective.maxHp * 0.2) {
     reduction *= 1 - state.titleEffects.lowHpDamageReduction;
@@ -8656,6 +8873,7 @@ function protocol3Strike(options) {
       return;
     }
     if (Math.random() > hitChance) {
+      recordPlayerEvasionSuccess(regionId);
       if (state.titleEffects.evadeCounterDamageBonus > 0) {
         state.titleRuntime.evadeCounterBoostReady = true;
       }
@@ -8790,6 +9008,7 @@ function otherworldKingStrike(options) {
       return;
     }
     if (Math.random() > hitChance) {
+      recordPlayerEvasionSuccess(regionId);
       if (state.titleEffects.evadeCounterDamageBonus > 0) {
         state.titleRuntime.evadeCounterBoostReady = true;
       }
@@ -8826,11 +9045,29 @@ function useSkill(skill) {
     state.battle.gimmick.extra.firstPlayerActionPending = false;
   }
   const mpCost = Math.max(0, Math.floor(skill.mpCost * (1 - getTotalMpCostReduction())));
-  if (state.battle.playerCurrentMp < mpCost) {
-    return;
+  const currentMp = state.battle.playerCurrentMp;
+  const missingMp = Math.max(0, mpCost - currentMp);
+  let usedHpCast = false;
+  if (missingMp > 0) {
+    if (!state.titleEffects.allowHpCastOnMpShortage) {
+      return;
+    }
+    const hpCost = Math.max(1, Math.floor(missingMp * Math.max(0.5, Number(state.titleEffects.hpCostPerMissingMp || 2))));
+    if (state.battle.playerCurrentHp <= hpCost) {
+      return;
+    }
+    state.battle.playerCurrentMp = 0;
+    state.battle.playerCurrentHp = Math.max(1, state.battle.playerCurrentHp - hpCost);
+    state.player.hp = state.battle.playerCurrentHp;
+    state.player.mp = state.battle.playerCurrentMp;
+    state.stats.hpCastSkillCount = (state.stats.hpCastSkillCount || 0) + 1;
+    usedHpCast = true;
+    addLog(`魔力暴走: MP不足をHP${hpCost}で代替`);
+  } else {
+    state.battle.playerCurrentMp -= mpCost;
   }
   triggerSkillVisualEffect(skill.id);
-  state.battle.playerCurrentMp -= mpCost;
+  state.runtime.lastSkillUsedHpCast = !!usedHpCast;
   const equippedSkillCount = getEquippedSkills().length;
   const hasOpenSkillSlot = equippedSkillCount < 4;
   const conditionalRecovery = hasOpenSkillSlot ? (state.titleEffects.skillCooldownRecoveryIfSkillSlotOpen || 0) : 0;
@@ -8953,6 +9190,24 @@ function applyDamage(source, amount, actionName, isCrit = false) {
   }
   if (source === "player") {
     let damage = applyPlayerDamageBonuses(amount, state.battle.enemy);
+    const hpForLowHpCheck = Math.max(1, Number(state.battle.playerCurrentHp || 0));
+    const maxHpForLowHpCheck = Math.max(1, Number(getEffectivePlayerStat("maxHp") || 1));
+    if (
+      state.titleEffects.lowHpBurstProcChance > 0 &&
+      hpForLowHpCheck <= maxHpForLowHpCheck * 0.1 &&
+      Math.random() < clamp(0, 0.95, Number(state.titleEffects.lowHpBurstProcChance || 0))
+    ) {
+      damage = Math.max(1, Math.floor(damage * (1 + Number(state.titleEffects.lowHpBurstDamageMultiplier || 0))));
+      addLog("最後に勝つ者: 瀕死の一撃が発動");
+    }
+    if (state.titleEffects.luckyDamageBoostChance > 0 && Math.random() < clamp(0, 0.95, Number(state.titleEffects.luckyDamageBoostChance || 0))) {
+      damage = Math.max(1, Math.floor(damage * (1 + Number(state.titleEffects.luckyDamageBoostMultiplier || 0))));
+      addLog("因果の片鱗: 偶然の増幅が発動");
+    }
+    const hitMeta = state.runtime.lastHitMeta || {};
+    const isPhysicalHit =
+      hitMeta.source === "normal" ||
+      (hitMeta.source === "skill" && ["attack", "multiAttack", "attackDebuff"].includes(hitMeta.skillType));
     if (state.battle.enemy.id === "protocol3") {
       const mul = Number(state.battle.gimmick?.extra?.protocol3DamageTakenMultiplier || 1);
       damage = Math.max(1, Math.floor(damage * mul));
@@ -8974,6 +9229,9 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     }
     if (state.titleEffects.mageSacrificeAttackMultiplier > 1) {
       damage = Math.max(1, Math.floor(damage * state.titleEffects.mageSacrificeAttackMultiplier));
+    }
+    if (isPhysicalHit && state.titleEffects.physicalAttackMultiplier > 0) {
+      damage = Math.max(1, Math.floor(damage * (1 + state.titleEffects.physicalAttackMultiplier)));
     }
     state.battle.enemy.hp = Math.max(0, state.battle.enemy.hp - damage);
     state.battle.recentActionText = `${actionName} -> ${state.battle.enemy.name} に ${damage} ダメージ`;
@@ -9014,10 +9272,17 @@ function applyDamage(source, amount, actionName, isCrit = false) {
         return;
       }
     }
-    if (state.titleEffects.mageSacrificeSelfHpRate > 0) {
-      const selfDamage = Math.max(1, Math.floor(getEffectivePlayerStat("maxHp") * state.titleEffects.mageSacrificeSelfHpRate));
+    consumeOverhealBarrierStacksOnAttack();
+    const maxHp = getEffectivePlayerStat("maxHp");
+    const genericSelfDamageRate = Math.max(0, Number(state.titleEffects.attackSelfHpCostRate || 0));
+    const currentSelfDamageRate = Math.max(0, Number(state.titleEffects.attackCurrentHpCostRate || 0));
+    const physicalSelfDamageRate = isPhysicalHit ? Math.max(0, Number(state.titleEffects.physicalAttackSelfHpCostRate || 0)) : 0;
+    const sacrificeSelfDamageRate = Math.max(0, Number(state.titleEffects.mageSacrificeSelfHpRate || 0));
+    const totalSelfDamageRate = genericSelfDamageRate + physicalSelfDamageRate + sacrificeSelfDamageRate;
+    if (totalSelfDamageRate > 0) {
+      const selfDamage = Math.max(1, Math.floor(maxHp * totalSelfDamageRate));
       state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - selfDamage);
-      addLog(`サクリファイス: 反動ダメージ ${selfDamage}`);
+      addLog(`代償ダメージ ${selfDamage}`);
       if (state.battle.playerCurrentHp <= 0) {
         if (canPlayerStayAtOneHpInOtherworldKingBattle()) {
           state.battle.playerCurrentHp = 1;
@@ -9027,6 +9292,11 @@ function applyDamage(source, amount, actionName, isCrit = false) {
           return;
         }
       }
+    }
+    if (currentSelfDamageRate > 0) {
+      const selfDamageCurrent = Math.max(1, Math.floor(Math.max(1, state.battle.playerCurrentHp) * currentSelfDamageRate));
+      state.battle.playerCurrentHp = Math.max(1, state.battle.playerCurrentHp - selfDamageCurrent);
+      addLog(`代償ダメージ ${selfDamageCurrent}`);
     }
     if (state.battle.enemy.hp <= 0) {
       const meta = state.runtime.lastHitMeta || {};
@@ -9058,6 +9328,10 @@ function applyDamage(source, amount, actionName, isCrit = false) {
   }
   if (Date.now() < (state.titleRuntime.comboInvincibleUntil || 0)) {
     addLog("聖騎士: 無敵で攻撃を無効化");
+    return;
+  }
+  if (state.titleEffects.damageNullifyChance > 0 && Math.random() < clamp(0, 0.95, Number(state.titleEffects.damageNullifyChance || 0))) {
+    addLog("因果の片鱗: 被ダメージを無効化");
     return;
   }
   state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - amount);
@@ -9116,6 +9390,13 @@ function handleEnemyDefeated() {
   state.stats.totalConsecutiveWinsBest = Math.max(state.stats.totalConsecutiveWinsBest || 0, state.stats.currentWinStreak);
   state.stats.totalKills += 1;
   state.stats.enemyKillCounts[enemy.id] = (state.stats.enemyKillCounts[enemy.id] || 0) + 1;
+  if (mapId === "sea") {
+    state.stats.seaMonsterKillCount = (state.stats.seaMonsterKillCount || 0) + 1;
+  } else if (mapId === "volcano") {
+    state.stats.volcanoMonsterKillCount = (state.stats.volcanoMonsterKillCount || 0) + 1;
+  } else if (mapId === "otherworld") {
+    state.stats.otherworldMonsterKillCount = (state.stats.otherworldMonsterKillCount || 0) + 1;
+  }
   if (isMechanicalEnemy(enemy)) {
     state.stats.mechanicalEnemyKillCount = (state.stats.mechanicalEnemyKillCount || 0) + 1;
   }
@@ -9143,6 +9424,12 @@ function handleEnemyDefeated() {
   }
   if (state.battle.playerCurrentHp <= getEffectivePlayerStat("maxHp") * 0.2) {
     state.stats.nearDeathWins += 1;
+  }
+  if (state.battle.playerCurrentHp <= getEffectivePlayerStat("maxHp") * 0.1) {
+    state.stats.hpTenPercentWins = (state.stats.hpTenPercentWins || 0) + 1;
+  }
+  if (state.battle.playerCurrentMp <= 0) {
+    state.stats.zeroMpWinCount = (state.stats.zeroMpWinCount || 0) + 1;
   }
   if (state.battle.enemySpawnedAt > 0 && Date.now() - state.battle.enemySpawnedAt <= 10000) {
     state.stats.quickKill10sCount = (state.stats.quickKill10sCount || 0) + 1;
@@ -9294,6 +9581,16 @@ function handleFieldBossClear(stageId) {
     state.fieldBossCleared.push(stageId);
   }
   state.stats.fieldBossKillCount += 1;
+  if (state.playerProfile?.displayTitleId) {
+    state.stats.displayTitleBossKillCount = (state.stats.displayTitleBossKillCount || 0) + 1;
+  }
+  if ((state.player.level || 1) < (stage?.recommendedLevel || 1)) {
+    state.stats.aboveRecommendedBossKillCount = (state.stats.aboveRecommendedBossKillCount || 0) + 1;
+  }
+  const hasSpeedBuff = state.activeEffects.some((effect) => effect.target === "player" && effect.stat === "speed" && effect.expiresAt > Date.now());
+  if (hasSpeedBuff) {
+    state.stats.speedBuffBossKillCount = (state.stats.speedBuffBossKillCount || 0) + 1;
+  }
   if (getEquippedSkills().length < 4) {
     state.stats.bossKillWithEmptySkillSlots = (state.stats.bossKillWithEmptySkillSlots || 0) + 1;
   }
@@ -10133,10 +10430,15 @@ function syncLegacyActiveTitles() {
 
 function recalculateTitleSlotCaps() {
   ensureOtherworldState();
+  ensureGuildFameState();
   const tier = getTitleSlotTierValue();
   const bossClearBonus = getBossClearTitleSlotBonus();
   const guildRankBonus = syncGuildRankTitleSlotBonus();
   const cheatShopBonus = getCheatTitleShopSlotBonus();
+  const collectionBonus = getTitleCollectionSlotBonus();
+  const fameRankBonus = getFameRankTitleSlotBonus();
+  const vipCheatBonus = getVipForbiddenTitleSlotBonus();
+  const otherworldForgeCheatBonus = getOtherworldMaterialTitleSlotBonus();
   const otherworldNormalBonus = Math.max(0, Number(state.otherworldNormalTitleSlotBonus || 0));
   const otherworldCheatBonus = Math.max(0, Number(state.otherworldCheatTitleSlotBonus || 0));
   const protagonistUnlimited = hasTitleUnlocked("protagonist") || !!state.hasProtagonistTitle;
@@ -10145,12 +10447,20 @@ function recalculateTitleSlotCaps() {
   state.bossClearNormalTitleSlotBonus = bossClearBonus.normal;
   state.bossClearCheatTitleSlotBonus = bossClearBonus.cheat;
   state.cheatTitleShopSlotBonus = cheatShopBonus;
+  state.collectionNormalTitleSlotBonus = collectionBonus.normal;
+  state.collectionCheatTitleSlotBonus = collectionBonus.cheat;
+  state.fameRankNormalTitleSlotBonus = fameRankBonus.normal;
+  state.fameRankCheatTitleSlotBonus = fameRankBonus.cheat;
+  state.vipForbiddenCheatTitleSlotBonus = vipCheatBonus;
+  state.otherworldForgeCheatTitleSlotBonus = otherworldForgeCheatBonus;
   state.maxNormalTitleSlots = Math.max(
     1,
     (state.baseNormalTitleSlots || 1) +
       state.bossClearNormalTitleSlotBonus +
       state.normalTitleTierBonus +
       guildRankBonus.normal +
+      collectionBonus.normal +
+      fameRankBonus.normal +
       otherworldNormalBonus
   );
   state.maxCheatTitleSlots = Math.max(
@@ -10160,9 +10470,13 @@ function recalculateTitleSlotCaps() {
       state.cheatTitleTierBonus +
       guildRankBonus.cheat +
       cheatShopBonus +
+      collectionBonus.cheat +
+      fameRankBonus.cheat +
+      vipCheatBonus +
+      otherworldForgeCheatBonus +
       otherworldCheatBonus
   );
-  if (protagonistUnlimited) {
+  if (protagonistUnlimited || fameRankBonus.hallUnlimited) {
     state.maxNormalTitleSlots = 999;
     state.maxCheatTitleSlots = 999;
   }
@@ -10230,11 +10544,19 @@ function ensureTitleSlotState() {
   }
   if (typeof state.titleSlotUnlocks.normalBasePlus !== "number") state.titleSlotUnlocks.normalBasePlus = 0;
   if (typeof state.titleSlotUnlocks.cheatBasePlus !== "number") state.titleSlotUnlocks.cheatBasePlus = 0;
+  if (typeof state.titleSlotUnlocks.vipForbiddenCheatSlotBuys !== "number") state.titleSlotUnlocks.vipForbiddenCheatSlotBuys = 0;
+  if (typeof state.titleSlotUnlocks.otherworldForgeCheatSlotBuys !== "number") state.titleSlotUnlocks.otherworldForgeCheatSlotBuys = 0;
   state.clearedRegionBossSlotRewards = normalizeRegionBossSlotRewardState(state.clearedRegionBossSlotRewards);
   state.cheatTitleSlotShopPurchases = normalizeCheatTitleSlotShopState(state.cheatTitleSlotShopPurchases);
   if (typeof state.bossClearNormalTitleSlotBonus !== "number") state.bossClearNormalTitleSlotBonus = 0;
   if (typeof state.bossClearCheatTitleSlotBonus !== "number") state.bossClearCheatTitleSlotBonus = 0;
   if (typeof state.cheatTitleShopSlotBonus !== "number") state.cheatTitleShopSlotBonus = 0;
+  if (typeof state.collectionNormalTitleSlotBonus !== "number") state.collectionNormalTitleSlotBonus = 0;
+  if (typeof state.collectionCheatTitleSlotBonus !== "number") state.collectionCheatTitleSlotBonus = 0;
+  if (typeof state.fameRankNormalTitleSlotBonus !== "number") state.fameRankNormalTitleSlotBonus = 0;
+  if (typeof state.fameRankCheatTitleSlotBonus !== "number") state.fameRankCheatTitleSlotBonus = 0;
+  if (typeof state.vipForbiddenCheatTitleSlotBonus !== "number") state.vipForbiddenCheatTitleSlotBonus = 0;
+  if (typeof state.otherworldForgeCheatTitleSlotBonus !== "number") state.otherworldForgeCheatTitleSlotBonus = 0;
   if (typeof state.guild?.guildRankNormalTitleSlotBonus !== "number") state.guild.guildRankNormalTitleSlotBonus = 0;
   if (typeof state.guild?.guildRankCheatTitleSlotBonus !== "number") state.guild.guildRankCheatTitleSlotBonus = 0;
   if (state.activeTitles.length > 0) {
@@ -10859,6 +11181,9 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.critRateBonus === "number") {
     target.critRateBonus += effect.critRateBonus;
   }
+  if (typeof effect.evasionBonus === "number") {
+    target.evasionBonus += effect.evasionBonus;
+  }
   if (typeof effect.speedMultiplier === "number") {
     target.speedMultiplier += effect.speedMultiplier;
   }
@@ -10948,6 +11273,21 @@ function mergeTitleEffect(target, effect) {
   }
   if (typeof effect.perEquippedAllStatsBonusCap === "number") {
     target.perEquippedAllStatsBonusCap = Math.max(target.perEquippedAllStatsBonusCap || 0, effect.perEquippedAllStatsBonusCap);
+  }
+  if (typeof effect.perEquippedAllStatsRequireFullSlots === "boolean") {
+    target.perEquippedAllStatsRequireFullSlots = target.perEquippedAllStatsRequireFullSlots || effect.perEquippedAllStatsRequireFullSlots;
+  }
+  if (typeof effect.displayTitleAttackDefenseBonus === "number") {
+    target.displayTitleAttackDefenseBonus += effect.displayTitleAttackDefenseBonus;
+  }
+  if (typeof effect.displayTitleCritBonusIfSlotsFull === "number") {
+    target.displayTitleCritBonusIfSlotsFull += effect.displayTitleCritBonusIfSlotsFull;
+  }
+  if (typeof effect.perEquippedFameGainBonus === "number") {
+    target.perEquippedFameGainBonus += effect.perEquippedFameGainBonus;
+  }
+  if (typeof effect.perEquippedFameGainBonusCap === "number") {
+    target.perEquippedFameGainBonusCap = Math.max(target.perEquippedFameGainBonusCap || 0, effect.perEquippedFameGainBonusCap);
   }
   if (typeof effect.titleSynergyBoost === "number") {
     target.titleSynergyBoost += effect.titleSynergyBoost;
@@ -11051,6 +11391,27 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.mageSacrificeSelfHpRate === "number") {
     target.mageSacrificeSelfHpRate += effect.mageSacrificeSelfHpRate;
   }
+  if (typeof effect.attackSelfHpCostRate === "number") {
+    target.attackSelfHpCostRate += effect.attackSelfHpCostRate;
+  }
+  if (typeof effect.attackCurrentHpCostRate === "number") {
+    target.attackCurrentHpCostRate += effect.attackCurrentHpCostRate;
+  }
+  if (typeof effect.physicalAttackMultiplier === "number") {
+    target.physicalAttackMultiplier += effect.physicalAttackMultiplier;
+  }
+  if (typeof effect.physicalAttackSelfHpCostRate === "number") {
+    target.physicalAttackSelfHpCostRate += effect.physicalAttackSelfHpCostRate;
+  }
+  if (typeof effect.allowHpCastOnMpShortage === "boolean") {
+    target.allowHpCastOnMpShortage = target.allowHpCastOnMpShortage || effect.allowHpCastOnMpShortage;
+  }
+  if (typeof effect.hpCostPerMissingMp === "number") {
+    target.hpCostPerMissingMp += effect.hpCostPerMissingMp;
+  }
+  if (typeof effect.hpCastSkillPowerBonus === "number") {
+    target.hpCastSkillPowerBonus += effect.hpCastSkillPowerBonus;
+  }
   if (typeof effect.comboDoubleStrikeChance === "number") {
     target.comboDoubleStrikeChance += effect.comboDoubleStrikeChance;
   }
@@ -11098,6 +11459,12 @@ function mergeTitleEffect(target, effect) {
   if (typeof effect.overhealActiveDefenseMultiplier === "number") {
     target.overhealActiveDefenseMultiplier += effect.overhealActiveDefenseMultiplier;
   }
+  if (typeof effect.overhealAttackWhileBarrier === "number") {
+    target.overhealAttackWhileBarrier += effect.overhealAttackWhileBarrier;
+  }
+  if (typeof effect.overhealBarrierConsumeOnAttack === "number") {
+    target.overhealBarrierConsumeOnAttack += effect.overhealBarrierConsumeOnAttack;
+  }
   if (typeof effect.weaponEnhanceAttackPerLevel === "number") {
     target.weaponEnhanceAttackPerLevel += effect.weaponEnhanceAttackPerLevel;
   }
@@ -11118,6 +11485,18 @@ function mergeTitleEffect(target, effect) {
   }
   if (typeof effect.perNormalEquippedAttackDefenseBonusCap === "number") {
     target.perNormalEquippedAttackDefenseBonusCap = Math.max(target.perNormalEquippedAttackDefenseBonusCap || 0, effect.perNormalEquippedAttackDefenseBonusCap);
+  }
+  if (typeof effect.perNormalEquippedMaxHpBonus === "number") {
+    target.perNormalEquippedMaxHpBonus += effect.perNormalEquippedMaxHpBonus;
+  }
+  if (typeof effect.perNormalEquippedMaxHpBonusCap === "number") {
+    target.perNormalEquippedMaxHpBonusCap = Math.max(target.perNormalEquippedMaxHpBonusCap || 0, effect.perNormalEquippedMaxHpBonusCap);
+  }
+  if (typeof effect.perCheatEquippedAttackBonus === "number") {
+    target.perCheatEquippedAttackBonus += effect.perCheatEquippedAttackBonus;
+  }
+  if (typeof effect.perCheatEquippedAttackBonusCap === "number") {
+    target.perCheatEquippedAttackBonusCap = Math.max(target.perCheatEquippedAttackBonusCap || 0, effect.perCheatEquippedAttackBonusCap);
   }
   if (typeof effect.perEquippedAttackDefenseBonus === "number") {
     target.perEquippedAttackDefenseBonus += effect.perEquippedAttackDefenseBonus;
@@ -11229,6 +11608,40 @@ function mergeTitleEffect(target, effect) {
   }
   if (typeof effect.cookGreatSuccessRateBonus === "number") {
     target.cookGreatSuccessRateBonus += effect.cookGreatSuccessRateBonus;
+  }
+  if (typeof effect.failureRetryChance === "number") {
+    target.failureRetryChance += effect.failureRetryChance;
+  }
+  if (effect.lowHpCritBonus) {
+    target.lowHpCritBonus = {
+      hpThreshold: Math.max(target.lowHpCritBonus?.hpThreshold || 0, Number(effect.lowHpCritBonus.hpThreshold || 0)),
+      critRateBonus: (target.lowHpCritBonus?.critRateBonus || 0) + Number(effect.lowHpCritBonus.critRateBonus || 0)
+    };
+  }
+  if (typeof effect.lowHpBurstProcChance === "number") {
+    target.lowHpBurstProcChance += effect.lowHpBurstProcChance;
+  }
+  if (typeof effect.lowHpBurstDamageMultiplier === "number") {
+    target.lowHpBurstDamageMultiplier += effect.lowHpBurstDamageMultiplier;
+  }
+  if (typeof effect.damageNullifyChance === "number") {
+    target.damageNullifyChance += effect.damageNullifyChance;
+  }
+  if (typeof effect.luckyDamageBoostChance === "number") {
+    target.luckyDamageBoostChance += effect.luckyDamageBoostChance;
+  }
+  if (typeof effect.luckyDamageBoostMultiplier === "number") {
+    target.luckyDamageBoostMultiplier += effect.luckyDamageBoostMultiplier;
+  }
+  if (typeof effect.uniqueDamageReduction === "number") {
+    target.uniqueDamageReduction += effect.uniqueDamageReduction;
+  }
+  if (effect.lowHpAttackSpeedBonus) {
+    target.lowHpAttackSpeedBonus = {
+      hpThreshold: Math.max(target.lowHpAttackSpeedBonus?.hpThreshold || 0, Number(effect.lowHpAttackSpeedBonus.hpThreshold || 0)),
+      attackMultiplier: (target.lowHpAttackSpeedBonus?.attackMultiplier || 0) + Number(effect.lowHpAttackSpeedBonus.attackMultiplier || 0),
+      speedMultiplier: (target.lowHpAttackSpeedBonus?.speedMultiplier || 0) + Number(effect.lowHpAttackSpeedBonus.speedMultiplier || 0)
+    };
   }
   if (effect.damageToSpecies) {
     Object.entries(effect.damageToSpecies).forEach(([species, bonus]) => {
@@ -11835,6 +12248,9 @@ function getEffectivePlayerStats() {
     evasion: afterEquip.evasion,
     critRate: afterEquip.critRate + state.titleEffects.critRateBonus
   };
+  if (state.titleEffects.evasionBonus > 0) {
+    stats.evasion += state.titleEffects.evasionBonus;
+  }
 
   if (state.titleEffects.conditionalBonusNoTitle && state.activeTitles.length === 0) {
     const plus = state.titleEffects.conditionalBonusNoTitle.allStatsFlat || 0;
@@ -11918,6 +12334,19 @@ function getEffectivePlayerStats() {
       stats.attack *= 1 + (cond.attackMultiplier || 0);
     }
   }
+  if (state.titleEffects.lowHpAttackSpeedBonus && state.battle.isActive) {
+    const cond = state.titleEffects.lowHpAttackSpeedBonus;
+    if (state.battle.playerCurrentHp <= stats.maxHp * (cond.hpThreshold || 0.5)) {
+      stats.attack *= 1 + Number(cond.attackMultiplier || 0);
+      stats.speed *= 1 + Number(cond.speedMultiplier || 0);
+    }
+  }
+  if (state.titleEffects.lowHpCritBonus && state.battle.isActive) {
+    const cond = state.titleEffects.lowHpCritBonus;
+    if (state.battle.playerCurrentHp <= stats.maxHp * (cond.hpThreshold || 0.2)) {
+      stats.critRate += Number(cond.critRateBonus || 0);
+    }
+  }
   if (state.titleEffects.ninjaLowEvasionConditional && getCurrentMainBattleLineId() === "ninja_line") {
     const cond = state.titleEffects.ninjaLowEvasionConditional;
     const threshold = Number(cond.threshold || 0.1);
@@ -11968,6 +12397,18 @@ function getEffectivePlayerStats() {
     stats.attack *= 1 + bonus;
     stats.defense *= 1 + bonus;
   }
+  if (state.titleEffects.perNormalEquippedMaxHpBonus > 0) {
+    const count = Math.max(0, (state.equippedNormalTitleIds || []).length);
+    const cap = state.titleEffects.perNormalEquippedMaxHpBonusCap || 0.15;
+    const bonus = Math.min(cap, count * state.titleEffects.perNormalEquippedMaxHpBonus);
+    stats.maxHp *= 1 + bonus;
+  }
+  if (state.titleEffects.perCheatEquippedAttackBonus > 0) {
+    const count = Math.max(0, (state.equippedCheatTitleIds || []).length);
+    const cap = state.titleEffects.perCheatEquippedAttackBonusCap || 0.15;
+    const bonus = Math.min(cap, count * state.titleEffects.perCheatEquippedAttackBonus);
+    stats.attack *= 1 + bonus;
+  }
   if (state.titleEffects.perEquippedAttackDefenseBonus > 0) {
     const equippedCount = Math.max(0, (state.activeTitles || []).filter((id) => !!getTitleById(id)).length);
     const cap = state.titleEffects.perEquippedAttackDefenseBonusCap || 0.2;
@@ -11978,7 +12419,13 @@ function getEffectivePlayerStats() {
   if (state.titleEffects.perEquippedAllStatsBonus > 0) {
     const equippedCount = Math.max(0, (state.activeTitles || []).filter((id) => !!getTitleById(id)).length);
     const cap = state.titleEffects.perEquippedAllStatsBonusCap || 0.2;
-    const bonus = Math.min(cap, equippedCount * state.titleEffects.perEquippedAllStatsBonus);
+    let bonus = Math.min(cap, equippedCount * state.titleEffects.perEquippedAllStatsBonus);
+    if (state.titleEffects.perEquippedAllStatsRequireFullSlots) {
+      const totalSlots = Math.max(0, Number(state.maxNormalTitleSlots || 0)) + Math.max(0, Number(state.maxCheatTitleSlots || 0));
+      if (totalSlots > 0 && equippedCount < totalSlots) {
+        bonus *= 0.5;
+      }
+    }
     const mul = 1 + bonus;
     stats.maxHp *= mul;
     stats.maxMp *= mul;
@@ -11997,6 +12444,24 @@ function getEffectivePlayerStats() {
     stats.speed *= mul;
     stats.intelligence *= mul;
     stats.luck *= mul;
+  }
+  if (state.titleEffects.displayTitleAttackDefenseBonus > 0 && state.playerProfile?.displayTitleId) {
+    const mul = 1 + state.titleEffects.displayTitleAttackDefenseBonus;
+    stats.attack *= mul;
+    stats.defense *= mul;
+  }
+  if (state.titleEffects.displayTitleCritBonusIfSlotsFull > 0 && state.playerProfile?.displayTitleId) {
+    const equippedCount = Math.max(0, (state.activeTitles || []).filter((id) => !!getTitleById(id)).length);
+    const totalSlots = Math.max(0, Number(state.maxNormalTitleSlots || 0)) + Math.max(0, Number(state.maxCheatTitleSlots || 0));
+    if (totalSlots > 0 && equippedCount >= totalSlots) {
+      stats.critRate += state.titleEffects.displayTitleCritBonusIfSlotsFull;
+    }
+  }
+  if (state.titleEffects.overhealAttackWhileBarrier > 0) {
+    const hasOverhealBuff = state.activeEffects.some((effect) => effect.target === "player" && typeof effect.fromSkillId === "string" && effect.fromSkillId.startsWith(OVERHEAL_DEFENSE_BUFF_PREFIX));
+    if (hasOverhealBuff) {
+      stats.attack *= 1 + state.titleEffects.overhealAttackWhileBarrier;
+    }
   }
   if (state.titleEffects.weaponEnhanceAttackPerLevel > 0 || state.titleEffects.armorEnhanceDefensePerLevel > 0) {
     const breakdown = equipStats.breakdownBySlot || {};
@@ -12242,6 +12707,30 @@ function getEquippedWeaponCount() {
   if (state.player.equipmentSlots?.weapon1) count += 1;
   if (state.player.equipmentSlots?.weapon2) count += 1;
   return count;
+}
+
+function recordPlayerEvasionSuccess(regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "grassland") {
+  state.stats.evadeSuccessCount = (state.stats.evadeSuccessCount || 0) + 1;
+  if (regionId === "sea") {
+    state.stats.seaEvadeSuccessCount = (state.stats.seaEvadeSuccessCount || 0) + 1;
+  }
+}
+
+function consumeOverhealBarrierStacksOnAttack() {
+  const consumeRate = Number(state.titleEffects.overhealBarrierConsumeOnAttack || 0);
+  if (consumeRate <= 0) {
+    return;
+  }
+  const stacks = state.activeEffects
+    .filter((effect) => effect.target === "player" && typeof effect.fromSkillId === "string" && effect.fromSkillId.startsWith(OVERHEAL_DEFENSE_BUFF_PREFIX))
+    .sort((a, b) => a.expiresAt - b.expiresAt);
+  if (!stacks.length) {
+    return;
+  }
+  const removeCount = Math.max(1, Math.floor(stacks.length * consumeRate));
+  const removeSet = new Set(stacks.slice(0, removeCount));
+  state.activeEffects = state.activeEffects.filter((effect) => !removeSet.has(effect));
+  addLog(`聖傷変換: 防壁スタックを${removeCount}消費`);
 }
 
 function recordNinjaDebuffApply() {
@@ -12599,6 +13088,9 @@ function getSkillCurrentState(skillId) {
   const currentMp = state.battle?.isActive ? state.battle.playerCurrentMp : state.player.mp;
   const needMp = Math.max(0, Math.floor(skill.mpCost * (1 - (state.titleEffects.mpCostReduction || 0))));
   if ((currentMp || 0) < needMp) {
+    if (state.titleEffects.allowHpCastOnMpShortage && state.battle?.isActive) {
+      return { code: "hp_cast", label: "HP代替可" };
+    }
     return { code: "mp_lack", label: "MP不足" };
   }
   return { code: "ready", label: "準備完了" };
@@ -12626,7 +13118,11 @@ function pickUsableSkill() {
     const skill = skills[index];
     const readyAt = state.skillCooldowns[skill.id] || 0;
     const needMp = Math.max(0, Math.floor(skill.mpCost * (1 - getTotalMpCostReduction())));
-    if (state.battle.playerCurrentMp >= needMp && now >= readyAt) {
+    const canHpCast = state.titleEffects.allowHpCastOnMpShortage && state.battle.playerCurrentMp < needMp;
+    const missingMp = Math.max(0, needMp - state.battle.playerCurrentMp);
+    const hpCost = Math.max(1, Math.floor(missingMp * Math.max(0.5, Number(state.titleEffects.hpCostPerMissingMp || 2))));
+    const enoughHpForCast = !canHpCast || state.battle.playerCurrentHp > hpCost;
+    if ((state.battle.playerCurrentMp >= needMp || canHpCast) && enoughHpForCast && now >= readyAt) {
       state.battle.skillRotationIndex = (index + 1) % skills.length;
       return skill;
     }
@@ -12671,6 +13167,9 @@ function calculateSkillDamage(skill) {
     if (equippedSkillCount >= 4 && state.titleEffects.mageFourSkillDamageBonus > 0) {
       skillMul *= 1 + state.titleEffects.mageFourSkillDamageBonus;
     }
+  }
+  if (state.runtime.lastSkillUsedHpCast && state.titleEffects.hpCastSkillPowerBonus > 0) {
+    skillMul *= 1 + state.titleEffects.hpCastSkillPowerBonus;
   }
   if (skill.type === "magicAttack") {
     const jobMul = getEffectivePlayerStats().magicPowerMultiplier || 1;
@@ -13041,7 +13540,12 @@ function spinNeverendRoulette(vip = false) {
     rolled = selected;
   }
   const hitChance = clamp(0, 0.95, rules.hitChance + Number(state.titleEffects.gambleHitChanceBonus || 0));
-  const hit = guaranteedWin || (rolled === selected && Math.random() < hitChance);
+  let hit = guaranteedWin || (rolled === selected && Math.random() < hitChance);
+  if (!hit && state.titleEffects.failureRetryChance > 0 && Math.random() < clamp(0, 0.9, state.titleEffects.failureRetryChance)) {
+    rolled = 1 + Math.floor(Math.random() * 5);
+    hit = rolled === selected && Math.random() < hitChance;
+    addLog("失敗回避: ルーレット判定を再抽選");
+  }
   if (hit) {
     totalGain = Math.floor(bet * rules.payoutMultiplier);
     const minPayoutMul = Math.max(1, 1 + Number(state.titleEffects.gambleMinPayoutMultiplier || 0));
@@ -13071,6 +13575,11 @@ function spinNeverendRoulette(vip = false) {
   } else {
     state.rouletteStats.spins += 1;
     if (won) state.rouletteStats.wins += 1;
+  }
+  if (!won) {
+    state.stats.rouletteLossCount = (state.stats.rouletteLossCount || 0) + 1;
+  } else if (totalGain >= Math.max(5000, Math.floor(bet * 5))) {
+    state.stats.rouletteBigWinCount = (state.stats.rouletteBigWinCount || 0) + 1;
   }
   state.rouletteStats.chipsLost += actualBetLoss;
   state.rouletteStats.chipsWon += totalGain;
@@ -13171,6 +13680,7 @@ function renderNeverendRouletteView() {
 
 function renderNeverendVipView() {
   ensureNeverendState();
+  ensureTitleSlotState();
   if (!state.neverendVipUnlocked) {
     return `
       <h3>VIP</h3>
@@ -13180,6 +13690,8 @@ function renderNeverendVipView() {
   const selected = state.neverendUi.vipRouletteNumber;
   const stat = state.rouletteStats;
   const winRate = stat.vipSpins > 0 ? Math.floor((stat.vipWins / stat.vipSpins) * 1000) / 10 : 0;
+  const vipBuys = Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.vipForbiddenCheatSlotBuys || 0)));
+  const canBuyForbiddenSlot = !!state.neverendBossClearFlags?.protocol3 && vipBuys < VIP_FORBIDDEN_TITLE_SLOT_RULE.maxBuys && state.chips >= VIP_FORBIDDEN_TITLE_SLOT_RULE.costChips;
   return `
     <h3>VIP</h3>
     <p class="tiny">所持チップ: ${state.chips}</p>
@@ -13190,6 +13702,14 @@ function renderNeverendVipView() {
       <button class="btn btn-primary" id="vip-spin-btn">VIPベット</button>
     </div>
     <p class="tiny">VIP統計: ${stat.vipSpins}回 / 勝利${stat.vipWins}回 / 勝率${winRate}%</p>
+    <div class="card" style="margin-top:10px;">
+      <h4>禁断の称号枠</h4>
+      <p class="tiny">価格: ${VIP_FORBIDDEN_TITLE_SLOT_RULE.costChips} チップ</p>
+      <p class="tiny">効果: チート称号枠 +${VIP_FORBIDDEN_TITLE_SLOT_RULE.bonusPerBuy}</p>
+      <p class="tiny">購入条件: Protocol3撃破済み / VIP解放済み</p>
+      <p class="tiny">購入回数: ${vipBuys} / ${VIP_FORBIDDEN_TITLE_SLOT_RULE.maxBuys}</p>
+      <button class="btn vip-forbidden-slot-buy-btn" ${canBuyForbiddenSlot ? "" : "disabled"}>購入</button>
+    </div>
   `;
 }
 
@@ -13889,7 +14409,9 @@ function getSellPrice(item) {
 
 function renderGuildTempleRankingPanel() {
   ensureGuildFameState();
+  ensureTitleSlotState();
   updateFameRankByProgress({ silent: true, reason: "templeRanking" });
+  const fameSlotBonus = getFameRankTitleSlotBonus();
   const rows = getGuildFameLeaderboardRows(15)
     .map((row) => {
       const isPlayer = row.kind === "player";
@@ -13908,6 +14430,7 @@ function renderGuildTempleRankingPanel() {
       <p class="tiny">現在名声: ${state.guild.fame}</p>
       <p class="tiny">現在順位: ${escapeHtml(formatFameRankLabel())}</p>
       <p class="tiny">異名: ${escapeHtml(getFameAlias())}</p>
+      <p class="tiny">名声ランク枠ボーナス: ${fameSlotBonus.hallUnlimited ? "制限解除" : `ノーマル+${fameSlotBonus.normal} / チート+${fameSlotBonus.cheat}`}</p>
       <p class="tiny">${escapeHtml(getNextFameRankTargetText())}</p>
       <p class="tiny">${state.guild.hallOfFame ? "殿堂入り状態です。" : "ボス撃破や異界到達で順位保証が発生します。"}</p>
     </div>
@@ -14085,8 +14608,28 @@ function renderWorkshopLayout() {
 }
 
 function renderWorkshopView() {
+  ensureTitleSlotState();
   const recipePane = renderRecipeList();
   const jobInfoPane = renderProductionJobInfo();
+  const otherworldForgeBuys = Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.otherworldForgeCheatSlotBuys || 0)));
+  const canForgeOtherworldSlot =
+    canEnterOtherworld() &&
+    otherworldForgeBuys < OTHERWORLD_TITLE_SLOT_FORGE_RULE.maxBuys &&
+    state.player.gold >= OTHERWORLD_TITLE_SLOT_FORGE_RULE.goldCost &&
+    OTHERWORLD_TITLE_SLOT_FORGE_RULE.materialNeed.every((row) => getInventoryCount(row.itemId) >= row.qty);
+  const materialLabel = OTHERWORLD_TITLE_SLOT_FORGE_RULE.materialNeed
+    .map((row) => `${ITEM_DATA[row.itemId]?.name || row.itemId} x${row.qty}`)
+    .join(" / ");
+  const otherworldForgeCard = `
+    <div class="card" style="margin-top:10px;">
+      <h4>異界素材で枠拡張</h4>
+      <p class="tiny">必要素材: ${escapeHtml(materialLabel)}</p>
+      <p class="tiny">必要GOLD: ${OTHERWORLD_TITLE_SLOT_FORGE_RULE.goldCost}</p>
+      <p class="tiny">効果: チート称号枠 +${OTHERWORLD_TITLE_SLOT_FORGE_RULE.bonusPerBuy}</p>
+      <p class="tiny">実行回数: ${otherworldForgeBuys} / ${OTHERWORLD_TITLE_SLOT_FORGE_RULE.maxBuys}</p>
+      <button class="btn otherworld-slot-forge-btn" ${canForgeOtherworldSlot ? "" : "disabled"}>異界素材で拡張</button>
+    </div>
+  `;
   const equipIds = state.player.inventory
     .filter((slot) => ["weapon", "armor", "accessory"].includes(ITEM_DATA[slot.itemId]?.category))
     .map((slot) => slot.itemId)
@@ -14142,6 +14685,7 @@ function renderWorkshopView() {
         ? renderRecipeList(true)
         : jobInfoPane
     }
+    ${otherworldForgeCard}
     <div style="margin-top:10px;"><button id="gather-materials-btn" class="btn">採取する</button></div>
   `;
 }
@@ -14241,7 +14785,11 @@ function craftRecipe(recipeId, quantity = 1) {
     }
     state.player.gold -= actualCost;
     recipe.materials.forEach((m) => removeItem(m.itemId, m.qty));
-    const result = rollCraftResult(recipe, state.player, false);
+    let result = rollCraftResult(recipe, state.player, false);
+    if (result.quality === "failure" && state.titleEffects.failureRetryChance > 0 && Math.random() < clamp(0, 0.9, state.titleEffects.failureRetryChance)) {
+      result = rollCraftResult(recipe, state.player, false);
+      addLog("失敗回避: 生産判定を再抽選");
+    }
     applyCraftQuality(result, recipe);
     applyQualityMaterialRefund(recipe, result);
   }
@@ -14548,7 +15096,11 @@ function enhanceItem(itemId) {
     state.stats.armorEnhanceCount = (state.stats.armorEnhanceCount || 0) + 1;
   }
   const isSmith = PRODUCTION_JOB_PATHS[state.player.productionJob]?.type === "smith";
-  const success = Math.random() <= getEnhanceSuccessRate(itemId);
+  let success = Math.random() <= getEnhanceSuccessRate(itemId);
+  if (!success && state.titleEffects.failureRetryChance > 0 && Math.random() < clamp(0, 0.9, state.titleEffects.failureRetryChance)) {
+    success = Math.random() <= getEnhanceSuccessRate(itemId);
+    addLog("失敗回避: 強化判定を再抽選");
+  }
   const enhanceLevel = (state.player.equipmentEnhancements[itemId] || 0) + (success ? 1 : 0);
   const buildKey = `${itemId}_lv${Math.floor(enhanceLevel / 3)}`;
   state.stats.equipmentBuildHistory[buildKey] = (state.stats.equipmentBuildHistory[buildKey] || 0) + 1;
@@ -14569,6 +15121,7 @@ function enhanceItem(itemId) {
       });
     }
   } else {
+    state.stats.enhanceFailureCount = (state.stats.enhanceFailureCount || 0) + 1;
     addLog(`強化失敗: ${ITEM_DATA[itemId]?.name || itemId} の強化に失敗しました。`);
   }
   if (isSmith) {
@@ -15156,6 +15709,10 @@ function renderStatusView(container) {
     ["周回ループ", `${state.loop.loopCount}`],
     ["ノーマル称号枠", `${state.equippedNormalTitleIds.length} / ${state.maxNormalTitleSlots}`],
     ["チート称号枠", `${state.equippedCheatTitleIds.length} / ${state.maxCheatTitleSlots}`],
+    ["ノーマル称号取得数", `${getUnlockedTitleCountByCategory("normal")} (30/60/100で+1)`],
+    ["チート称号取得数", `${getUnlockedTitleCountByCategory("cheat")} (30/60/120で+1)`],
+    ["VIP禁断枠購入", `${Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.vipForbiddenCheatSlotBuys || 0)))} / ${VIP_FORBIDDEN_TITLE_SLOT_RULE.maxBuys}`],
+    ["異界素材枠拡張", `${Math.max(0, Math.floor(Number(state.titleSlotUnlocks?.otherworldForgeCheatSlotBuys || 0)))} / ${OTHERWORLD_TITLE_SLOT_FORGE_RULE.maxBuys}`],
     ["称号装備上限(互換)", `${getCurrentTitleLimit()}`],
     ["次上限条件", `${getNextTitleLimitCondition()}`],
     ["周回挑戦クリア", `${state.stats.loopChallengeClearCount}`],
@@ -15555,6 +16112,12 @@ function renderTitleCatalog() {
   const baseCheat = TITLE_SLOT_RULES.cheat.baseDefault;
   const loopNormal = Math.max(0, Number(state.titleSlotUnlocks?.normalBasePlus || 0));
   const loopCheat = Math.max(0, Number(state.titleSlotUnlocks?.cheatBasePlus || 0));
+  const collectionNormal = Math.max(0, Number(state.collectionNormalTitleSlotBonus || 0));
+  const collectionCheat = Math.max(0, Number(state.collectionCheatTitleSlotBonus || 0));
+  const fameRankNormal = Math.max(0, Number(state.fameRankNormalTitleSlotBonus || 0));
+  const fameRankCheat = Math.max(0, Number(state.fameRankCheatTitleSlotBonus || 0));
+  const vipForbiddenCheat = Math.max(0, Number(state.vipForbiddenCheatTitleSlotBonus || 0));
+  const otherworldForgeCheat = Math.max(0, Number(state.otherworldForgeCheatTitleSlotBonus || 0));
   const otherworldNormal = Math.max(0, Number(state.otherworldNormalTitleSlotBonus || 0));
   const otherworldCheat = Math.max(0, Number(state.otherworldCheatTitleSlotBonus || 0));
   const bossNormal = Math.max(0, Number(state.bossClearNormalTitleSlotBonus || 0));
@@ -15578,8 +16141,8 @@ function renderTitleCatalog() {
         summaryCollapsed
           ? ""
           : `
-      <p class="tiny">内訳(N): 初期${baseNormal} + 周回${loopNormal} + 地域突破${bossNormal} + Tier${tierNormal} + ギルドランク${guildNormal} + 異界${otherworldNormal}</p>
-      <p class="tiny">内訳(C): 初期${baseCheat} + 周回${loopCheat} + 地域突破${bossCheat} + Tier${tierCheat} + ギルドランク${guildCheat} + 神殿購入${cheatShop} + 異界${otherworldCheat}</p>
+      <p class="tiny">内訳(N): 初期${baseNormal} + 周回${loopNormal} + 取得数${collectionNormal} + 地域突破${bossNormal} + Tier${tierNormal} + ギルドランク${guildNormal} + 名声${fameRankNormal} + 異界${otherworldNormal}</p>
+      <p class="tiny">内訳(C): 初期${baseCheat} + 周回${loopCheat} + 取得数${collectionCheat} + 地域突破${bossCheat} + Tier${tierCheat} + ギルドランク${guildCheat} + 名声${fameRankCheat} + 神殿購入${cheatShop} + VIP購入${vipForbiddenCheat} + 異界鍛造${otherworldForgeCheat} + 異界${otherworldCheat}</p>
       <p class="tiny">ノーマル装備中: ${escapeHtml(normalEquippedNames || "なし")}</p>
       <p class="tiny">チート装備中: ${escapeHtml(cheatEquippedNames || "なし")}</p>
       <p class="tiny">解放条件: ${escapeHtml(normalTierHint)} / ${escapeHtml(cheatTierHint)}</p>
@@ -16280,6 +16843,8 @@ function applyLoadedState(payload) {
   if (typeof state.stats.rouletteSameNumberStreak !== "number") state.stats.rouletteSameNumberStreak = 0;
   if (typeof state.stats.rouletteSameNumberBest !== "number") state.stats.rouletteSameNumberBest = 0;
   if (typeof state.stats.rouletteSameNumberLastPick !== "number") state.stats.rouletteSameNumberLastPick = null;
+  if (typeof state.stats.rouletteLossCount !== "number") state.stats.rouletteLossCount = 0;
+  if (typeof state.stats.rouletteBigWinCount !== "number") state.stats.rouletteBigWinCount = 0;
   if (typeof state.stats.tripleAttackEnemyWinCount !== "number") state.stats.tripleAttackEnemyWinCount = 0;
   if (typeof state.stats.enragedBossKillCount !== "number") state.stats.enragedBossKillCount = 0;
   if (typeof state.stats.mechanicalEnemyKillCount !== "number") state.stats.mechanicalEnemyKillCount = 0;
@@ -17134,6 +17699,12 @@ function bindGameEvents() {
     if (vipSpinBtn) {
       vipSpinBtn.addEventListener("click", () => spinNeverendRoulette(true));
     }
+    document.querySelectorAll(".vip-forbidden-slot-buy-btn").forEach((btn) =>
+      btn.addEventListener("click", () => purchaseVipForbiddenTitleSlot())
+    );
+    document.querySelectorAll(".otherworld-slot-forge-btn").forEach((btn) =>
+      btn.addEventListener("click", () => forgeOtherworldCheatTitleSlot())
+    );
   }
 
   if (state.currentTab === "board") {
@@ -18187,6 +18758,8 @@ function resetForNewLoop() {
   state.stats.rouletteSameNumberStreak = 0;
   state.stats.rouletteSameNumberBest = 0;
   state.stats.rouletteSameNumberLastPick = null;
+  state.stats.rouletteLossCount = 0;
+  state.stats.rouletteBigWinCount = 0;
   state.stats.craftCountByType = {};
   state.stats.craftCountByRecipe = {};
   state.stats.craftSuccessCount = 0;
