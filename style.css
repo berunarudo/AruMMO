@@ -323,7 +323,29 @@ body {
 }
 
 .log-important {
-  border-left: 3px solid rgba(248, 113, 113, 0.8);
+  border-left: 3px solid rgba(239, 68, 68, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.3), 0 0 14px rgba(239, 68, 68, 0.2);
+}
+
+.log-world {
+  border-left: 3px solid rgba(250, 204, 21, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.3), 0 0 14px rgba(250, 204, 21, 0.2);
+}
+
+.log-announce {
+  border-left: 3px solid rgba(250, 204, 21, 0.85);
+}
+
+.log-machine {
+  border-left: 3px solid rgba(148, 163, 184, 0.85);
+}
+
+.log-otherworld {
+  border-left: 3px solid rgba(192, 132, 252, 0.9);
+}
+
+.log-system {
+  border-left: 3px solid rgba(148, 163, 184, 0.55);
 }
 
 .log-time {

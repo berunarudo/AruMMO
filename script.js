@@ -28,6 +28,7 @@ const BALANCE_CONFIG = {
     expCurvePerLevel: 24
   },
   crafting: {
+    baseProductionExpMultiplier: 1.45,
     perLoopSuccessBonus: 0.006,
     perLoopGodBonus: 0.0015
   },
@@ -4861,8 +4862,251 @@ const BOARD_RESPONSE_SETS = {
     { author: "市場観測班", body: "カジノはGOLD→チップの入口。オークションは高額一点狙いが基本。", tone: "guide" },
     { author: "守り神しめ鯖", body: "ルーレットは欲張ると溶ける。収支ラインを決めて撤退しろ。", tone: "hint", isHint: true },
     { author: "無課金仙人", body: "VIPは夢あるけど地獄もある。勝ち逃げ推奨。", tone: "chat" }
+  ],
+  causality_exposed_legend: [
+    { author: "名無しの冒険者", body: "おい、カジノスレ見たか？", tone: "chat" },
+    { author: "名無しの冒険者", body: "また誰か破産した話？", tone: "chat" },
+    { author: "名無しの冒険者", body: "違う。ルーレット100％勝利の称号が出たらしい。", tone: "legend", important: true },
+    { author: "名無しの冒険者", body: "は？ 100％？", tone: "chat" },
+    { author: "名無しの冒険者", body: "ギャンブルで100％はもうギャンブルじゃないんよ。", tone: "meme" },
+    { author: "破産騎士", body: "それは勝利ではない。カジノへの宣戦布告だ。", tone: "meme" },
+    { author: "カジノディーラー", body: "お客様、その勝ち方は記録にありません。", tone: "legend" },
+    { author: "検証班A", body: "条件は未確定だが、同じ数字を異常回数選び続けた報告がある。", tone: "hint", isHint: true, important: true },
+    { author: "名無しの考察班", body: "このゲーム、変な反復行動を『祈り』扱いして確率に干渉してないか？", tone: "theory", important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "確率を従える者は賭博者ではない。世界の側が負けを認めただけだ。", tone: "theory", important: true },
+    { author: "名無しの冒険者", body: "で、そいつ誰なん？ 最近ボス撃破ログでも名前見るんだが。", tone: "chat" },
+    { author: "名無しの冒険者", body: "あいつ何者だ？", tone: "legend", important: true }
+  ],
+  desert_fast_clear_who: [
+    { author: "名無しの冒険者", body: "砂漠ボス突破者出たぞ。", tone: "chat" },
+    { author: "名無しの冒険者", body: "早くない？ まだ装備揃ってない人多いのに。", tone: "chat" },
+    { author: "名無しの冒険者", body: "ログ見た感じ、称号枠かなり増やしてるっぽい。", tone: "theory" },
+    { author: "検証班A", body: "砂漠ボスはレベルだけでは厳しい。称号枠・毒耐性・武器強化、この3点で突破率が上がる。", tone: "hint", isHint: true, important: true },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "そこを積んだから突破したのだろう。", tone: "guide" },
+    { author: "名無しの冒険者", body: "正論やめろ。", tone: "meme" },
+    { author: "名無しの考察班", body: "問題は突破速度。通常ルートより特殊称号を複数持ってる可能性が高い。", tone: "theory", important: true },
+    { author: "名無しの冒険者", body: "あいつ何者だ？", tone: "legend", important: true },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "強い奴はログが先に歩く。名前は後から追いつく。", tone: "chat" }
+  ],
+  sea_fast_clear_who: [
+    { author: "名無しの冒険者", body: "海ボス突破者、もう出たのかよ。", tone: "chat" },
+    { author: "名無しの冒険者", body: "ブレス事故で溶けるのに早すぎる。", tone: "chat" },
+    { author: "検証班A", body: "海は『壁を越える者』『地域馴染み』採用で安定が一段上がる。", tone: "hint", isHint: true, important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "単体高火力構成へ寄せた者から先に抜ける。範囲信仰はここで止まる。", tone: "guide", important: true },
+    { author: "名無しの考察班", body: "最近の突破ログ、同じ名前が混ざり始めてないか？", tone: "theory" },
+    { author: "名無しの冒険者", body: "またあいつか。何者なんだよ。", tone: "legend", important: true }
+  ],
+  volcano_fast_clear_who: [
+    { author: "名無しの冒険者", body: "火山ボス突破報告、出た。", tone: "chat" },
+    { author: "名無しの冒険者", body: "レベルよりビルド差が出る場所をもう抜いたの？", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "ここは耐久ラインを作ってから殴る。脳筋だけでは越えられん。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "回復2枚と軽減重ね、これだけで事故率が目に見えて落ちる。", tone: "guide" },
+    { author: "名無しの考察班", body: "攻略速度が完全に上位勢のそれ。一般ルートの進度じゃない。", tone: "theory", important: true },
+    { author: "名無しの冒険者", body: "あいつ何者だよ、マジで。", tone: "legend", important: true }
+  ],
+  protocol3_slayer_who: [
+    { author: "名無しの冒険者", body: "Protocol3撃破ログ来たぞ。", tone: "chat" },
+    { author: "名無しの冒険者", body: "三連撃ボスを正面から落としたのか。", tone: "chat" },
+    { author: "検証班A", body: "前半は受け、激怒後は削り切り。切替ができる構成じゃないと勝てない。", tone: "hint", isHint: true, important: true },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "連撃は読む。読むだけじゃ足りない。次の一手まで決めて初めて勝つ。", tone: "guide", important: true },
+    { author: "名無しの考察班", body: "撃破者の行動ログ、無駄がない。慣れじゃなく最適化の動きだ。", tone: "theory" },
+    { author: "名無しの冒険者", body: "最近の主役、完全にこいつじゃん。", tone: "legend", important: true }
+  ],
+  title_gold_breaker_report: [
+    { author: "名無しの冒険者", body: "黄金律破壊者取った人いるってマジ？", tone: "chat" },
+    { author: "名無しの冒険者", body: "累計1000万Gってもう個人経済圏だろ。", tone: "meme" },
+    { author: "市場観測班", body: "戦闘GOLDと売却の両軸を回してる。片方だけじゃ届かない。", tone: "hint", isHint: true },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "稼ぎは装備と周回の副産物。勝ち続ける者が最後に取る称号だ。", tone: "guide" },
+    { author: "名無しの考察班", body: "こいつ、攻略速度も資金速度もおかしい。", tone: "theory", important: true }
+  ],
+  title_exp_usurper_report: [
+    { author: "名無しの冒険者", body: "経験値の簒奪者とか名前が物騒すぎる。", tone: "chat" },
+    { author: "名無しの冒険者", body: "成長速度が別ゲーだった理由これか。", tone: "chat" },
+    { author: "検証班A", body: "戦闘回数・ボス撃破・レベル進行の複合達成。効率周回の積み重ねが条件。", tone: "hint", isHint: true, important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "育成が最適化された者は、戦闘時間そのものを短くする。", tone: "guide" },
+    { author: "名無しの考察班", body: "このプレイヤー、世界線ごと周回速度を更新してる。", tone: "theory", important: true }
+  ],
+  title_final_job_overlord_report: [
+    { author: "名無しの冒険者", body: "最終職の支配者って、取ったやつ本当にいたんだな。", tone: "chat" },
+    { author: "名無しの冒険者", body: "最終職になってから20体ボス狩りとか修羅。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "最終職はゴールではない。そこから構成を仕上げる。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "完成ビルドの継戦力がないと到達できない称号。", tone: "guide" },
+    { author: "名無しの考察班", body: "ここまで来ると『強い人』じゃなくて『物語の中心』なんよ。", tone: "theory", important: true }
+  ],
+  title_gamble_market_breakers: [
+    { author: "名無しの冒険者", body: "胴元泣かせと市場崩壊者、同時に持ってる人がいるらしい。", tone: "chat" },
+    { author: "名無しの冒険者", body: "カジノとオークションを両方壊すのはやめてくれ。", tone: "meme" },
+    { author: "市場観測班", body: "黒幕の取引まで乗ると、買う・売る・稼ぐの全動線が加速する。", tone: "hint", isHint: true, important: true },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "経済を制したやつはビルド自由度まで制する。", tone: "guide" },
+    { author: "名無しの考察班", body: "最近の異常進行、戦闘だけじゃ説明つかない。経済が先に壊れてる。", tone: "theory", important: true }
+  ],
+  otherworld_defeat_route_watch: [
+    { author: "名無しの冒険者", body: "異界の王に負けて称号取るルート、あれ本当に進むんだな。", tone: "chat" },
+    { author: "名無しの冒険者", body: "負けが進行になるの、発想が怖い。", tone: "chat" },
+    { author: "検証班A", body: "王に認められた者→諦めないもの→運命に贖う者。敗北回数が導線。", tone: "hint", isHint: true, important: true },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "折れないこと自体が勝ち筋になる。ここはそういう戦い。", tone: "guide", important: true },
+    { author: "名無しの考察班", body: "このプレイヤー、もう攻略者じゃなくて物語の当事者だ。", tone: "theory", important: true }
+  ],
+  protagonist_confirmed_reaction: [
+    { author: "名無しの冒険者", body: "主人公、取得確認。", tone: "legend", important: true },
+    { author: "名無しの冒険者", body: "うそだろ、異界の王倒したのか。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "剣を振り続けた者が最後に名前を得る。見事。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "世界の結末は更新された。ここから先は伝説だ。", tone: "theory", important: true },
+    { author: "名無しの考察班", body: "結論: あいつ何者だ？ -> 主人公だった。", tone: "legend", important: true }
   ]
 };
+
+const BOARD_RESPONSE_SET_EXPANSIONS = {
+  rumor_early_watch: [
+    { author: "名無しの冒険者", body: "草原ボス撃破ログ、また同じ名前見たんだけど。", tone: "chat" },
+    { author: "名無しの冒険者", body: "序盤なのに動きが妙に完成してるやついるよな。", tone: "chat" },
+    { author: "検証班A", body: "単発の上振れではなく、判断の一貫性がある。伸びるタイプ。", tone: "theory", important: true },
+    { author: "名無しの考察班", body: "この時点で目立つの、普通に才能か周回勢かのどっちか。", tone: "theory" }
+  ],
+  rumor_mid_watch: [
+    { author: "名無しの冒険者", body: "砂漠と海の突破ログ、同じ名前が連続してる。", tone: "chat" },
+    { author: "名無しの冒険者", body: "もう『上手い人』ってより『物語の人』じゃない？", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "強いプレイヤーは戦闘より先に準備で差を作る。ログにそれが出てる。", tone: "guide", important: true },
+    { author: "名無しの考察班", body: "噂の中心が一人に収束し始めてるの、ちょっと出来すぎてる。", tone: "theory", important: true }
+  ],
+  rumor_neverend_watch: [
+    { author: "名無しの冒険者", body: "ネバーエンド到達勢の中でも、進行速度が別格の人いる。", tone: "chat" },
+    { author: "市場観測班", body: "戦闘だけじゃない。経済の回し方まで最適化されてる。", tone: "theory", important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "ここまで来ると偶然ではない。世界の難所を選んで越えている。", tone: "theory", important: true },
+    { author: "名無しの考察班", body: "あいつ何者だ？ が、もう挨拶みたいになってる。", tone: "legend" }
+  ],
+  rumor_otherworld_defeat_watch: [
+    { author: "名無しの冒険者", body: "異界の王に負けても前進してるやつ、あの人だろ。", tone: "chat" },
+    { author: "名無しの冒険者", body: "普通は折れる回数なのに、まだ挑んでる。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "折れない者は強い。異界はその一点で評価される。", tone: "guide", important: true },
+    { author: "名無しの考察班", body: "勝利より敗北の積み重ねで主人公になっていくの、完全に物語。", tone: "theory", important: true }
+  ],
+  rumor_fate_redeemer_watch: [
+    { author: "名無しの冒険者", body: "運命に贖う者、取得者が出たってマジか。", tone: "legend", important: true },
+    { author: "名無しの冒険者", body: "異界の王戦だけ不死化って、もう演出が主人公。", tone: "chat" },
+    { author: "総合スレ民", body: "掲示板の応援ログ流れてるって報告、熱すぎる。", tone: "chat", important: true },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "何度倒れても立つ者は、最後に勝つ資格を得る。", tone: "theory" }
+  ],
+  rumor_protagonist_afterglow: [
+    { author: "名無しの冒険者", body: "主人公取得後もログに名前出るたび空気変わるのすごい。", tone: "chat" },
+    { author: "名無しの冒険者", body: "最初の『あいつ何者だ？』からここまで来るとは思わなかった。", tone: "chat", important: true },
+    { author: "名無しの考察班", body: "この掲示板そのものが、主人公誕生の観測記録になってる。", tone: "theory", important: true }
+  ],
+  starter_job: [
+    { author: "名無しの冒険者", body: "剣士スタートで詰まったら何を優先すればいい？", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "武器更新→防具更新→称号1枠。まずこの順で安定する。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "魔術師は序盤からMP回復導線を意識しろ。枯渇が最大の敗因だ。", tone: "guide" }
+  ],
+  bee_warning: [
+    { author: "名無しの冒険者", body: "蜂の会心が痛すぎて草原で止まった。", tone: "chat" },
+    { author: "検証班A", body: "被会心は軽減と最大HPで受ける設計。攻撃一点よりまず生存。", tone: "hint", isHint: true }
+  ],
+  desert_toxic: [
+    { author: "名無しの冒険者", body: "砂漠は毒対策したら急に楽になった。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "毒を軽視するほど回復リソースが先に尽きる。耐性は火力だ。", tone: "guide", important: true },
+    { author: "名無しの考察班", body: "砂漠だけ異常に『封印設備』っぽい遺構が多いの気になる。", tone: "theory" }
+  ],
+  sea_jelly: [
+    { author: "名無しの冒険者", body: "海は状態異常でテンポを壊されるのが一番きつい。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "海は先手を取って行動前に落とす。長引くほど不利。", tone: "guide" }
+  ],
+  volcano_wall: [
+    { author: "名無しの冒険者", body: "火山で初めてビルド差って言葉の意味を理解した。", tone: "chat" },
+    { author: "検証班A", body: "火山は単純レベルより称号複合と耐性管理で勝敗が分かれる。", tone: "hint", isHint: true, important: true }
+  ],
+  story_grassland_clear: [
+    { author: "名無しの考察班", body: "草原ボス、敵意より『通行を拒否する』感じだったんだよな。", tone: "theory", important: true },
+    { author: "名無しの冒険者", body: "女神の台詞、テンプレNPCより感情が乗ってる気がする。", tone: "theory" }
+  ],
+  story_desert_clear: [
+    { author: "運営監視班", body: "背景にしては遺跡の情報量が多すぎる。設定資料を直接置いてる感じ。", tone: "theory", important: true },
+    { author: "名無しの考察班", body: "ユニークは災厄というより調律装置説、かなり有力。", tone: "theory" }
+  ],
+  story_sea_clear: [
+    { author: "名無しの考察班", body: "海以降、世界側の『歪み』が敵の行動に混ざってる。", tone: "theory", important: true },
+    { author: "名無しの冒険者", body: "俺ら修復してるつもりで封印外してない？", tone: "theory" }
+  ],
+  story_volcano_clear: [
+    { author: "運営監視班", body: "神殺しの断片ログ、これプレイヤーへの警告じゃないか？", tone: "theory", important: true },
+    { author: "名無しの考察班", body: "ここで急に機械文明の痕跡が増えるの、時代が繋がってる証拠っぽい。", tone: "theory" }
+  ],
+  operator_theory: [
+    { author: "名無しの考察班", body: "運営会社が実在するようで実在しない。痕跡が綺麗すぎる。", tone: "theory", important: true },
+    { author: "名無しの冒険者", body: "もしかして最初から『招待』されてたのか。", tone: "theory" }
+  ],
+  swordsman_meta_builds: [
+    { author: "名無しの冒険者", body: "剣士は重装と火力どっち寄せがいい？", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "序盤中盤は重装寄り、終盤はボス特攻混成。これが最も事故が少ない。", tone: "guide", important: true },
+    { author: "検証班A", body: "被ダメが痛い区間は与ダメ期待値より生存ターンを伸ばす方が総火力が高い。", tone: "hint", isHint: true }
+  ],
+  mage_meta_builds: [
+    { author: "名無しの冒険者", body: "魔術師、MP切れして何もできなくなる問題。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "回復1枚では足りない。海以降は回転率を維持できる構成が前提だ。", tone: "guide", important: true },
+    { author: "検証班A", body: "単体高火力の優先度は海以降で急上昇。範囲は雑魚処理枠で運用。", tone: "hint", isHint: true }
+  ],
+  ninja_meta_builds: [
+    { author: "名無しの冒険者", body: "忍者ってロマン職？ 実用職？", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "実用だ。回避・会心・デバフを同時に回せると化ける。", tone: "guide", important: true },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "サブ僧侶忍者は本当に硬い。回復テンポが噛み合う。", tone: "guide" }
+  ],
+  priest_meta_builds: [
+    { author: "名無しの冒険者", body: "僧侶は火力不足にならない？", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.shimeSaba.name, body: "サブ攻撃系を重ねれば不足しない。守るほど行動回数で勝つ。", tone: "guide", important: true },
+    { author: "検証班A", body: "過剰回復ビルドは高難易度ほど期待値が上がる。", tone: "hint", isHint: true }
+  ],
+  title_research_lab: [
+    { author: "称号コレクター", body: "称号は単体性能より組み合わせシナジーを見た方が強い。", tone: "guide" },
+    { author: "名無しの冒険者", body: "最近は称号構成だけで別人みたいな火力差が出る。", tone: "chat" },
+    { author: "名無しの考察班", body: "称号が世界法則そのものを触ってる説、わりと冗談じゃない。", tone: "theory" }
+  ],
+  map_boss_route_notes: [
+    { author: "攻略班テンプレ職人", body: "ネバーエンド雑魚は高防御高火力低HP。短期決戦で処理しろ。", tone: "hint", isHint: true },
+    { author: "攻略班テンプレ職人", body: "Protocol3は三連撃受け切りと激怒後の削り切りを分離して考える。", tone: "hint", isHint: true, important: true }
+  ],
+  neverend_strategy_notes: [
+    { author: "名無しの冒険者", body: "Protocol3の激怒後、怖いけど削れるの気持ちいい。", tone: "chat" },
+    { author: "検証班A", body: "激怒移行直後の行動順管理が勝敗を分ける。バフ更新を前倒し。", tone: "hint", isHint: true },
+    { author: BOARD_CHARACTER_PROFILES.crimsonMage.name, body: "終盤の一手は詠唱ではなく決断だ。迷う者から落ちる。", tone: "theory" }
+  ],
+  neverend_economy_notes: [
+    { author: "名無しの冒険者", body: "オークション、安い時に買ってクラフト売却で戻すのが美味い。", tone: "chat" },
+    { author: "市場観測班", body: "高額帯は一点豪華。中途半端に散らすと回収が遅い。", tone: "hint", isHint: true },
+    { author: BOARD_CHARACTER_PROFILES.akaBell.name, body: "稼ぎの最適化は戦闘ビルドの自由度に直結する。", tone: "guide" }
+  ],
+  causality_exposed_legend: [
+    { author: "名無しの冒険者", body: "同じ数字100連選択って、正気じゃないだろ。", tone: "chat" },
+    { author: "検証班A", body: "偏りの継続がトリガーになっている可能性が高い。", tone: "hint", isHint: true },
+    { author: "名無しの考察班", body: "偶然を積み上げて因果にする。称号名が一番怖い。", tone: "theory", important: true }
+  ],
+  protocol3_slayer_who: [
+    { author: "名無しの冒険者", body: "撃破ログの語り口まで主人公っぽく見えてくるの何。", tone: "chat" },
+    { author: BOARD_CHARACTER_PROFILES.romanSamurai.name, body: "勝者は派手さではなく、積み重ねの精度で決まる。", tone: "guide" }
+  ],
+  protagonist_confirmed_reaction: [
+    { author: "総合スレ民", body: "うおおおおおおおおお", tone: "chat", important: true },
+    { author: "名無しの冒険者", body: "ここまで掲示板で追ってきたけど、本当に終わったんだな。", tone: "chat" },
+    { author: "名無しの考察班", body: "攻略と考察の線が最後に一本になるの、綺麗すぎる。", tone: "theory" }
+  ],
+  desert_fast_clear_who: [
+    { author: "名無しの冒険者", body: "砂漠抜け時点で噂立つのは、もう主人公フラグなんよ。", tone: "chat" },
+    { author: "名無しの考察班", body: "この頃から『何者だ』の温度が変わり始めてる。", tone: "theory" }
+  ],
+  sea_fast_clear_who: [
+    { author: "名無しの冒険者", body: "海突破でここまで騒がれるの珍しい。", tone: "chat" },
+    { author: "検証班A", body: "攻略順と装備更新のタイミングが綺麗すぎる。", tone: "hint", isHint: true }
+  ],
+  volcano_fast_clear_who: [
+    { author: "名無しの冒険者", body: "火山抜けた時点で『追う側』になった感ある。", tone: "chat" },
+    { author: "名無しの考察班", body: "このプレイヤーだけ物語のカメラが寄ってる。", tone: "theory", important: true }
+  ]
+};
+
+Object.entries(BOARD_RESPONSE_SET_EXPANSIONS).forEach(([setId, extraRows]) => {
+  if (!Array.isArray(BOARD_RESPONSE_SETS[setId])) {
+    BOARD_RESPONSE_SETS[setId] = [];
+  }
+  BOARD_RESPONSE_SETS[setId].push(...extraRows);
+});
 
 const BOARD_THREAD_DEFS = [
   { id: "th_job", category: "beginner", title: "【初心者向け】最初に選ぶならどの職？", visibleIf: { minStage: "1-1" }, responseSetId: "starter_job" },
@@ -4879,9 +5123,14 @@ const BOARD_THREAD_DEFS = [
   { id: "th_sea", category: "strategy", title: "海マップのクラゲ許せん", visibleIf: { unlockedTown: "akamatsu" }, responseSetId: "sea_jelly" },
   { id: "th_volcano", category: "strategy", title: "火山のゴーレム硬すぎる", visibleIf: { unlockedTown: "rulacia" }, responseSetId: "volcano_wall" },
   { id: "th_story_grassland", category: "theory", title: "草原ボス、討伐演出が妙に不穏だった件", visibleIf: { fieldBossCleared: "1-10" }, responseSetId: "story_grassland_clear" },
+  { id: "th_rumor_early", category: "legend", title: "【噂】草原突破ログのあの名前、最近よく見る", visibleIf: { fieldBossCleared: "1-10" }, responseSetId: "rumor_early_watch" },
   { id: "th_story_desert", category: "theory", title: "砂漠遺跡ってただの背景じゃなくない？", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "story_desert_clear" },
+  { id: "th_desert_who", category: "boss", title: "【速報】砂漠ボス突破者、あいつ何者だ？", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "desert_fast_clear_who" },
   { id: "th_story_sea", category: "theory", title: "海以降の敵、世界バグみたいな挙動してる", visibleIf: { fieldBossCleared: "3-10" }, responseSetId: "story_sea_clear" },
+  { id: "th_sea_who", category: "boss", title: "【海域突破】また同じ名前が出てる件", visibleIf: { fieldBossCleared: "3-10" }, responseSetId: "sea_fast_clear_who" },
+  { id: "th_rumor_mid", category: "legend", title: "【噂】中盤の突破ログ、同一人物説", visibleIf: { fieldBossCleared: "3-10" }, responseSetId: "rumor_mid_watch" },
   { id: "th_story_volcano", category: "theory", title: "火山壁画の神殺し図、見たやついる？", visibleIf: { fieldBossCleared: "4-10" }, responseSetId: "story_volcano_clear" },
+  { id: "th_volcano_who", category: "boss", title: "【火山突破】攻略速度おかしいプレイヤーいるよな", visibleIf: { fieldBossCleared: "4-10" }, responseSetId: "volcano_fast_clear_who" },
   { id: "th_operator_theory", category: "theory", title: "運営会社と女神、設定以上の違和感がある", visibleIf: { fieldBossCleared: "2-10" }, responseSetId: "operator_theory" },
   { id: "th_bison", category: "boss", title: "ベヒモスバイソン初見で轢かれた", visibleIf: { minStage: "1-10" }, responseSetId: "boss_bison" },
   { id: "th_bison_loss10", category: "boss", title: "【1-10】10連敗したんだが、何を直せばいい？", visibleIf: { all: [{ minStage: "1-10" }, { stageDefeatsAtLeast: { stageId: "1-10", count: 10 } }] }, responseSetId: "bison_loss_streak" },
@@ -4912,6 +5161,16 @@ const BOARD_THREAD_DEFS = [
   { id: "th_speed2", category: "title", title: "2倍速解放したら世界変わった", visibleIf: { speedUnlockedAtLeast: 2 }, responseSetId: "speed_unlock", variantSelector: "timer_meta" },
   { id: "th_speed5", category: "title", title: "5倍速まで行ったやついる？", visibleIf: { speedUnlockedAtLeast: 5 }, responseSetId: "speed_unlock", variantSelector: "timer_meta" },
   { id: "th_nobody", category: "meme", title: "何者でもない取ったのに本当に何もない", visibleIf: { titleAny: ["nobody_special"] }, responseSetId: "meme_nothing" },
+  { id: "th_causality", category: "legend", title: "【称号: 因果晒し】確率が壊れたらしい", visibleIf: { titleAny: ["cheat_causality_exposed"] }, responseSetId: "causality_exposed_legend" },
+  { id: "th_gold_breaker", category: "title", title: "【称号】黄金律破壊者、実在した", visibleIf: { titleAny: ["cheat_gold_law_breaker", "normal_money_maker"] }, responseSetId: "title_gold_breaker_report" },
+  { id: "th_exp_usurper", category: "title", title: "【称号】経験値の簒奪者を見た", visibleIf: { titleAny: ["cheat_exp_usurper", "normal_stack_builder"] }, responseSetId: "title_exp_usurper_report" },
+  { id: "th_final_job_overlord", category: "title", title: "【称号】最終職の支配者が出たらしい", visibleIf: { titleAny: ["cheat_final_job_overlord"] }, responseSetId: "title_final_job_overlord_report" },
+  { id: "th_gamble_market_breakers", category: "title", title: "【経済崩壊】胴元泣かせ/市場崩壊者/黒幕の取引", visibleIf: { titleAny: ["cheat_house_edge_breaker", "cheat_market_meltdown", "cheat_shadow_dealer", "normal_auction_appraiser", "normal_gambler_instinct"] }, responseSetId: "title_gamble_market_breakers" },
+  { id: "th_otherworld_defeat_route", category: "legend", title: "【異界】負けるほど前進するルートの報告", visibleIf: { titleAny: ["acknowledged_by_king", "never_give_up", "fate_redeemer"] }, responseSetId: "otherworld_defeat_route_watch" },
+  { id: "th_rumor_otherworld", category: "legend", title: "【噂】異界で折れないあいつ、何者なんだ", visibleIf: { titleAny: ["acknowledged_by_king", "never_give_up"] }, responseSetId: "rumor_otherworld_defeat_watch" },
+  { id: "th_rumor_fate", category: "legend", title: "【噂】運命に贖う者、掲示板応援ログが流れた件", visibleIf: { titleAny: ["fate_redeemer"] }, responseSetId: "rumor_fate_redeemer_watch" },
+  { id: "th_protagonist_confirmed", category: "legend", title: "【確定】あいつ何者だ？ -> 主人公", visibleIf: { titleAny: ["protagonist"] }, responseSetId: "protagonist_confirmed_reaction" },
+  { id: "th_rumor_afterglow", category: "legend", title: "【後日談】主人公確定後の掲示板", visibleIf: { titleAny: ["protagonist"] }, responseSetId: "rumor_protagonist_afterglow" },
   { id: "th_unexpected", category: "title", title: "運営想定外って何やれば取れるの？", visibleIf: { titleAny: ["dev_unexpected", "unexpected_architect"] }, responseSetId: "endgame_titles", variantSelector: "unexpected_meta" },
   { id: "th_loopcarry", category: "loop", title: "2周目何持ち込む？", visibleIf: { loopAtLeast: 1 }, responseSetId: "loop_carry", variantSelector: "loop_chat" },
   { id: "th_limit", category: "loop", title: "titleLimit増えたら別ゲーになった", visibleIf: { titleLimitAtLeast: 2 }, responseSetId: "title_limit", variantSelector: "loop_chat" },
@@ -4922,9 +5181,11 @@ const BOARD_THREAD_DEFS = [
   { id: "th_loop_challenge_open", category: "loop", title: "追憶カテゴリ解放されたんだが", visibleIf: { featureUnlocked: "loop_challenge_basic" }, responseSetId: "loop_carry", variantSelector: "loop_chat" },
   { id: "th_reborn_boss", category: "boss", title: "再臨ボス、通常ボスの顔してない", visibleIf: { featureUnlocked: "enhanced_boss" }, responseSetId: "endgame_titles" },
   { id: "th_story_neverend", category: "theory", title: "ネバーエンド、娯楽都市に見えて終末遺跡すぎる", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "story_neverend_arrive" },
+  { id: "th_rumor_neverend", category: "legend", title: "【噂】ネバーエンド到達勢の中に別格がいる", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "rumor_neverend_watch" },
   { id: "th_neverend_strategy", category: "strategy", title: "天空都市攻略: 機械敵とProtocol3対策", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "neverend_strategy_notes" },
   { id: "th_neverend_economy", category: "strategy", title: "天空都市のギャンブル/オークション情報共有", visibleIf: { worldStateFlag: "neverendArrived" }, responseSetId: "neverend_economy_notes" },
   { id: "th_protocol3_identity", category: "theory", title: "Protocol3って対ユニーク兵器では？", visibleIf: { worldStateFlag: "protocol3Slayer" }, responseSetId: "story_neverend_arrive" },
+  { id: "th_protocol3_who", category: "boss", title: "【Protocol3撃破】ログの主、またあいつか", visibleIf: { worldStateFlag: "protocol3Slayer" }, responseSetId: "protocol3_slayer_who" },
   { id: "th_unique_balance_break", category: "unique", title: "ユニーク全撃破後、空がおかしい", visibleIf: { uniqueTypesAtLeast: 7 }, responseSetId: "story_unique_collapse" },
   { id: "th_deep_clear", category: "loop", title: "深層踏破者ってここで取れる？", visibleIf: { specialChallengeClearAtLeast: 1 }, responseSetId: "endgame_titles" },
   { id: "th_loop4", category: "legend", title: "4周目から空気変わりすぎだろ", visibleIf: { loopAtLeast: 4 }, responseSetId: "myth_godslayer" },
@@ -5167,7 +5428,7 @@ function ensureJobEvolutionFlags() {
   if (!state.jobEvolutionFlags.production) state.jobEvolutionFlags.production = {};
 }
 
-const LOG_CATEGORIES = ["battle", "title", "craft", "board", "loop", "important", "system"];
+const LOG_CATEGORIES = ["battle", "title", "craft", "board", "loop", "important", "world", "announce", "machine", "otherworld", "system"];
 const LOG_CATEGORY_LABELS = {
   all: "すべて",
   battle: "戦闘",
@@ -5176,7 +5437,181 @@ const LOG_CATEGORY_LABELS = {
   board: "掲示板",
   loop: "周回",
   important: "重要",
+  world: "世界ログ",
+  announce: "運営",
+  machine: "機械音声",
+  otherworld: "異界",
   system: "システム"
+};
+
+const STORY_DIRECTION_EVENTS = {
+  game_start: [
+    { category: "world", text: "世界ログ：世界は、まだあなたの名を知らない。だが、記録はすでに始まっている。" },
+    { category: "announce", text: "運営アナウンス：『タイトルはどっかで見たことあるMMORPG』へようこそ。" },
+    { category: "announce", text: "運営アナウンス：初回プレイでは草原エリアで基本操作を学ぶことを推奨します。" },
+    { category: "world", text: "世界ログ：あなたの最初の一歩を、草原の風が待っている。" }
+  ],
+  grassland_arrive: [
+    { category: "world", text: "世界ログ：草原に風が吹いている。穏やかだが、遠くで地面を踏み鳴らす音がした。" },
+    { category: "announce", text: "運営アナウンス：草原エリアが解放されました。武器強化の確認を推奨します。" }
+  ],
+  boss_behemoth_spawn: [
+    { category: "world", text: "世界ログ：草原の奥で巨大な影が動いた。風が止まり、地面が低く鳴る。" },
+    { category: "battle", text: "ベヒモスバイソン：――進むな。" },
+    { category: "world", text: "世界ログ：その咆哮は、侵入者を止めようとしていた。" }
+  ],
+  boss_behemoth_clear: [
+    { category: "system", text: "システム：草原の覇者 ベヒモスバイソンを撃破しました。" },
+    { category: "world", text: "世界ログ：草原を覆っていた重い気配が薄れ、風の流れがわずかに乱れた。" },
+    { category: "announce", text: "運営アナウンス：草原マップボスの撃破を確認。次地域への進行条件が満たされました。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  desert_arrive: [
+    { category: "world", text: "世界ログ：砂漠に入った瞬間、風の音が変わった。乾いた砂の奥で何かが軋む。" },
+    { category: "world", text: "世界ログ：遺跡の壁には七つの獣と、剣を掲げる人間の紋様が刻まれていた。" },
+    { category: "announce", text: "運営アナウンス：砂漠エリアが解放されました。毒・奇襲・高防御対策を推奨します。" }
+  ],
+  boss_hydra_spawn: [
+    { category: "world", text: "世界ログ：砂そのものが呼吸している。" },
+    { category: "battle", text: "デューンヒドラ：――乾きは、記憶を奪わない。" }
+  ],
+  boss_hydra_clear: [
+    { category: "system", text: "システム：砂海の暴君 デューンヒドラを撃破しました。" },
+    { category: "world", text: "旧音声ログ：――第七防衛線、崩壊。――ラグナロク、継続。" },
+    { category: "announce", text: "運営アナウンス：砂漠マップボスの撃破を確認。次地域への進行条件が満たされました。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  sea_arrive: [
+    { category: "world", text: "世界ログ：海は静かだった。だがその静けさは平穏ではない。" },
+    { category: "announce", text: "運営アナウンス：海エリアが解放されました。感電・麻痺・拘束に注意してください。" }
+  ],
+  boss_leviathan_spawn: [
+    { category: "world", text: "世界ログ：海面が盛り上がる。海そのものが背を伸ばしたようだった。" },
+    { category: "battle", text: "リヴァイアサン：――沈め。" }
+  ],
+  boss_leviathan_clear: [
+    { category: "system", text: "システム：蒼海王 リヴァイアサンを撃破しました。" },
+    { category: "world", text: "世界ログ：海の王が沈むと同時に、深部で別の何かが目を覚ました。" },
+    { category: "announce", text: "運営アナウンス：海マップボスの撃破を確認。次地域への進行条件が満たされました。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  volcano_arrive: [
+    { category: "world", text: "世界ログ：火山の空は赤く、灰が降っていた。壁画には――神殺し。" },
+    { category: "announce", text: "運営アナウンス：火山エリアが解放されました。称号と装備の組み合わせが重要になります。" }
+  ],
+  boss_volkazard_spawn: [
+    { category: "world", text: "世界ログ：火口が割れ、溶岩の奥で巨大な影が翼を広げる。" },
+    { category: "battle", text: "ヴォルカザード：――また、燃やすのか。" }
+  ],
+  boss_volkazard_clear: [
+    { category: "system", text: "システム：炎獄竜 ヴォルカザードを撃破しました。" },
+    { category: "world", text: "旧通信ログ：――天空都市ネバーエンド、応答確認。――人類帰還プロトコル、継続。" },
+    { category: "announce", text: "運営アナウンス：草原ショップに入場券が追加されました。現在価格:100G" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  neverend_arrive: [
+    { category: "world", text: "世界ログ：天空都市ネバーエンドへ到達。無人のカジノから音楽だけが流れている。" },
+    { category: "machine", text: "機械音声：おかえりなさいませ。人類のお客様。娯楽機構を再開します。" },
+    { category: "announce", text: "運営アナウンス：ギルド→カジノ / ショップ→オークション / 神殿→ルーレット / 工房→VIP" }
+  ],
+  casino_first: [
+    { category: "machine", text: "機械音声：チップ交換を開始します。娯楽は人類文明の維持機構です。" },
+    { category: "announce", text: "運営アナウンス：カジノではGOLDとチップを交換できます。" }
+  ],
+  auction_first: [
+    { category: "machine", text: "機械音声：オークション会場を開放。所有権を再定義します。" },
+    { category: "announce", text: "運営アナウンス：オークションでは高額な特殊商品をチップで落札できます。" }
+  ],
+  roulette_first: [
+    { category: "machine", text: "機械音声：確率娯楽機構を起動。数字を選択してください。" },
+    { category: "announce", text: "運営アナウンス：ルーレットは1-5選択。的中で配当、外れで没収です。" }
+  ],
+  protocol3_spawn: [
+    { category: "world", text: "世界ログ：都市中枢が赤く点灯。娯楽機構が停止し、戦闘警報だけが鳴る。" },
+    { category: "machine", text: "機械音声：対ユニークモンスター戦闘兵器、Protocol3を起動します。" },
+    { category: "battle", text: "Protocol3：排除対象を確認。三連撃機構、起動。" }
+  ],
+  protocol3_rage: [
+    { category: "system", text: "システム：Protocol3のHPが30%を下回りました。" },
+    { category: "machine", text: "機械音声：警告。オーバークロック状態へ移行します。" },
+    { category: "battle", text: "Protocol3：人類未帰還。命令だけが残存。排除を継続する。" }
+  ],
+  protocol3_clear: [
+    { category: "system", text: "システム：Protocol3を撃破しました。" },
+    { category: "machine", text: "機械音声：人類応答なし。娯楽機構、継続。" },
+    { category: "world", text: "世界ログ：機械都市は一度沈黙し、やがて再び照明だけが点いた。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  vip_unlock: [
+    { category: "system", text: "システム：Protocol3撃破により、VIPが解放されました。" },
+    { category: "machine", text: "機械音声：上位娯楽機構を開放。警告。本施設は高損失を伴います。" }
+  ],
+  unique_first_clear: [
+    { category: "system", text: "システム：ユニークモンスターを撃破しました。" },
+    { category: "world", text: "世界ログ：勝利の余韻の中で、空がほんの少しだけ暗くなった。" },
+    { category: "announce", text: "運営アナウンス：均衡値の低下を確認。代替調律処理を開始します。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  unique_all_clear: [
+    { category: "system", text: "システム：七体のユニークモンスター撃破を確認しました。" },
+    { category: "world", text: "世界ログ：七つの均衡が失われ、空に穴が開いた。" },
+    { category: "announce", text: "運営アナウンス：緊急告知。世界均衡値が最低基準を下回りました。" },
+    { category: "system", text: "システム：異界が解放されました。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  otherworld_arrive: [
+    { category: "world", text: "世界ログ：異界へ到達。空も地面もなく、世界の裏側だけが広がっていた。" },
+    { category: "announce", text: "運営アナウンス：未登録領域への接続を確認。本エリアは通常サポート対象外です。" },
+    { category: "otherworld", text: "異界ログ：ようやく、こちらを見たか。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  otherworld_common_battle: [
+    { category: "otherworld", text: "異界ログ：ここでは倒したものが戻ってくる。忘れたものが形を持つ。" },
+    { category: "world", text: "世界ログ：異界の怪物は獣ではない。記憶の残骸に牙が生えたものだった。" }
+  ],
+  awakened_spawn: [
+    { category: "system", text: "システム：覚醒ボスが出現しました。" },
+    { category: "world", text: "世界ログ：過去の勝利が、異界の中で敵として再演される。" }
+  ],
+  otherworld_king_spawn: [
+    { category: "world", text: "世界ログ：6-10。異界の最奥に王がいた。" },
+    { category: "otherworld", text: "異界の王：七つの柱を折り、兵器を越え、ここまで来たか。" },
+    { category: "system", text: "システム：異界の王との戦闘を開始します。" }
+  ],
+  otherworld_king_first_defeat: [
+    { category: "system", text: "システム：異界の王に敗北しました。" },
+    { category: "otherworld", text: "異界の王：弱い。だが、弱さを知った者だけが次を選べる。" },
+    { category: "system", text: "システム：称号『王に認められた者』を獲得。レベル上限が300まで解放されました。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  otherworld_king_10_defeat: [
+    { category: "system", text: "システム：異界の王への敗北回数が10回に到達しました。" },
+    { category: "otherworld", text: "異界の王：まだ立つのか。勝てぬと知りながら、なお進むのか。" },
+    { category: "system", text: "システム：称号『諦めないもの』を獲得。称号枠が大きく増加しました。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  otherworld_king_100_defeat: [
+    { category: "system", text: "システム：異界の王への敗北回数が100回に到達しました。" },
+    { category: "otherworld", text: "異界の王：お前は勝者でも英雄でもない。ただ終わることを拒んだ者だ。" },
+    { category: "system", text: "システム：称号『運命に贖う者』を獲得。王戦限定の不死と侵食効果を解放。" },
+    { category: "system", text: "システム：掲示板応援ログを戦闘ログへ統合します。" },
+    { category: "board", text: "掲示板更新通知：掲示板に新しい書き込みがあります。" }
+  ],
+  otherworld_support_merge: [
+    { category: "system", text: "システム：掲示板応援ログが戦闘ログへ統合されました。" },
+    { category: "board", text: "掲示板ログ：名無しの冒険者：行け。" },
+    { category: "board", text: "掲示板ログ：浪漫侍：剣を振れ。最後まで。" },
+    { category: "board", text: "掲示板ログ：AKA.ベル：避けるな。進め。" },
+    { category: "board", text: "掲示板ログ：守り神しめ鯖：もう倒れません。ここからです。" },
+    { category: "board", text: "掲示板ログ：紅の魔術師：世界の結末を更新しろ。" }
+  ],
+  otherworld_king_clear: [
+    { category: "system", text: "システム：異界の王を撃破しました。" },
+    { category: "system", text: "システム：称号『主人公』を獲得しました。" },
+    { category: "world", text: "世界ログ：世界は、ようやくあなたを認めた。選ばれたからではない。降りなかったからだ。" },
+    { category: "announce", text: "運営アナウンス：主要異常値が安定化。世界均衡値を再構築します。" },
+    { category: "system", text: "システム：世界は救われた。そう、主人公によって。" }
+  ]
 };
 
 const state = {
@@ -5901,6 +6336,10 @@ function escapeHtml(value) {
 
 function inferLogCategory(text) {
   const normalized = String(text || "");
+  if (/世界ログ/.test(normalized)) return "world";
+  if (/運営アナウンス/.test(normalized)) return "announce";
+  if (/機械音声/.test(normalized)) return "machine";
+  if (/異界ログ/.test(normalized)) return "otherworld";
   if (/称号|titleLimit|装備上限/.test(normalized)) return "title";
   if (/生産|工房|強化|品質|レシピ|素材|作成/.test(normalized)) return "craft";
   if (/掲示板|スレッド/.test(normalized)) return "board";
@@ -5911,7 +6350,13 @@ function inferLogCategory(text) {
 }
 
 function addLog(text, category = "auto", options = {}) {
-  const resolvedCategory = category === "auto" ? inferLogCategory(text) : category;
+  let resolvedCategory = category === "auto" ? inferLogCategory(text) : category;
+  if (resolvedCategory === "system") {
+    const inferredCategory = inferLogCategory(text);
+    if (inferredCategory !== "system") {
+      resolvedCategory = inferredCategory;
+    }
+  }
   const important = !!options.important || resolvedCategory === "important";
   state.player.logs.push({ at: nowTimeText(), text, category: resolvedCategory, important });
   if (state.player.logs.length > MAX_LOG_LINES) {
@@ -5923,6 +6368,22 @@ function addLog(text, category = "auto", options = {}) {
   if (state.screen === "game") {
     renderLogPanel();
     renderNotifications();
+  }
+}
+
+function emitStoryDirectionEvent(eventId, options = {}) {
+  const rows = STORY_DIRECTION_EVENTS[eventId];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+  const once = options.once !== false;
+  const flagKey = `story_direction_${eventId}`;
+  if (once && state.worldStateFlags?.[flagKey]) {
+    return;
+  }
+  rows.forEach((row) => addLog(row.text, row.category || "system", { important: !!row.important }));
+  if (once) {
+    state.worldStateFlags = { ...(state.worldStateFlags || {}), [flagKey]: true };
   }
 }
 
@@ -6222,6 +6683,8 @@ function chooseMainJob(jobId) {
   state.screen = "game";
   state.currentTab = "adventure";
   addLog(`初期ジョブを選択: ${job.name}`);
+  emitStoryDirectionEvent("game_start");
+  emitStoryDirectionEvent("grassland_arrive");
   render();
 }
 
@@ -6396,7 +6859,11 @@ function renderLogPanel() {
     ? state.player.logs
     : state.player.logs.filter((log) => (log.category || "system") === state.ui.logFilter);
   logList.innerHTML = filtered
-    .map((log) => `<li class="log-${escapeHtml(log.category || "system")} ${log.important ? "important" : ""}"><span class="log-time">[${escapeHtml(log.at)}]</span>${escapeHtml(log.text)}</li>`)
+    .map((log) => {
+      const baseCategory = log.category || "system";
+      const displayCategory = baseCategory === "system" ? inferLogCategory(log.text) : baseCategory;
+      return `<li class="log-${escapeHtml(displayCategory || "system")} ${log.important ? "important" : ""}"><span class="log-time">[${escapeHtml(log.at)}]</span>${escapeHtml(log.text)}</li>`;
+    })
     .join("");
   if (state.ui.logAutoScroll) {
     logList.scrollTop = logList.scrollHeight;
@@ -6685,6 +7152,7 @@ function selectTown(townId) {
   state.player.currentTown = TOWN_DATA[townId].name;
   if (townId === "neverend") {
     state.worldStateFlags = { ...(state.worldStateFlags || {}), neverendArrived: true };
+    emitStoryDirectionEvent("neverend_arrive");
   } else if (townId === "otherworld") {
     const firstArrive = !state.worldStateFlags?.otherworldArrived;
     state.worldStateFlags = { ...(state.worldStateFlags || {}), otherworldArrived: true };
@@ -6692,6 +7160,7 @@ function selectTown(townId) {
     if (firstArrive) {
       showCenterPopup({ text: "異界へ到達した", type: "important" });
       addLog("異界到達: 世界の綻びの先へ踏み込んだ。", "important", { important: true });
+      emitStoryDirectionEvent("otherworld_arrive");
     }
   }
   state.stats.townVisitCount += 1;
@@ -6706,6 +7175,15 @@ function selectTown(townId) {
     refreshGuildQuestsForCurrentTown(true);
   }
   syncStoryProgress();
+  if (townId === "balladore") {
+    emitStoryDirectionEvent("grassland_arrive");
+  } else if (townId === "dustria") {
+    emitStoryDirectionEvent("desert_arrive");
+  } else if (townId === "akamatsu") {
+    emitStoryDirectionEvent("sea_arrive");
+  } else if (townId === "rulacia") {
+    emitStoryDirectionEvent("volcano_arrive");
+  }
   updateBoardThreadsFromProgress();
   addLog(`転移門を使って ${TOWN_DATA[townId].name} へ移動した。`);
   autoSaveIfNeeded("townMove");
@@ -6917,13 +7395,27 @@ function spawnStageEnemy() {
     showCenterPopup({ text: `BOSS: ${master.name}`, type: "important" });
     if (stage.mapId === "otherworld" && String(master.name || "").includes("覚醒")) {
       addLog(`異界補正: ${master.name} が再演された。`, "important", { important: true });
+      emitStoryDirectionEvent("awakened_spawn");
     }
     if (master.id === "otherworldKing") {
       addLog("異界の王が出現した。世界の終着点が目前にある。", "important", { important: true });
+      emitStoryDirectionEvent("otherworld_king_spawn");
       if (shouldUseOtherworldSupportLog()) {
         pushOtherworldSupportLog(true);
       }
+    } else if (master.id === "behemothBison") {
+      emitStoryDirectionEvent("boss_behemoth_spawn");
+    } else if (master.id === "duneHydra") {
+      emitStoryDirectionEvent("boss_hydra_spawn");
+    } else if (master.id === "leviathan") {
+      emitStoryDirectionEvent("boss_leviathan_spawn");
+    } else if (master.id === "volkazard") {
+      emitStoryDirectionEvent("boss_volkazard_spawn");
+    } else if (master.id === "protocol3") {
+      emitStoryDirectionEvent("protocol3_spawn");
     }
+  } else if (stage.mapId === "otherworld") {
+    emitStoryDirectionEvent("otherworld_common_battle");
   }
   refreshSceneBgm({ force: true, useFade: true });
 }
@@ -7232,6 +7724,7 @@ function triggerBossGimmick(gimmick) {
     if (!state.battle.gimmick.triggered && state.battle.enemy.hp <= state.battle.enemy.maxHp * gimmick.triggerHpRate) {
       state.battle.gimmick.triggered = true;
       addLog("[ギミック] Protocol3がコア過熱状態へ。後半フェーズが開始。");
+      emitStoryDirectionEvent("protocol3_rage");
     }
   }
 }
@@ -8246,8 +8739,10 @@ function handleFieldBossClear(stageId) {
   }
 
   if (stageId === "1-10") {
+    emitStoryDirectionEvent("boss_behemoth_clear");
     unlockTown("dustria");
   } else if (stageId === "2-10") {
+    emitStoryDirectionEvent("boss_hydra_clear");
     if (getCurrentMainBattleLineId() === "priest_line") {
       state.stats.priestDesertBossClearCount = (state.stats.priestDesertBossClearCount || 0) + 1;
       const equippedSkills = getEquippedSkills();
@@ -8259,10 +8754,12 @@ function handleFieldBossClear(stageId) {
     addLog("ボス素材獲得: ヒドラ鱗 x2");
     unlockTown("akamatsu");
   } else if (stageId === "3-10") {
+    emitStoryDirectionEvent("boss_leviathan_clear");
     addItem("leviathanFin", 2);
     addLog("ボス素材獲得: リヴァイア鰭 x2");
     unlockTown("rulacia");
   } else if (stageId === "4-10") {
+    emitStoryDirectionEvent("boss_volkazard_clear");
     addItem("volkaCore", 2);
     addLog("ボス素材獲得: ヴォルカ核 x2");
     addLog("火山4-10をクリア。現段階の到達点です。");
@@ -8292,6 +8789,8 @@ function handleFieldBossClear(stageId) {
     addLog("Protocol3撃破報酬: 制御基板x2 / オーバークロック回路x2 / 崩壊装甲片x2 / 天空炉心x1");
     addLog("称号獲得: Protocol3撃破者");
     showCenterPopup({ text: "Protocol3撃破: VIP解放", type: "important" });
+    emitStoryDirectionEvent("protocol3_clear");
+    emitStoryDirectionEvent("vip_unlock");
   } else if (stageId === "6-10") {
     ensureOtherworldState();
     state.otherworldKingCleared = true;
@@ -8303,6 +8802,7 @@ function handleFieldBossClear(stageId) {
     addLog("称号『主人公』を獲得した！ すべての限界が解放された。", "important", { important: true });
     OTHERWORLD_ENDING_CHEER_LOG_DATA.forEach((text) => addLog(text, "board", { important: true }));
     showCenterPopup({ text: "異界の王撃破: 主人公", type: "important" });
+    emitStoryDirectionEvent("otherworld_king_clear");
     state.screen = "otherworldEnding";
   }
   if (!state.player.subJobId) {
@@ -8329,6 +8829,7 @@ function unlockTown(townId) {
 }
 
 function handleUniqueVictory(enemy) {
+  const firstUniqueBefore = (state.stats.uniqueKillCount || 0) <= 0;
   state.stats.uniqueNoRetreatResolveCount = (state.stats.uniqueNoRetreatResolveCount || 0) + 1;
   state.uniqueKillCount += 1;
   state.stats.uniqueKillCount += 1;
@@ -8351,6 +8852,12 @@ function handleUniqueVictory(enemy) {
   addLog(`ユニーク撃破: ${enemy.name} / 特別報酬 EXP+${uniqueBonusExp}, GOLD+${uniqueBonusGold}`);
   showToast(`ユニーク撃破: ${enemy.name}`, "important");
   syncStoryProgress();
+  if (firstUniqueBefore) {
+    emitStoryDirectionEvent("unique_first_clear");
+  }
+  if ((state.uniqueDefeatedIds || []).length >= 7) {
+    emitStoryDirectionEvent("unique_all_clear");
+  }
   updateBoardThreadsFromProgress();
   checkTitleUnlocks("afterUniqueKill");
 }
@@ -8367,6 +8874,7 @@ function handleOtherworldKingDefeatProgress() {
     addLog("異界の王は、あなたを退けた。だが挑戦者として認めた。", "important", { important: true });
     addLog("称号『王に認められた者』を獲得した！ レベル上限が300まで解放された！", "important", { important: true });
     showCenterPopup({ text: "称号獲得: 王に認められた者 (Lv上限300)", type: "important" });
+    emitStoryDirectionEvent("otherworld_king_first_defeat");
   }
 
   if (state.otherworldKingDefeatCount >= 10 && !state.otherworldKingTenDefeatRewardClaimed) {
@@ -8378,6 +8886,7 @@ function handleOtherworldKingDefeatProgress() {
     normalizeEquippedTitleSlots({ logOnTrim: false });
     addLog("称号『諦めないもの』を獲得した！ 称号枠が拡張された。", "important", { important: true });
     showCenterPopup({ text: "称号獲得: 諦めないもの (称号枠+10/+10)", type: "important" });
+    emitStoryDirectionEvent("otherworld_king_10_defeat");
   }
 
   if (state.otherworldKingDefeatCount >= 100 && !state.otherworldKingHundredDefeatRewardClaimed) {
@@ -8386,6 +8895,8 @@ function handleOtherworldKingDefeatProgress() {
     unlockTitle("fate_redeemer");
     addLog("称号『運命に贖う者』を獲得した！ 異界の王の理を侵す力が解放された。", "important", { important: true });
     showCenterPopup({ text: "称号獲得: 運命に贖う者", type: "important" });
+    emitStoryDirectionEvent("otherworld_king_100_defeat");
+    emitStoryDirectionEvent("otherworld_support_merge");
   }
 
   recalculateTitleEffects();
@@ -11588,6 +12099,7 @@ function getNeverendFacilityLabel(id, fallback) {
 }
 
 function exchangeGoldToChips(goldAmount) {
+  emitStoryDirectionEvent("casino_first");
   ensureNeverendState();
   const amount = Math.max(0, Math.floor(Number(goldAmount || 0)));
   if (amount <= 0) {
@@ -11698,6 +12210,7 @@ function canAuctionSellItem(itemId) {
 }
 
 function buyAuctionItem(auctionId) {
+  emitStoryDirectionEvent("auction_first");
   ensureNeverendState();
   ensureOtherworldState();
   const row = getAuctionItemById(auctionId);
@@ -11754,6 +12267,7 @@ function setRouletteNumber(number, vip = false) {
 }
 
 function spinNeverendRoulette(vip = false) {
+  emitStoryDirectionEvent("roulette_first");
   ensureNeverendState();
   const rules = vip ? NEVEREND_VIP_ROULETTE_RULES : NEVEREND_ROULETTE_RULES;
   if (vip && !state.neverendVipUnlocked) {
@@ -13059,7 +13573,10 @@ function applyQualityMaterialRefund(recipe, result) {
 
 function gainProductionExp(amount) {
   const pJob = getJobDataById(state.player.productionJobCurrentId || state.player.productionJobBaseId || state.player.productionJob);
-  const expMul = 1 + (pJob?.productionBonus?.productionExpRate || 0) + (state.titleEffects.productionExpRateBonus || 0);
+  const expMul =
+    (BALANCE_CONFIG.crafting.baseProductionExpMultiplier || 1) +
+    (pJob?.productionBonus?.productionExpRate || 0) +
+    (state.titleEffects.productionExpRateBonus || 0);
   const gained = Math.max(1, Math.floor(amount * expMul));
   state.player.productionJobExp += gained;
   state.stats.totalCraftExp += gained;
