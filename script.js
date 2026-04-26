@@ -5848,6 +5848,43 @@ function ensureJobEvolutionFlags() {
   if (!state.jobEvolutionFlags.production) state.jobEvolutionFlags.production = {};
 }
 
+function ensureJobTierMemoryState() {
+  const normalizeTierMap = (source) => {
+    if (!source || typeof source !== "object") {
+      return {};
+    }
+    const normalized = {};
+    Object.entries(source).forEach(([jobId, tier]) => {
+      if (!jobId) return;
+      const safeTier = Math.max(1, Math.floor(Number(tier) || 1));
+      normalized[jobId] = safeTier;
+    });
+    return normalized;
+  };
+  state.player.mainJobTierByBaseId = normalizeTierMap(state.player.mainJobTierByBaseId);
+  state.player.subJobTierByBaseId = normalizeTierMap(state.player.subJobTierByBaseId);
+}
+
+function recordBattleJobTierProgress(slotKey, baseId, tier) {
+  if (!baseId) {
+    return;
+  }
+  ensureJobTierMemoryState();
+  const targetKey = slotKey === "sub" ? "subJobTierByBaseId" : "mainJobTierByBaseId";
+  const current = Number(state.player[targetKey][baseId] || 1);
+  const safeTier = Math.max(1, Math.floor(Number(tier) || 1));
+  state.player[targetKey][baseId] = Math.max(current, safeTier);
+}
+
+function getRememberedBattleJobTier(slotKey, baseId) {
+  if (!baseId) {
+    return 1;
+  }
+  ensureJobTierMemoryState();
+  const targetKey = slotKey === "sub" ? "subJobTierByBaseId" : "mainJobTierByBaseId";
+  return Math.max(1, Math.floor(Number(state.player[targetKey][baseId] || 1)));
+}
+
 const LOG_CATEGORIES = ["battle", "title", "craft", "board", "loop", "important", "world", "announce", "machine", "otherworld", "system"];
 const LOG_CATEGORY_LABELS = {
   all: "すべて",
@@ -6510,11 +6547,13 @@ const state = {
     mainJobBaseId: null,
     mainJobTier: 1,
     mainJobCurrentId: null,
+    mainJobTierByBaseId: {},
     subJobId: null,
     subJob: null,
     subJobBaseId: null,
     subJobTier: 1,
     subJobCurrentId: null,
+    subJobTierByBaseId: {},
     subJobUnlocked: false,
     productionJob: "apothecary",
     productionJobBaseId: "apothecary",
@@ -9753,6 +9792,7 @@ function syncMainJobState(baseId, tier = 1, currentId = null, resetBaseStats = f
   if (!baseData) {
     return;
   }
+  ensureJobTierMemoryState();
   const lineId = baseData.baseLineId;
   const safeTier = Math.max(1, Number(tier) || 1);
   const resolvedCurrentId = currentId || getJobIdByTier(lineId, safeTier) || baseId;
@@ -9762,6 +9802,7 @@ function syncMainJobState(baseId, tier = 1, currentId = null, resetBaseStats = f
   state.player.mainJobCurrentId = currentJob.id;
   state.player.mainJobId = currentJob.id;
   state.player.mainJob = currentJob.nameJa || currentJob.name || currentJob.id;
+  recordBattleJobTierProgress("main", baseId, safeTier);
   unlockBattleSkillsThroughTier(lineId, safeTier);
   if (resetBaseStats) {
     const baseStats = JOB_DATA.main[baseId]?.baseStats;
@@ -9782,6 +9823,7 @@ function syncMainJobState(baseId, tier = 1, currentId = null, resetBaseStats = f
 }
 
 function syncSubJobState(baseId, tier = 1, currentId = null) {
+  ensureJobTierMemoryState();
   if (!baseId) {
     state.player.subJobBaseId = null;
     state.player.subJobTier = 1;
@@ -9803,6 +9845,7 @@ function syncSubJobState(baseId, tier = 1, currentId = null) {
   state.player.subJobCurrentId = currentJob.id;
   state.player.subJobId = currentJob.id;
   state.player.subJob = currentJob.nameJa || currentJob.name || currentJob.id;
+  recordBattleJobTierProgress("sub", baseId, safeTier);
   unlockBattleSkillsThroughTier(lineId, safeTier);
 }
 
@@ -9854,6 +9897,7 @@ function initializeJobEvolutionState(options = {}) {
   const silent = !!options.silent;
   ensureUnlockedSkillsState();
   ensureJobEvolutionFlags();
+  ensureJobTierMemoryState();
 
   if (state.player.mainJobId) {
     const currentMain = getJobDataById(state.player.mainJobCurrentId || state.player.mainJobId) || getJobDataById(state.player.mainJobId);
@@ -13936,13 +13980,15 @@ function selectMainJobFromTemple(jobId) {
   if (!job) {
     return;
   }
-  syncMainJobState(job.id, 1, job.id, true);
-  initializeJobEvolutionState({ silent: true });
   const mainLineId = getJobDataById(job.id)?.baseLineId;
+  const restoredTier = getRememberedBattleJobTier("main", job.id);
+  const restoredJobId = getJobIdByTier(mainLineId, restoredTier) || job.id;
+  syncMainJobState(job.id, restoredTier, restoredJobId, false);
+  initializeJobEvolutionState({ silent: true });
   state.player.equippedSkills = getUnlockedSkillIdsForLine(mainLineId).slice(0, 4);
   recalculateTitleEffects();
   refreshPlayerDerivedStats();
-  addLog(`神殿: メインジョブを ${job.name} に変更しました。進化段階は1に初期化されます。`);
+  addLog(`神殿: メインジョブを ${job.name} に変更しました。進化段階 Tier${restoredTier} を復元しました。`);
   render();
 }
 
@@ -13982,10 +14028,13 @@ function selectSubJob(jobId) {
   if (!job) {
     return;
   }
-  syncSubJobState(job.id, 1, job.id);
+  const subLineId = getJobDataById(job.id)?.baseLineId;
+  const restoredTier = getRememberedBattleJobTier("sub", job.id);
+  const restoredJobId = getJobIdByTier(subLineId, restoredTier) || job.id;
+  syncSubJobState(job.id, restoredTier, restoredJobId);
   refreshJobEvolutionFlags();
   refreshPlayerDerivedStats();
-  addLog(`神殿: サブジョブを ${job.name} に設定しました。進化段階は1です。`);
+  addLog(`神殿: サブジョブを ${job.name} に設定しました。進化段階 Tier${restoredTier} を復元しました。`);
   render();
 }
 
@@ -16159,6 +16208,7 @@ function applyLoadedState(payload) {
   state.board = { ...state.board, ...(run.board || {}) };
   state.guild = { ...state.guild, ...(run.guild || {}) };
   state.player = { ...state.player, ...(run.player || {}) };
+  ensureJobTierMemoryState();
   state.stats = { ...state.stats, ...(run.stats || {}) };
   if (typeof state.stats.noReturnExpeditionActive !== "boolean") state.stats.noReturnExpeditionActive = true;
   if (!state.stats.noReturnRegionClears || typeof state.stats.noReturnRegionClears !== "object") state.stats.noReturnRegionClears = {};
@@ -18020,11 +18070,13 @@ function resetForNewLoop() {
   state.player.gold = 100;
   state.player.mainJobTier = 1;
   state.player.mainJobCurrentId = state.player.mainJobBaseId || state.player.mainJobId || null;
+  state.player.mainJobTierByBaseId = {};
   state.player.subJobId = null;
   state.player.subJob = null;
   state.player.subJobBaseId = null;
   state.player.subJobTier = 1;
   state.player.subJobCurrentId = null;
+  state.player.subJobTierByBaseId = {};
   state.player.subJobUnlocked = false;
   state.player.equipmentEnhancements = {};
   syncEquipmentEnhancementCache();
