@@ -2177,7 +2177,7 @@ const ADVENTURE_REGION_BALANCE_CONFIG = {
       dataEater: { hp: 0.88, attack: 1.22, defense: 1.12, speed: 1.18, intelligence: 1.28, luck: 1.12 },
       guardianArm: { hp: 1.12, attack: 1.3, defense: 1.42, speed: 0.92, intelligence: 1.1, luck: 1.04 },
       overloadFrame: { hp: 1.18, attack: 1.36, defense: 1.4, speed: 0.95, intelligence: 1.14, luck: 1.06 },
-      protocol3: { hp: 1.05, attack: 1.38, defense: 1.45, speed: 1.16, intelligence: 1.18, luck: 1.1 }
+      protocol3: { hp: 1.02, attack: 1.24, defense: 0.42, speed: 1.12, intelligence: 1.16, luck: 1.1 }
     }
   },
   otherworld: {
@@ -2529,7 +2529,7 @@ const ENEMY_DATA = {
   hollowEnforcer: enemyTemplate({ id: "hollowEnforcer", name: "ホロウ・エンフォーサー", species: "machine", region: "neverend", rarity: "elite", hp: 2700, attack: 720, defense: 500, speed: 84, intelligence: 110, luck: 36, exp: 4000, gold: 4450 }),
   signalCore: enemyTemplate({ id: "signalCore", name: "シグナル・コア", species: "machine", region: "neverend", rarity: "elite", hp: 2500, attack: 760, defense: 480, speed: 90, intelligence: 136, luck: 42, exp: 4100, gold: 4600 }),
   overloadFrame: enemyTemplate({ id: "overloadFrame", name: "オーバーロード・フレーム", species: "machine", region: "neverend", rarity: "elite", hp: 3800, attack: 820, defense: 660, speed: 72, intelligence: 120, luck: 40, exp: 6200, gold: 7000, aiType: "boss" }),
-  protocol3: enemyTemplate({ id: "protocol3", name: "Protocol3", species: "machineBoss", region: "neverend", rarity: "fieldBoss", hp: 9800, attack: 980, defense: 900, speed: 128, intelligence: 156, luck: 54, exp: 22000, gold: 26000, aiType: "boss" }),
+  protocol3: enemyTemplate({ id: "protocol3", name: "Protocol3", species: "machineBoss", region: "neverend", rarity: "fieldBoss", hp: 9200, attack: 920, defense: 320, speed: 124, intelligence: 156, luck: 54, exp: 22000, gold: 26000, aiType: "boss" }),
 
   riftGnawer: enemyTemplate({ id: "riftGnawer", name: "歪み喰らい", species: "otherworld", region: "otherworld", hp: 6200, attack: 1180, defense: 760, speed: 132, intelligence: 150, luck: 62, exp: 18000, gold: 15000 }),
   hollowWalker: enemyTemplate({ id: "hollowWalker", name: "虚ろ歩き", species: "otherworld", region: "otherworld", hp: 7000, attack: 1120, defense: 860, speed: 120, intelligence: 142, luck: 60, exp: 19000, gold: 16000 }),
@@ -9087,10 +9087,10 @@ function enemyActionProtocol3() {
   const hpRate = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
   if (!extra.protocol3Rage && hpRate <= 0.3) {
     extra.protocol3Rage = true;
-    enemy.attack = Math.floor(extra.protocol3BaseAttack * 1.62);
-    enemy.speed = Math.floor(extra.protocol3BaseSpeed * 1.25);
-    enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.72);
-    extra.protocol3DamageTakenMultiplier = 1.36;
+    enemy.attack = Math.floor(extra.protocol3BaseAttack * 1.48);
+    enemy.speed = Math.floor(extra.protocol3BaseSpeed * 1.2);
+    enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.68);
+    extra.protocol3DamageTakenMultiplier = 1.42;
     addLog("Protocol3 が激怒状態へ移行。火力が激増し、装甲が脆化した。");
     refreshSceneBgm({ force: true, useFade: true });
   }
@@ -9111,7 +9111,7 @@ function enemyActionProtocol3() {
   ];
   const action = weightedPick(enraged ? enragedActions : normalActions)?.id || "tri_burst";
   if (action === "armor_deploy") {
-    enemy.defense = Math.min(Math.floor(extra.protocol3BaseDefense * 1.42), Math.floor(enemy.defense * 1.18));
+    enemy.defense = Math.min(Math.floor(extra.protocol3BaseDefense * 1.2), Math.floor(enemy.defense * 1.1));
     addLog("Protocol3: 装甲展開（防御上昇）");
     return;
   }
@@ -9140,7 +9140,7 @@ function enemyActionProtocol3() {
     return;
   }
   if (action === "pulse_cannon") {
-    protocol3Strike({ label: "パルスキャノン", hits: 1, power: 1.52, critBonus: 0.08 });
+    protocol3Strike({ label: "パルスキャノン", hits: 1, power: 1.42, critBonus: 0.08 });
     return;
   }
   if (action === "break_burst") {
@@ -9148,7 +9148,7 @@ function enemyActionProtocol3() {
     return;
   }
   if (action === "ignition") {
-    protocol3Strike({ label: "プロトコル・イグニッション", hits: 1, power: 2.2, critBonus: 0.18 });
+    protocol3Strike({ label: "プロトコル・イグニッション", hits: 1, power: 2.02, critBonus: 0.16 });
     return;
   }
   protocol3Strike({ label: "トライバースト", hits: 3, power: 0.82, critBonus: 0.1 });
