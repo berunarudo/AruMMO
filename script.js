@@ -6768,7 +6768,9 @@ const state = {
     systemSubTab: "save",
     titleCatalogSummaryCollapsed: false,
     profileNameEditMode: false,
-    profilePendingName: ""
+    profilePendingName: "",
+    mobileLogOpen: false,
+    boardMobileDetailOpen: false
   },
   titleRuntime: {
     reviveBuffPending: false,
@@ -7683,11 +7685,18 @@ const SCROLL_PRESERVE_SELECTORS = [
   "#main-view",
   ".shop-grid",
   ".title-grid",
+  ".inventory-grid",
+  ".quest-grid",
+  ".stage-grid",
   ".board-thread-list",
   ".board-post-list",
   ".carry-grid",
   ".log-list"
 ];
+
+function isMobileLayout() {
+  return window.innerWidth <= 768;
+}
 
 function captureScrollablePositions() {
   return SCROLL_PRESERVE_SELECTORS.flatMap((selector) =>
@@ -7881,8 +7890,13 @@ function chooseMainJob(jobId) {
 
 function renderGameScreen() {
   applyLoopUnlocks();
+  if (!isMobileLayout()) {
+    state.ui.mobileLogOpen = false;
+    state.ui.boardMobileDetailOpen = false;
+  }
+  const mobileLogOpenClass = state.ui.mobileLogOpen ? "mobile-log-open" : "";
   app.innerHTML = `
-    <section class="game-layout-wrap">
+    <section class="game-layout-wrap ${mobileLogOpenClass}">
       ${renderTopBar()}
       ${renderNotifications()}
 
@@ -7900,6 +7914,7 @@ function renderGameScreen() {
           ${MAIN_TABS.map((tab) => `<button class="btn tab-btn ${state.currentTab === tab.id ? "active" : ""}" data-tab-id="${tab.id}">${tab.label}</button>`).join("")}
         </nav>
       </section>
+      <button id="mobile-log-toggle-btn" class="btn mobile-log-toggle-btn" aria-expanded="${state.ui.mobileLogOpen ? "true" : "false"}">${state.ui.mobileLogOpen ? "ログを閉じる" : "ログを開く"}</button>
 
       <div id="title-unlock-popup" class="title-popup"></div>
       <div id="battle-special-popup" class="title-popup special-popup"></div>
@@ -16395,6 +16410,9 @@ function renderBoardThreadDetail(threadId) {
     .join("");
   return `
     <div class="card board-thread-view">
+      <div class="board-mobile-actions">
+        <button class="btn mobile-board-back-btn">スレ一覧へ</button>
+      </div>
       <h4>${escapeHtml(thread.title)}</h4>
       <div class="board-thread-info tiny">
         <span>カテゴリ: ${escapeHtml(cat)}</span>
@@ -16419,13 +16437,14 @@ function renderBoardView(container) {
 }
 
 function renderBoardLayout(selectedId) {
+  const boardLayoutClass = state.ui.boardMobileDetailOpen ? "detail-open" : "";
   return `
     <div class="main-header">
       <h2>掲示板</h2>
       <span class="tiny">スレッド ${(state.board.unlockedThreadIds || []).length} / 閲覧 ${state.stats.boardViewedCount} / 未読 ${(state.board.newThreadIds || []).length}</span>
     </div>
     ${renderBoardCategories()}
-    <div class="board-layout">
+    <div class="board-layout ${boardLayoutClass}">
       ${renderBoardThreadList(state.board.threads)}
       ${renderBoardThreadDetail(selectedId)}
     </div>
@@ -16440,6 +16459,9 @@ function openBoardThread(threadId) {
     pushNavigationHistory();
   }
   state.board.selectedThreadId = threadId;
+  if (isMobileLayout()) {
+    state.ui.boardMobileDetailOpen = true;
+  }
   state.stats.threadOpenedCounts[threadId] = (state.stats.threadOpenedCounts[threadId] || 0) + 1;
   state.stats.boardViewedCount += 1;
   markThreadAsRead(threadId);
@@ -17473,7 +17495,9 @@ function splitRunAndPersistentState() {
       helpOpen: state.ui.helpOpen,
       topHudCollapsed: state.ui.topHudCollapsed,
       lastMainTab: state.ui.lastMainTab,
-      systemSubTab: state.ui.systemSubTab
+      systemSubTab: state.ui.systemSubTab,
+      mobileLogOpen: !!state.ui.mobileLogOpen,
+      boardMobileDetailOpen: !!state.ui.boardMobileDetailOpen
     }
   };
   return { runState, persistentState, settingsState };
@@ -17747,6 +17771,8 @@ function applyLoadedState(payload) {
   state.ui.topHudCollapsed = settings.ui?.topHudCollapsed ?? state.ui.topHudCollapsed;
   state.ui.lastMainTab = settings.ui?.lastMainTab || state.ui.lastMainTab;
   state.ui.systemSubTab = settings.ui?.systemSubTab || state.ui.systemSubTab;
+  state.ui.mobileLogOpen = settings.ui?.mobileLogOpen ?? state.ui.mobileLogOpen;
+  state.ui.boardMobileDetailOpen = settings.ui?.boardMobileDetailOpen ?? state.ui.boardMobileDetailOpen;
   syncEquipmentEnhancementCache();
 
   stopBattleLoop();
@@ -18280,6 +18306,13 @@ function handleSecondTick() {
 }
 
 function bindGameEvents() {
+  const mobileLogToggleBtn = document.getElementById("mobile-log-toggle-btn");
+  if (mobileLogToggleBtn) {
+    mobileLogToggleBtn.addEventListener("click", () => {
+      state.ui.mobileLogOpen = !state.ui.mobileLogOpen;
+      renderPreservingWindowScroll();
+    });
+  }
   const timerBtn = document.getElementById("timer-button");
   if (timerBtn) {
     timerBtn.addEventListener("click", handleTimerClick);
@@ -18353,6 +18386,7 @@ function bindGameEvents() {
       if (state.ui.helpOpen) {
         closeHelpPanel(false);
       }
+      state.ui.mobileLogOpen = false;
       state.ui.lastMainTab = tabId;
       pushNavigationHistory();
       state.currentTab = tabId;
@@ -18368,6 +18402,8 @@ function bindGameEvents() {
       if (tabId === "board") {
         state.stats.boardViewedCount += 1;
         checkTitleUnlocks("afterBoardView");
+      } else {
+        state.ui.boardMobileDetailOpen = false;
       }
       addLog(`メインメニュー切替: ${tabLabel(tabId)}`);
       render();
@@ -18615,6 +18651,12 @@ function bindGameEvents() {
       });
     }
     document.querySelectorAll(".board-thread-btn").forEach((btn) => btn.addEventListener("click", () => openBoardThread(btn.dataset.threadId)));
+    document.querySelectorAll(".mobile-board-back-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        state.ui.boardMobileDetailOpen = false;
+        renderPreservingWindowScroll();
+      })
+    );
   }
 
   if (state.currentTab === "status") {
@@ -19974,6 +20016,8 @@ function bootstrapStoredPreferences() {
     state.ui.topHudCollapsed = settings.ui.topHudCollapsed ?? state.ui.topHudCollapsed;
     state.ui.lastMainTab = settings.ui.lastMainTab || state.ui.lastMainTab;
     state.ui.systemSubTab = settings.ui.systemSubTab || state.ui.systemSubTab;
+    state.ui.mobileLogOpen = settings.ui.mobileLogOpen ?? state.ui.mobileLogOpen;
+    state.ui.boardMobileDetailOpen = settings.ui.boardMobileDetailOpen ?? state.ui.boardMobileDetailOpen;
   }
   const persistent = safeLoadJson(STORAGE_KEYS.PERSISTENT);
   if (persistent?.loop?.persistentStats) {

@@ -1040,6 +1040,15 @@ body {
   background: linear-gradient(180deg, #475569, #334155);
 }
 
+.mobile-log-toggle-btn {
+  display: none;
+}
+
+.board-mobile-actions {
+  display: none;
+  margin-bottom: 8px;
+}
+
 .tiny {
   font-size: 0.86rem;
   color: var(--text-sub);
@@ -1099,5 +1108,250 @@ body {
   .board-layout,
   .carry-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  #app {
+    align-items: stretch;
+    padding: 8px;
+  }
+
+  .game-layout-wrap {
+    width: 100%;
+    padding-bottom: 76px;
+  }
+
+  .screen {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .hud-top {
+    gap: 10px;
+  }
+
+  .hud-actions {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .hud-actions .btn {
+    min-height: 44px;
+  }
+
+  .hud-stats {
+    gap: 7px 10px;
+  }
+
+  .hud-item {
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .main-panel {
+    min-height: 56vh;
+    padding: 10px;
+  }
+
+  .main-view {
+    padding-right: 0;
+    padding-bottom: 12px;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    gap: 10px;
+    min-height: 78vh;
+  }
+
+  .log-panel {
+    display: none;
+  }
+
+  .mobile-log-toggle-btn {
+    display: inline-flex;
+    position: fixed;
+    right: 10px;
+    bottom: 86px;
+    z-index: 24;
+    min-height: 44px;
+    min-width: 96px;
+    align-items: center;
+    justify-content: center;
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .game-layout-wrap.mobile-log-open .log-panel {
+    display: flex;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 140px;
+    max-height: 52vh;
+    z-index: 23;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+    border-width: 2px;
+  }
+
+  .game-layout-wrap.mobile-log-open .mobile-log-toggle-btn {
+    background: linear-gradient(180deg, #b45309 0%, #92400e 100%);
+  }
+
+  .log-toolbar {
+    gap: 8px;
+  }
+
+  .log-list {
+    font-size: 0.9rem;
+    line-height: 1.45;
+    max-height: 40vh;
+  }
+
+  .bottom-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 22;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+    background: rgba(15, 23, 42, 0.97);
+  }
+
+  .tab-btn {
+    min-height: 46px;
+    font-size: 0.95rem;
+    padding: 10px 8px;
+  }
+
+  .btn {
+    min-height: 44px;
+    font-size: 0.95rem;
+    padding: 10px 12px;
+  }
+
+  .main-header h2 {
+    margin: 0;
+    font-size: 1.12rem;
+  }
+
+  .panel-title {
+    font-size: 1rem;
+  }
+
+  .status-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .board-layout {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .board-mobile-actions {
+    display: block;
+  }
+
+  .board-layout.detail-open .board-thread-list {
+    display: none;
+  }
+
+  .board-layout:not(.detail-open) .board-thread-view {
+    display: none;
+  }
+
+  .board-thread-list {
+    max-height: 50vh;
+    padding-right: 0;
+  }
+
+  .board-post-list {
+    max-height: 48vh;
+    padding-right: 0;
+  }
+
+  .board-post {
+    padding: 10px;
+  }
+
+  .shop-card,
+  .quest-card,
+  .title-card,
+  .skill-card,
+  .auto-item-card,
+  .card {
+    padding: 11px;
+  }
+
+  .battle-top-info p {
+    margin: 6px 0;
+    font-size: 0.95rem;
+  }
+
+  .battle-grid {
+    gap: 8px;
+  }
+
+  .battle-skill-grid,
+  .battle-auto-item-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .skill-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-effect-chip {
+    font-size: 0.8rem;
+  }
+
+  .roulette-number-btn {
+    min-height: 48px;
+    min-width: 52px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  #roulette-spin-btn,
+  #vip-spin-btn,
+  .shop-buy-btn,
+  .shop-sell-btn,
+  .auction-buy-chip-btn,
+  .auction-sell-chip-btn,
+  .casino-buy-chip-btn,
+  .casino-sell-chip-btn,
+  .title-toggle-btn,
+  .display-title-set-btn,
+  .equip-item-btn,
+  .unequip-btn,
+  .enhance-btn,
+  .craft-btn,
+  .craft-batch-btn {
+    min-height: 44px;
+  }
+
+  .title-search-input,
+  .title-sort-select {
+    min-height: 42px;
+    font-size: 0.95rem;
+  }
+
+  .town-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
