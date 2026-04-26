@@ -5861,8 +5861,27 @@ function ensureJobTierMemoryState() {
     });
     return normalized;
   };
-  state.player.mainJobTierByBaseId = normalizeTierMap(state.player.mainJobTierByBaseId);
-  state.player.subJobTierByBaseId = normalizeTierMap(state.player.subJobTierByBaseId);
+  const legacyMain = normalizeTierMap(state.player.mainJobTierByBaseId);
+  const legacySub = normalizeTierMap(state.player.subJobTierByBaseId);
+  const shared = normalizeTierMap(state.player.battleJobTierByBaseId);
+  const merged = { ...shared };
+  Object.keys(legacyMain).forEach((jobId) => {
+    merged[jobId] = Math.max(merged[jobId] || 1, legacyMain[jobId]);
+  });
+  Object.keys(legacySub).forEach((jobId) => {
+    merged[jobId] = Math.max(merged[jobId] || 1, legacySub[jobId]);
+  });
+  const currentMainBaseId = state.player.mainJobBaseId;
+  if (currentMainBaseId) {
+    merged[currentMainBaseId] = Math.max(merged[currentMainBaseId] || 1, Math.max(1, Math.floor(Number(state.player.mainJobTier || 1))));
+  }
+  const currentSubBaseId = state.player.subJobBaseId;
+  if (currentSubBaseId) {
+    merged[currentSubBaseId] = Math.max(merged[currentSubBaseId] || 1, Math.max(1, Math.floor(Number(state.player.subJobTier || 1))));
+  }
+  state.player.battleJobTierByBaseId = merged;
+  state.player.mainJobTierByBaseId = { ...merged };
+  state.player.subJobTierByBaseId = { ...merged };
 }
 
 function recordBattleJobTierProgress(slotKey, baseId, tier) {
@@ -5870,10 +5889,12 @@ function recordBattleJobTierProgress(slotKey, baseId, tier) {
     return;
   }
   ensureJobTierMemoryState();
-  const targetKey = slotKey === "sub" ? "subJobTierByBaseId" : "mainJobTierByBaseId";
-  const current = Number(state.player[targetKey][baseId] || 1);
   const safeTier = Math.max(1, Math.floor(Number(tier) || 1));
-  state.player[targetKey][baseId] = Math.max(current, safeTier);
+  const current = Number(state.player.battleJobTierByBaseId[baseId] || 1);
+  const nextTier = Math.max(current, safeTier);
+  state.player.battleJobTierByBaseId[baseId] = nextTier;
+  state.player.mainJobTierByBaseId[baseId] = nextTier;
+  state.player.subJobTierByBaseId[baseId] = nextTier;
 }
 
 function getRememberedBattleJobTier(slotKey, baseId) {
@@ -5881,8 +5902,7 @@ function getRememberedBattleJobTier(slotKey, baseId) {
     return 1;
   }
   ensureJobTierMemoryState();
-  const targetKey = slotKey === "sub" ? "subJobTierByBaseId" : "mainJobTierByBaseId";
-  return Math.max(1, Math.floor(Number(state.player[targetKey][baseId] || 1)));
+  return Math.max(1, Math.floor(Number(state.player.battleJobTierByBaseId[baseId] || 1)));
 }
 
 const LOG_CATEGORIES = ["battle", "title", "craft", "board", "loop", "important", "world", "announce", "machine", "otherworld", "system"];
@@ -6547,6 +6567,7 @@ const state = {
     mainJobBaseId: null,
     mainJobTier: 1,
     mainJobCurrentId: null,
+    battleJobTierByBaseId: {},
     mainJobTierByBaseId: {},
     subJobId: null,
     subJob: null,
@@ -18070,6 +18091,7 @@ function resetForNewLoop() {
   state.player.gold = 100;
   state.player.mainJobTier = 1;
   state.player.mainJobCurrentId = state.player.mainJobBaseId || state.player.mainJobId || null;
+  state.player.battleJobTierByBaseId = {};
   state.player.mainJobTierByBaseId = {};
   state.player.subJobId = null;
   state.player.subJob = null;
