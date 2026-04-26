@@ -13781,7 +13781,7 @@ function enhanceItem(itemId) {
   }
   checkProductionRelatedTitles();
   refreshPlayerDerivedStats();
-  render();
+  renderPreservingWindowScroll();
 }
 
 function enhanceEquipment(itemId) {
