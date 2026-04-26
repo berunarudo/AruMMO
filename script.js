@@ -158,9 +158,78 @@ function hasTitleUnlocked(titleId) {
 }
 
 function getPlayerLevelCap() {
-  if (hasTitleUnlocked("protagonist")) return OTHERWORLD_UNLOCK_RULES.protagonistLevelCap;
+  if (hasTitleUnlocked("protagonist") || state.hasProtagonistTitle) return OTHERWORLD_UNLOCK_RULES.protagonistLevelCap;
   if (hasTitleUnlocked("acknowledged_by_king") || (state.otherworldLevelCapBonus || 0) >= 100) return OTHERWORLD_UNLOCK_RULES.kingRecognizedLevelCap;
   return OTHERWORLD_UNLOCK_RULES.defaultLevelCap;
+}
+
+function isMainJobFinalTier() {
+  const tier = Number(state.player.mainJobTier || 1);
+  return tier >= 5;
+}
+
+function getTotalRouletteSpins() {
+  return Number(state.rouletteStats?.spins || 0) + Number(state.rouletteStats?.vipSpins || 0);
+}
+
+function getTotalRouletteWins() {
+  return Number(state.rouletteStats?.wins || 0) + Number(state.rouletteStats?.vipWins || 0);
+}
+
+const TRIPLE_ATTACK_ENEMY_IDS = new Set([
+  "metalHound",
+  "bladeWorker",
+  "overloadFrame",
+  "protocol3",
+  "awakenedProtocol3",
+  "otherworldKing"
+]);
+
+const RAGE_BOSS_IDS = new Set([
+  "volkazard",
+  "volkazardInferno",
+  "protocol3",
+  "awakenedProtocol3",
+  "otherworldKing",
+  "awakenedBehemothBison",
+  "awakenedDuneHydra",
+  "awakenedLeviathan",
+  "awakenedVolkazard"
+]);
+
+function isTripleAttackEnemy(enemy) {
+  const id = typeof enemy === "string" ? enemy : enemy?.id;
+  return TRIPLE_ATTACK_ENEMY_IDS.has(id);
+}
+
+function isRageBossEnemy(enemy) {
+  const id = typeof enemy === "string" ? enemy : enemy?.id;
+  return RAGE_BOSS_IDS.has(id);
+}
+
+function isMechanicalEnemy(enemy) {
+  const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
+  if (!e) return false;
+  const species = String(e.species || "").toLowerCase();
+  return species.includes("machine") || e.region === "neverend";
+}
+
+function isGlassCannonEnemy(enemy) {
+  const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
+  if (!e) return false;
+  return (Number(e.maxHp || e.hp || 0) <= 12000 && Number(e.attack || 0) >= 1000) || ["plasmaCore", "collapseEye", "lifelineReaper"].includes(e.id);
+}
+
+function isHighDifficultyStage(stage = STAGE_DATA[state.battle?.stageId]) {
+  if (!stage) return false;
+  if (stage.loopChallengeId || stage.finalContentId) return true;
+  if (!stage.isFieldBossStage) return false;
+  return ["neverend", "otherworld"].includes(stage.mapId) || ["4-10", "5-10", "6-6", "6-7", "6-8", "6-9", "6-10"].includes(stage.id);
+}
+
+function isEnemyEnragedState() {
+  const extra = state.battle?.gimmick?.extra || {};
+  return !!(extra.protocol3Rage || extra.kingPhase2 || (state.battle?.gimmick?.triggered && state.battle?.isFieldBossBattle));
 }
 
 function canPlayerStayAtOneHpInOtherworldKingBattle() {
@@ -188,7 +257,8 @@ function createDefaultAuctionRefreshState() {
   return {
     seed: 1,
     lastRefreshAt: 0,
-    refreshCount: 0
+    refreshCount: 0,
+    bargainAuctionId: null
   };
 }
 
@@ -2919,10 +2989,66 @@ const UNIQUE_TITLES = [
   { id: "god_slayer", name: "神殺し", conditionDescription: "ユニーク7体を全撃破", effectDescription: "全能力+25%/ユニーク特攻+50%/遭遇率上昇", effect: { allStatsMultiplier: 0.25, damageToUnique: 0.5, uniqueEncounterRateBonus: 0.004 }, trigger: ["afterUniqueKill"], isHidden: true }
 ];
 
+const OTHERWORLD_TITLES = [
+  {
+    id: "acknowledged_by_king",
+    name: "王に認められた者",
+    category: "cheat",
+    description: "異界の王に退けられ、それでも進む者",
+    conditionDescription: "異界の王に初めて敗北",
+    effectDescription: "レベル上限が300になる",
+    effect: {},
+    trigger: ["afterDefeat"],
+    isHidden: true,
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "never_give_up",
+    name: "諦めないもの",
+    category: "cheat",
+    description: "何度倒れても挑み続ける者",
+    conditionDescription: "異界の王に10回敗北",
+    effectDescription: "称号枠(N/C)を各+10",
+    effect: {},
+    trigger: ["afterDefeat"],
+    isHidden: true,
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "fate_redeemer",
+    name: "運命に贖う者",
+    category: "cheat",
+    description: "敗北の蓄積で運命そのものを侵す者",
+    conditionDescription: "異界の王に100回敗北",
+    effectDescription: "異界の王戦でHP1踏みとどまり / 運命侵食ダメージ解放",
+    effect: {},
+    trigger: ["afterDefeat"],
+    isHidden: true,
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "protagonist",
+    name: "主人公",
+    category: "cheat",
+    description: "異界の王を討ち、結末を書き換えた者",
+    conditionDescription: "異界の王を撃破",
+    effectDescription: "すべての限界解放",
+    effect: {},
+    trigger: ["afterFieldBossClear"],
+    isHidden: true,
+    canCarryOver: true,
+    carryOverType: "direct"
+  }
+];
+
 const TITLE_DATA = [
   ...NORMAL_TITLES.map((t) => ({ category: "normal", description: t.name, isHidden: false, canCarryOver: false, carryOverType: "recordOnly", ...t })),
   ...CHEAT_TITLES.map((t) => ({ category: "cheat", description: t.name, isHidden: false, canCarryOver: true, carryOverType: "direct", ...t })),
-  ...UNIQUE_TITLES.map((t) => ({ category: "cheat", description: t.name, isHidden: false, canCarryOver: true, carryOverType: "direct", ...t }))
+  ...UNIQUE_TITLES.map((t) => ({ category: "cheat", description: t.name, isHidden: false, canCarryOver: true, carryOverType: "direct", ...t })),
+  ...OTHERWORLD_TITLES
 ];
 
 const TITLE_CHECKERS = {
@@ -3015,7 +3141,12 @@ const TITLE_CHECKERS = {
   unique_minotauros: () => state.uniqueDefeatedIds.includes("minotauros"),
   unique_phoenix: () => state.uniqueDefeatedIds.includes("phoenix"),
   unique_kirin: () => state.uniqueDefeatedIds.includes("kirin"),
-  god_slayer: () => ["fenrir", "jormungand", "cerberus", "griffon", "minotauros", "phoenix", "kirin"].every((id) => state.uniqueDefeatedIds.includes(id))
+  god_slayer: () => ["fenrir", "jormungand", "cerberus", "griffon", "minotauros", "phoenix", "kirin"].every((id) => state.uniqueDefeatedIds.includes(id)),
+
+  acknowledged_by_king: () => !!state.otherworldKingFirstDefeatRewardClaimed,
+  never_give_up: () => !!state.otherworldKingTenDefeatRewardClaimed,
+  fate_redeemer: () => !!state.otherworldKingHundredDefeatRewardClaimed,
+  protagonist: () => !!state.otherworldKingCleared || !!state.hasProtagonistTitle
 };
 
 const PHASE10_TITLES = [
@@ -3864,6 +3995,312 @@ Object.assign(TITLE_CHECKERS, {
   wall_ready: () => state.fieldBossCleared.includes("2-10") && (state.stats.winsByRegion?.sea || 0) >= 200
 });
 
+const PHASE17_FINAL_CLASS_CHEAT_TITLES = [
+  {
+    id: "cheat_gamble_king",
+    name: "イカサマの王",
+    category: "cheat",
+    description: "運ではなく仕組みの穴を握る者",
+    conditionDescription: "ルーレット+VIP 100回 / 累計100万チップ獲得",
+    effectDescription: "当選率微上昇 / 最低配当保証 / チップ獲得+25%",
+    effect: { gambleHitChanceBonus: 0.02, gambleMinPayoutMultiplier: 1.0, chipGainMultiplier: 0.25 },
+    trigger: ["afterCasinoPlay"],
+    customCheckerId: "cheat_gamble_king",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_gold_law_breaker",
+    name: "黄金律破壊者",
+    category: "cheat",
+    description: "金の流れを書き換える金策怪物",
+    conditionDescription: "累計1000万GOLD獲得",
+    effectDescription: "戦闘後GOLD+35% / 売却+20% / オークション売却+25%",
+    effect: { goldMultiplier: 0.35, sellPriceMultiplier: 0.2, auctionSellPriceMultiplier: 0.25 },
+    trigger: ["afterBattle", "afterShopTrade"],
+    customCheckerId: "cheat_gold_law_breaker",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_exp_usurper",
+    name: "経験値の簒奪者",
+    category: "cheat",
+    description: "育成効率を塗り潰す周回特化者",
+    conditionDescription: "Lv/累計戦闘/ボス撃破の複合達成",
+    effectDescription: "経験値+30% / ボス撃破EXP+20% / 倍速時EXP+10%",
+    effect: { expMultiplier: 0.3, bossExpMultiplier: 0.2, speedModeBonus: { expMultiplier: 0.1, minSpeed: 1.5 } },
+    trigger: ["afterBattle", "afterFieldBossClear", "afterLevelUp"],
+    customCheckerId: "cheat_exp_usurper",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_final_job_overlord",
+    name: "最終職の支配者",
+    category: "cheat",
+    description: "最終職で高難易度を踏み潰した者",
+    conditionDescription: "メイン最終段階 + 高難易度ボス20体撃破",
+    effectDescription: "メイン補正+25% / 最終段階スキル威力+20% / 回転率+10%",
+    effect: { finalJobAllStatsMultiplier: 0.25, finalJobSkillDamageBonus: 0.2, finalJobSkillCooldownRecovery: 0.1 },
+    trigger: ["afterBattle", "afterEnhancedBossClear", "afterFieldBossClear"],
+    customCheckerId: "cheat_final_job_overlord",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_fate_rewriter",
+    name: "運命改竄者",
+    category: "cheat",
+    description: "確率そのものへ干渉する最終やり込み者",
+    conditionDescription: "ギャンブル/オークション/ボス/ユニークの複合達成",
+    effectDescription: "会心+10% / 回避+10% / 抽選系微補正 / 戦闘開始時ランダム強化",
+    effect: {
+      critRateBonus: 0.1,
+      evadeByRegion: { grassland: 0.1, desert: 0.1, sea: 0.1, volcano: 0.1, neverend: 0.1, otherworld: 0.1, final: 0.1 },
+      uniqueEncounterRateBonus: 0.002,
+      gambleHitChanceBonus: 0.015,
+      randomBattleStartBuff: { durationSec: 16, power: 0.2 }
+    },
+    trigger: ["afterBattle", "afterCasinoPlay", "afterShopTrade", "afterUniqueKill", "afterFieldBossClear"],
+    customCheckerId: "cheat_fate_rewriter",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  }
+];
+
+const PHASE17_FINAL_CLASS_NORMAL_TITLES = [
+  {
+    id: "normal_auction_appraiser",
+    name: "目利きの達人",
+    category: "normal",
+    description: "取引の妙を知る実務商人",
+    conditionDescription: "オークション高額取引を20回",
+    effectDescription: "ショップ売値+10% / オークション売却+10%",
+    effect: { sellPriceMultiplier: 0.1, auctionSellPriceMultiplier: 0.1 },
+    trigger: ["afterShopTrade"],
+    customCheckerId: "normal_auction_appraiser",
+    tier: "epic",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "normal_money_maker",
+    name: "稼ぎ頭",
+    category: "normal",
+    description: "終盤まで腐らない実直金策家",
+    conditionDescription: "累計100万GOLD獲得",
+    effectDescription: "戦闘後GOLD+15%",
+    effect: { goldMultiplier: 0.15 },
+    trigger: ["afterBattle", "afterQuestClaim", "afterShopTrade"],
+    customCheckerId: "normal_money_maker",
+    tier: "rare",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "normal_stack_builder",
+    name: "積み上げる者",
+    category: "normal",
+    description: "勝利数を愚直に積んだ冒険者",
+    conditionDescription: "累計500戦勝利",
+    effectDescription: "取得経験値+15%",
+    effect: { expMultiplier: 0.15 },
+    trigger: ["afterBattle"],
+    customCheckerId: "normal_stack_builder",
+    tier: "rare",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "normal_final_job_mastery",
+    name: "熟達の最終職",
+    category: "normal",
+    description: "いずれかの最終職で実戦を積んだ者",
+    conditionDescription: "戦闘ジョブを最終段階まで進化",
+    effectDescription: "メインジョブ補正+10% / 最大HP+10%",
+    effect: { finalJobAllStatsMultiplier: 0.1, finalJobMaxHpMultiplier: 0.1 },
+    trigger: ["afterBattle", "afterLevelUp", "afterFieldBossClear"],
+    customCheckerId: "normal_final_job_mastery",
+    tier: "epic",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "normal_gambler_instinct",
+    name: "勝負師の勘",
+    category: "normal",
+    description: "勝負勘と損切り感覚を併せ持つ者",
+    conditionDescription: "ルーレットかVIPで50回勝利",
+    effectDescription: "チップ獲得+10% / 敗北損失-10%",
+    effect: { chipGainMultiplier: 0.1, gambleLossReduction: 0.1 },
+    trigger: ["afterCasinoPlay"],
+    customCheckerId: "normal_gambler_instinct",
+    tier: "epic",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  }
+];
+
+TITLE_DATA.push(...PHASE17_FINAL_CLASS_CHEAT_TITLES, ...PHASE17_FINAL_CLASS_NORMAL_TITLES);
+
+Object.assign(TITLE_CHECKERS, {
+  cheat_gamble_king: () => getTotalRouletteSpins() >= 100 && (state.rouletteStats?.chipsWon || 0) >= 1000000,
+  cheat_gold_law_breaker: () => (state.stats.totalGoldLifetime || 0) >= 10000000,
+  cheat_exp_usurper: () =>
+    (state.player.level || 0) >= 200 &&
+    (state.stats.totalBattles || 0) >= 3000 &&
+    (state.stats.fieldBossKillCount || 0) >= 120,
+  cheat_final_job_overlord: () => isMainJobFinalTier() && (state.stats.enhancedBossKillCount || 0) >= 20,
+  cheat_fate_rewriter: () =>
+    getTotalRouletteSpins() >= 200 &&
+    (state.stats.auctionTradeCount || 0) >= 60 &&
+    (state.stats.fieldBossKillCount || 0) >= 120 &&
+    (state.stats.uniqueEncounterCount || 0) >= 30,
+
+  normal_auction_appraiser: () => (state.stats.auctionTradeCount || 0) >= 20,
+  normal_money_maker: () => (state.stats.totalGoldLifetime || 0) >= 1000000,
+  normal_stack_builder: () => (state.stats.totalWins || 0) >= 500,
+  normal_final_job_mastery: () => isMainJobFinalTier(),
+  normal_gambler_instinct: () => getTotalRouletteWins() >= 50
+});
+
+const PHASE18_NEVEREND_OTHERWORLD_CHEAT_TITLES = [
+  { id: "cheat_multi_hit_read", name: "連撃看破", category: "cheat", description: "三連撃の軌道を見切る者", conditionDescription: "3回攻撃持ち敵に50回勝利", effectDescription: "3連撃時2発目以降被ダメ-40% / 次行動与ダメ+20%", effect: { multiHitFromSecondDamageReduction: 0.4, afterTripleHitDamageBonus: 0.2 }, trigger: ["afterBattle"], customCheckerId: "cheat_multi_hit_read", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_rage_breaker", name: "逆上潰し", category: "cheat", description: "激怒後半を狩る終盤処理役", conditionDescription: "HP30%以下で強化される敵を20体撃破", effectDescription: "敵HP50%以下で与ダメ+25% / 激怒時回避+10%", effect: { lowHpEnemyDamageBonus: 0.25, evasionWhenEnemyEnraged: 0.1 }, trigger: ["afterFieldBossClear"], customCheckerId: "cheat_rage_breaker", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_machine_slayer", name: "機神断ち", category: "cheat", description: "装甲機神を断ち切る機械特効", conditionDescription: "機械系モンスター200体撃破", effectDescription: "機械系与ダメ+30% / 防御無視+15%", effect: { machineDamageBonus: 0.3, machineDefenseIgnore: 0.15 }, trigger: ["afterBattle"], customCheckerId: "cheat_machine_slayer", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_instant_kill_doctrine", name: "瞬殺主義", category: "cheat", description: "10秒決着に全てを賭ける思想", conditionDescription: "10秒以内撃破を100回達成", effectDescription: "開始10秒 攻撃+25%/速度+15% / 以降防御-10%", effect: { quickBattleAttackBonus: 0.25, quickBattleSpeedBonus: 0.15, postQuickBattleDefensePenalty: 0.1 }, trigger: ["afterBattle"], customCheckerId: "cheat_instant_kill_doctrine", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_paper_edge_hunter", name: "紙刃狩り", category: "cheat", description: "低HP高火力個体の処理専門家", conditionDescription: "低HP高火力敵に100回勝利", effectDescription: "敵HP70%以下へ与ダメ+20% / 先制会心+12%", effect: { lowHpEnemyDamageBonus: 0.2, firstStrikeCritBonus: 0.12 }, trigger: ["afterBattle"], customCheckerId: "cheat_paper_edge_hunter", tier: "epic", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_defeat_adapt", name: "敗北適応", category: "cheat", description: "敗北数すら火力へ変換する者", conditionDescription: "ボスに20回敗北", effectDescription: "ボス戦で敗北回数に応じ与ダメ上昇(最大+20%)", effect: { bossDefeatAdaptiveDamageMax: 0.2 }, trigger: ["afterDefeat", "afterBattle"], customCheckerId: "cheat_defeat_adapt", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_build_completer", name: "複合完成者", category: "cheat", description: "称号ビルドの完成形", conditionDescription: "N3+C2以上装備で50勝", effectDescription: "装備中称号1つにつき全能力+2%(最大20%)", effect: { perEquippedAllStatsBonus: 0.02, perEquippedAllStatsBonusCap: 0.2 }, trigger: ["afterBattle"], customCheckerId: "cheat_build_completer", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_overweight_fortress", name: "超過装甲", category: "cheat", description: "重量で殴る超重装構築", conditionDescription: "重量80%以上で高難易度ボス10体撃破", effectDescription: "重量ペナルティ半減 / 80%以上時 防御+20% 被ダメ-10%", effect: { weightPenaltyReduction: 0.5, heavyWeightDefenseBonus: 0.2, heavyWeightDamageReduction: 0.1 }, trigger: ["afterFieldBossClear"], customCheckerId: "cheat_overweight_fortress", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_utsusemi_tactic", name: "空蝉戦法", category: "cheat", description: "軽装回避カウンターの極地", conditionDescription: "重量50%未満で高難易度ボス10体撃破", effectDescription: "50%未満時 回避+15%/速度+12% / 回避成功後 次の一撃+20%", effect: { lightWeightEvasionBonus: 0.15, lightWeightSpeedBonus: 0.12, evadeCounterDamageBonus: 0.2 }, trigger: ["afterFieldBossClear", "afterBattle"], customCheckerId: "cheat_utsusemi_tactic", tier: "legend", canCarryOver: true, carryOverType: "direct" },
+  { id: "cheat_end_of_world_solver", name: "終末攻略者", category: "cheat", description: "天空都市と異界を跨ぐ総合攻略者", conditionDescription: "火山ボス/Protocol3/覚醒ボス系 合計10体撃破", effectDescription: "高難易度ボス与ダメ+20% / 状態異常耐性+20%", effect: { highDifficultyBossDamageBonus: 0.2, statusAilmentResist: 0.2 }, trigger: ["afterFieldBossClear"], customCheckerId: "cheat_end_of_world_solver", tier: "legend", canCarryOver: true, carryOverType: "direct" }
+];
+
+const PHASE18_NEVEREND_OTHERWORLD_NORMAL_TITLES = [
+  { id: "normal_multi_battle_wall", name: "連戦防壁", category: "normal", description: "連戦で削れない防御姿勢", conditionDescription: "3回攻撃持ち敵に50回勝利", effectDescription: "被ダメージ-8%相当", effect: { defenseMultiplier: 0.08 }, trigger: ["afterBattle"], customCheckerId: "normal_multi_battle_wall", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_endgame_habituated", name: "終盤慣れ", category: "normal", description: "後半ボス戦に慣れた者", conditionDescription: "HP30%以下で強化される敵を20体撃破", effectDescription: "ボス与ダメ+10%", effect: { bossDamageBonus: 0.1 }, trigger: ["afterFieldBossClear"], customCheckerId: "normal_endgame_habituated", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_armor_breaker", name: "装甲崩し", category: "normal", description: "高防御相手へ通す技量", conditionDescription: "機械系モンスター200体撃破", effectDescription: "高防御敵への与ダメ+10%", effect: { highDefenseEnemyDamageBonus: 0.1 }, trigger: ["afterBattle"], customCheckerId: "normal_armor_breaker", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_fast_resolution", name: "速戦即決", category: "normal", description: "開幕火力で押し切る者", conditionDescription: "10秒以内撃破を100回達成", effectDescription: "開始10秒 攻撃+10%", effect: { quickBattleAttackBonus: 0.1 }, trigger: ["afterBattle"], customCheckerId: "normal_fast_resolution", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_first_strike_focus", name: "先制意識", category: "normal", description: "先手意識で安定を得る", conditionDescription: "低HP高火力敵に100回勝利", effectDescription: "命中+6% / 会心+5%", effect: { accuracyBonus: 0.06, critRateBonus: 0.05 }, trigger: ["afterBattle"], customCheckerId: "normal_first_strike_focus", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_indomitable", name: "不屈", category: "normal", description: "負けを土台に立ち続ける者", conditionDescription: "ボスに20回敗北", effectDescription: "最大HP+12%", effect: { regionStatMultiplier: { grassland: { maxHp: 1.12 }, desert: { maxHp: 1.12 }, sea: { maxHp: 1.12 }, volcano: { maxHp: 1.12 }, neverend: { maxHp: 1.12 }, otherworld: { maxHp: 1.12 }, final: { maxHp: 1.12 } } }, trigger: ["afterDefeat"], customCheckerId: "normal_indomitable", tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_title_familiarity", name: "称号慣れ", category: "normal", description: "称号運用に慣れた熟練者", conditionDescription: "N3+C2以上装備で50勝", effectDescription: "称号運用時 全能力+10%", effect: { titleSynergyBoost: 0.1 }, trigger: ["afterBattle"], customCheckerId: "normal_title_familiarity", tier: "epic", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_heavy_armor_mastery", name: "重装熟練", category: "normal", description: "重装運用の基礎を極めた者", conditionDescription: "重量80%以上で高難易度ボス10体撃破", effectDescription: "防御+10%", effect: { defenseMultiplier: 0.1 }, trigger: ["afterFieldBossClear"], customCheckerId: "normal_heavy_armor_mastery", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_light_step", name: "軽身", category: "normal", description: "軽量装備を使いこなす者", conditionDescription: "重量50%未満で高難易度ボス10体撃破", effectDescription: "速度+8% / 回避+5%", effect: { speedMultiplier: 0.08, evadeByRegion: { grassland: 0.05, desert: 0.05, sea: 0.05, volcano: 0.05, neverend: 0.05, otherworld: 0.05, final: 0.05 } }, trigger: ["afterFieldBossClear"], customCheckerId: "normal_light_step", tier: "rare", canCarryOver: false, carryOverType: "recordOnly" },
+  { id: "normal_keep_breaking_walls", name: "壁を越え続ける者", category: "normal", description: "終盤の壁を越え続けた証", conditionDescription: "火山ボス/Protocol3/覚醒ボス系 合計10体撃破", effectDescription: "全能力+8%", effect: { allStatsMultiplier: 0.08 }, trigger: ["afterFieldBossClear"], customCheckerId: "normal_keep_breaking_walls", tier: "epic", canCarryOver: false, carryOverType: "recordOnly" }
+];
+
+TITLE_DATA.push(...PHASE18_NEVEREND_OTHERWORLD_CHEAT_TITLES, ...PHASE18_NEVEREND_OTHERWORLD_NORMAL_TITLES);
+
+Object.assign(TITLE_CHECKERS, {
+  cheat_multi_hit_read: () => (state.stats.tripleAttackEnemyWinCount || 0) >= 50,
+  normal_multi_battle_wall: () => (state.stats.tripleAttackEnemyWinCount || 0) >= 50,
+  cheat_rage_breaker: () => (state.stats.enragedBossKillCount || 0) >= 20,
+  normal_endgame_habituated: () => (state.stats.enragedBossKillCount || 0) >= 20,
+  cheat_machine_slayer: () => (state.stats.mechanicalEnemyKillCount || 0) >= 200,
+  normal_armor_breaker: () => (state.stats.mechanicalEnemyKillCount || 0) >= 200,
+  cheat_instant_kill_doctrine: () => (state.stats.quickKill10sCount || 0) >= 100,
+  normal_fast_resolution: () => (state.stats.quickKill10sCount || 0) >= 100,
+  cheat_paper_edge_hunter: () => (state.stats.glassCannonWinCount || 0) >= 100,
+  normal_first_strike_focus: () => (state.stats.glassCannonWinCount || 0) >= 100,
+  cheat_defeat_adapt: () => (state.stats.bossDefeatCount || 0) >= 20,
+  normal_indomitable: () => (state.stats.bossDefeatCount || 0) >= 20,
+  cheat_build_completer: () => (state.stats.titleBuildQualifiedWinCount || 0) >= 50,
+  normal_title_familiarity: () => (state.stats.titleBuildQualifiedWinCount || 0) >= 50,
+  cheat_overweight_fortress: () => (state.stats.heavyHighDifficultyBossKillCount || 0) >= 10,
+  normal_heavy_armor_mastery: () => (state.stats.heavyHighDifficultyBossKillCount || 0) >= 10,
+  cheat_utsusemi_tactic: () => (state.stats.lightHighDifficultyBossKillCount || 0) >= 10,
+  normal_light_step: () => (state.stats.lightHighDifficultyBossKillCount || 0) >= 10,
+  cheat_end_of_world_solver: () => (state.stats.endgamePreparationBossKillCount || 0) >= 10,
+  normal_keep_breaking_walls: () => (state.stats.endgamePreparationBossKillCount || 0) >= 10
+});
+
+const PHASE19_ECONOMY_BREAKER_CHEAT_TITLES = [
+  {
+    id: "cheat_house_edge_breaker",
+    name: "胴元泣かせ",
+    category: "cheat",
+    description: "勝ち報酬を異常増幅するギャンブル覇者",
+    conditionDescription: "ルーレット+VIP 累計200勝",
+    effectDescription: "ギャンブル勝利チップ+100% / 低確率でさらに2倍",
+    effect: { chipGainMultiplier: 1.0, gambleJackpotDoubleChance: 0.1 },
+    trigger: ["afterCasinoPlay"],
+    customCheckerId: "cheat_house_edge_breaker",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_market_meltdown",
+    name: "市場崩壊者",
+    category: "cheat",
+    description: "相場そのものを崩壊させる入札王",
+    conditionDescription: "オークション累計500万チップ使用",
+    effectDescription: "オークション価格-40% / 更新時に低確率で1件だけ-70%",
+    effect: { auctionBuyPriceReduction: 0.4, auctionBargainChance: 0.12 },
+    trigger: ["afterShopTrade"],
+    customCheckerId: "cheat_market_meltdown",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "cheat_shadow_dealer",
+    name: "黒幕の取引",
+    category: "cheat",
+    description: "稼ぎ・買い・売りを同時に歪める経済支配者",
+    conditionDescription: "カジノ/オークション/VIPを一定以上利用し高額品を複数購入",
+    effectDescription: "ギャンブル勝利+50% / オークション価格-25% / オークション売却+50%",
+    effect: { chipGainMultiplier: 0.5, auctionBuyPriceReduction: 0.25, auctionSellPriceMultiplier: 0.5 },
+    trigger: ["afterCasinoPlay", "afterShopTrade"],
+    customCheckerId: "cheat_shadow_dealer",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  }
+];
+
+TITLE_DATA.push(...PHASE19_ECONOMY_BREAKER_CHEAT_TITLES);
+
+Object.assign(TITLE_CHECKERS, {
+  cheat_house_edge_breaker: () => getTotalRouletteWins() >= 200,
+  cheat_market_meltdown: () => (state.stats.auctionChipSpentTotal || 0) >= 5000000,
+  cheat_shadow_dealer: () =>
+    (state.stats.casinoExchangeCount || 0) >= 40 &&
+    (state.stats.auctionTradeCount || 0) >= 30 &&
+    (state.rouletteStats?.vipSpins || 0) >= 40 &&
+    (state.stats.auctionHighValuePurchaseCount || 0) >= 5
+});
+
+const PHASE20_FINAL_CHEAT_TITLES = [
+  {
+    id: "cheat_causality_exposed",
+    name: "因果晒し",
+    category: "cheat",
+    description: "偶然を積み重ね、確率をねじ曲げた最終格の異常者",
+    conditionDescription: "ルーレット/VIPで同じ数字を100回連続で選んで回す",
+    effectDescription: "ギャンブル勝率100% / 勝利報酬+50%",
+    effect: { gambleGuaranteedWin: true, chipGainMultiplier: 0.5 },
+    trigger: ["afterCasinoPlay"],
+    customCheckerId: "cheat_causality_exposed",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  }
+];
+
+TITLE_DATA.push(...PHASE20_FINAL_CHEAT_TITLES);
+
+Object.assign(TITLE_CHECKERS, {
+  cheat_causality_exposed: () => (state.stats.rouletteSameNumberBest || 0) >= 100
+});
+
 function applyPhase10TitleBalance() {
   const patch = (id, effectPatch) => {
     const title = TITLE_DATA.find((t) => t.id === id);
@@ -4481,6 +4918,19 @@ const state = {
   hasNeverendTicket: false,
   neverendUnlocked: false,
   neverendVipUnlocked: false,
+  hasOtherworldKey: false,
+  otherworldUnlocked: false,
+  otherworldKingDefeatCount: 0,
+  otherworldKingFirstDefeatRewardClaimed: false,
+  otherworldKingTenDefeatRewardClaimed: false,
+  otherworldKingHundredDefeatRewardClaimed: false,
+  otherworldKingCleared: false,
+  otherworldKingSupportLogMode: false,
+  otherworldLevelCapBonus: 0,
+  otherworldNormalTitleSlotBonus: 0,
+  otherworldCheatTitleSlotBonus: 0,
+  hasProtagonistTitle: false,
+  endingUnlocked: false,
   chips: 0,
   neverendBossClearFlags: {},
   auctionRefreshState: createDefaultAuctionRefreshState(),
@@ -4609,7 +5059,9 @@ const state = {
     flashSwordsmanEvasionUntil: 0,
     comboReflectReady: false,
     comboInvincibleUntil: 0,
-    comboExtraStrikeDepth: 0
+    comboExtraStrikeDepth: 0,
+    afterTripleHitDamageBoostReady: false,
+    evadeCounterBoostReady: false
   },
   stats: {
     totalBattles: 0,
@@ -4624,6 +5076,13 @@ const state = {
     totalGoldEarned: 0,
     oneGoldPickupCount: 0,
     totalShopTrades: 0,
+    auctionTradeCount: 0,
+    auctionChipSpentTotal: 0,
+    auctionHighValuePurchaseCount: 0,
+    casinoExchangeCount: 0,
+    rouletteSameNumberStreak: 0,
+    rouletteSameNumberBest: 0,
+    rouletteSameNumberLastPick: null,
     totalCrafts: 0,
     craftFailures: 0,
     totalEnhances: 0,
@@ -4740,6 +5199,16 @@ const state = {
     seaSpecialEnemyKillCount: 0,
     volcanoBurnWinCount: 0,
     seaEvadeSuccessCount: 0,
+    tripleAttackEnemyWinCount: 0,
+    enragedBossKillCount: 0,
+    mechanicalEnemyKillCount: 0,
+    quickKill10sCount: 0,
+    glassCannonWinCount: 0,
+    bossDefeatCount: 0,
+    titleBuildQualifiedWinCount: 0,
+    heavyHighDifficultyBossKillCount: 0,
+    lightHighDifficultyBossKillCount: 0,
+    endgamePreparationBossKillCount: 0,
     volcanoDefenseSkillUseCount: 0,
     weaponEnhanceCount: 0,
     armorEnhanceCount: 0,
@@ -4846,7 +5315,8 @@ const state = {
     ,
     stageDamageTaken: 0,
     loopChallengeId: null,
-    autoItemGlobalCooldownUntil: 0
+    autoItemGlobalCooldownUntil: 0,
+    enemySpawnedAt: 0
   },
   player: {
     name: "プレイヤー",
@@ -5060,6 +5530,41 @@ function createDefaultTitleEffects() {
     mpCostReduction: 0,
     healMultiplier: 0,
     sellPriceMultiplier: 0,
+    auctionSellPriceMultiplier: 0,
+    auctionBuyPriceReduction: 0,
+    auctionBargainChance: 0,
+    chipGainMultiplier: 0,
+    gambleJackpotDoubleChance: 0,
+    gambleGuaranteedWin: false,
+    gambleLossReduction: 0,
+    gambleHitChanceBonus: 0,
+    gambleMinPayoutMultiplier: 0,
+    bossExpMultiplier: 0,
+    finalJobAllStatsMultiplier: 0,
+    finalJobMaxHpMultiplier: 0,
+    finalJobSkillDamageBonus: 0,
+    finalJobSkillCooldownRecovery: 0,
+    multiHitFromSecondDamageReduction: 0,
+    afterTripleHitDamageBonus: 0,
+    lowHpEnemyDamageBonus: 0,
+    evasionWhenEnemyEnraged: 0,
+    machineDamageBonus: 0,
+    machineDefenseIgnore: 0,
+    highDefenseEnemyDamageBonus: 0,
+    quickBattleAttackBonus: 0,
+    quickBattleSpeedBonus: 0,
+    postQuickBattleDefensePenalty: 0,
+    firstStrikeCritBonus: 0,
+    bossDefeatAdaptiveDamageMax: 0,
+    perEquippedAllStatsBonus: 0,
+    perEquippedAllStatsBonusCap: 0.2,
+    titleSynergyBoost: 0,
+    heavyWeightDefenseBonus: 0,
+    heavyWeightDamageReduction: 0,
+    lightWeightEvasionBonus: 0,
+    lightWeightSpeedBonus: 0,
+    evadeCounterDamageBonus: 0,
+    highDifficultyBossDamageBonus: 0,
     productionExpRateBonus: 0,
     qualityMaterialRefundChance: 0,
     defenseToAttackRatio: 0,
@@ -5238,6 +5743,10 @@ function render() {
   }
   if (state.screen === "carryOverSelection") {
     renderCarryOverSelectionView();
+    return;
+  }
+  if (state.screen === "otherworldEnding") {
+    renderOtherworldEndingView();
     return;
   }
   renderGameScreen();
@@ -5819,10 +6328,13 @@ function selectTown(townId) {
   if (townId === "neverend") {
     state.worldStateFlags = { ...(state.worldStateFlags || {}), neverendArrived: true };
   } else if (townId === "otherworld") {
+    const firstArrive = !state.worldStateFlags?.otherworldArrived;
     state.worldStateFlags = { ...(state.worldStateFlags || {}), otherworldArrived: true };
     state.otherworldUnlocked = true;
-    showCenterPopup({ text: "異界へ到達した", type: "important" });
-    addLog("異界到達: 世界の綻びの先へ踏み込んだ。", "important", { important: true });
+    if (firstArrive) {
+      showCenterPopup({ text: "異界へ到達した", type: "important" });
+      addLog("異界到達: 世界の綻びの先へ踏み込んだ。", "important", { important: true });
+    }
   }
   state.stats.townVisitCount += 1;
   state.stats.viewSwitchCount += 1;
@@ -5912,6 +6424,13 @@ function startStageBattle() {
   state.titleRuntime.comboReflectReady = false;
   state.titleRuntime.comboInvincibleUntil = 0;
   state.titleRuntime.comboExtraStrikeDepth = 0;
+  state.titleRuntime.afterTripleHitDamageBoostReady = false;
+  state.titleRuntime.evadeCounterBoostReady = false;
+  state.titleRuntime.comboReflectReady = false;
+  state.titleRuntime.comboInvincibleUntil = 0;
+  state.titleRuntime.comboExtraStrikeDepth = 0;
+  state.titleRuntime.afterTripleHitDamageBoostReady = false;
+  state.titleRuntime.evadeCounterBoostReady = false;
   recalculateTitleEffects();
   state.ui.autoItemVisualEffects = {};
   state.stats.totalBattles += 1;
@@ -5943,9 +6462,11 @@ function startStageBattle() {
     uniqueCombatProfile: null,
     critFinishThisBoss: false,
     stageDamageTaken: 0,
-    loopChallengeId: stage.loopChallengeId || null
+    loopChallengeId: stage.loopChallengeId || null,
+    enemySpawnedAt: 0
   };
   state.battle.autoItemGlobalCooldownUntil = 0;
+  state.battle.gimmick.extra.firstPlayerActionPending = true;
 
   if (state.titleEffects.battleStartBuff) {
     const buff = state.titleEffects.battleStartBuff;
@@ -6024,6 +6545,7 @@ function spawnStageEnemy() {
   state.battle.uniqueGimmickProfile = state.battle.isUniqueBattle ? (master.uniqueGimmickProfile || null) : null;
   state.battle.uniqueCombatProfile = state.battle.isUniqueBattle ? (master.uniqueCombatProfile || null) : null;
   state.battle.enemy = { ...master, maxHp: master.hp, hp: master.hp, maxMp: master.mp, mp: master.mp };
+  state.battle.enemySpawnedAt = Date.now();
   state.battle.playerNextActionAt = Date.now() + Math.floor(360 / state.battleSpeedMultiplier);
   state.battle.enemyNextActionAt = Date.now() + Math.floor(580 / state.battleSpeedMultiplier);
   state.battle.recentActionText = `${master.name} が現れた`;
@@ -6037,6 +6559,12 @@ function spawnStageEnemy() {
     showCenterPopup({ text: `BOSS: ${master.name}`, type: "important" });
     if (stage.mapId === "otherworld" && String(master.name || "").includes("覚醒")) {
       addLog(`異界補正: ${master.name} が再演された。`, "important", { important: true });
+    }
+    if (master.id === "otherworldKing") {
+      addLog("異界の王が出現した。世界の終着点が目前にある。", "important", { important: true });
+      if (shouldUseOtherworldSupportLog()) {
+        pushOtherworldSupportLog(true);
+      }
     }
   }
 }
@@ -6377,11 +6905,15 @@ function playerAction() {
     return;
   }
 
-  const critChance = effective.critRate;
+  const firstStrikeBonus = state.battle.gimmick.extra.firstPlayerActionPending ? (state.titleEffects.firstStrikeCritBonus || 0) : 0;
+  const critChance = clamp(0, 0.95, effective.critRate + firstStrikeBonus);
   const isCrit = Math.random() < critChance;
-  const base = Math.max(1, Math.floor(effective.attack - state.battle.enemy.defense * 0.6));
+  const machineDefenseIgnore = isMechanicalEnemy(state.battle.enemy) ? clamp(0, 0.9, Number(state.titleEffects.machineDefenseIgnore || 0)) : 0;
+  const effectiveEnemyDefense = state.battle.enemy.defense * (1 - machineDefenseIgnore);
+  const base = Math.max(1, Math.floor(effective.attack - effectiveEnemyDefense * 0.6));
   const critMul = 1.5 * (1 + (state.titleEffects.critDamageBonus || 0));
   const damage = isCrit ? Math.floor(base * critMul) : base;
+  state.battle.gimmick.extra.firstPlayerActionPending = false;
   state.runtime.lastHitMeta = { source: "normal", isCrit };
   applyDamage("player", damage, isCrit ? "会心の一撃" : "通常攻撃", isCrit);
   recoverMpFromMageAttack("魔術師特性");
@@ -6389,6 +6921,10 @@ function playerAction() {
 
 function enemyAction() {
   if (!state.battle.enemy || state.battle.enemy.hp <= 0) {
+    return;
+  }
+  if (state.battle.enemy.id === "otherworldKing") {
+    enemyActionOtherworldKing();
     return;
   }
   if (state.battle.enemy.id === "protocol3") {
@@ -6406,6 +6942,9 @@ function enemyAction() {
   if (Math.random() > hitChance) {
     if (STAGE_DATA[state.battle.stageId]?.mapId === "sea") {
       state.stats.seaEvadeSuccessCount = (state.stats.seaEvadeSuccessCount || 0) + 1;
+    }
+    if (state.titleEffects.evadeCounterDamageBonus > 0) {
+      state.titleRuntime.evadeCounterBoostReady = true;
     }
     addLog(`${state.battle.enemy.name} の通常攻撃を受けた。`);
     return;
@@ -6489,8 +7028,12 @@ function enemyAction() {
   const hits = uniqueProfile && Math.random() < (uniqueProfile.multiHitChance || 0)
     ? 1 + Math.floor(Math.random() * Math.max(1, uniqueProfile.multiHitMax || 1))
     : forcedHits || 1;
+  const multiHitReduction = hits >= 3 ? clamp(0, 0.9, Number(state.titleEffects.multiHitFromSecondDamageReduction || 0)) : 0;
   for (let i = 0; i < hits; i += 1) {
     let damage = Math.max(1, Math.floor(baseDamage * reduction));
+    if (multiHitReduction > 0 && i >= 1) {
+      damage = Math.max(1, Math.floor(damage * (1 - multiHitReduction)));
+    }
     if (state.titleEffects.priestDamageHalfChance > 0 && Math.random() < state.titleEffects.priestDamageHalfChance) {
       damage = Math.max(1, Math.floor(damage * 0.5));
       addLog("目覚めた僧侶: 被ダメージ半減が発動");
@@ -6499,6 +7042,9 @@ function enemyAction() {
     if (state.battle.playerCurrentHp <= 0) {
       break;
     }
+  }
+  if (hits >= 3 && state.titleEffects.afterTripleHitDamageBonus > 0 && state.battle.playerCurrentHp > 0) {
+    state.titleRuntime.afterTripleHitDamageBoostReady = true;
   }
 }
 
@@ -6600,11 +7146,15 @@ function protocol3Strike(options) {
   const regionReduction = state.titleEffects.regionDamageReduction?.[regionId] || 0;
   if (regionReduction > 0) reduction *= 1 - regionReduction;
   const hits = Math.max(1, Math.floor(options.hits || 1));
+  const multiHitReduction = hits >= 3 ? clamp(0, 0.9, Number(state.titleEffects.multiHitFromSecondDamageReduction || 0)) : 0;
   for (let i = 0; i < hits; i += 1) {
     if (!state.battle.isActive || state.battle.playerCurrentHp <= 0) {
       return;
     }
     if (Math.random() > hitChance) {
+      if (state.titleEffects.evadeCounterDamageBonus > 0) {
+        state.titleRuntime.evadeCounterBoostReady = true;
+      }
       addLog(`Protocol3の${options.label} ${i + 1}段目を回避した。`);
       continue;
     }
@@ -6612,6 +7162,9 @@ function protocol3Strike(options) {
     const isCrit = Math.random() < critChance;
     const raw = Math.max(1, Math.floor(enemy.attack * (options.power || 1) - effective.defense * 0.52));
     let damage = Math.max(1, Math.floor(raw * reduction * (isCrit ? 1.62 : 1)));
+    if (multiHitReduction > 0 && i >= 1) {
+      damage = Math.max(1, Math.floor(damage * (1 - multiHitReduction)));
+    }
     if (state.titleEffects.priestDamageHalfChance > 0 && Math.random() < state.titleEffects.priestDamageHalfChance) {
       damage = Math.max(1, Math.floor(damage * 0.5));
       addLog("目覚めた僧侶: 被ダメージ半減が発動");
@@ -6622,11 +7175,152 @@ function protocol3Strike(options) {
       addLog("Protocol3の破壊信号で防御が低下した。");
     }
   }
+  if (hits >= 3 && state.titleEffects.afterTripleHitDamageBonus > 0 && state.battle.playerCurrentHp > 0) {
+    state.titleRuntime.afterTripleHitDamageBoostReady = true;
+  }
+}
+
+function enemyActionOtherworldKing() {
+  const enemy = state.battle.enemy;
+  if (!enemy) return;
+  const extra = state.battle.gimmick.extra;
+  if (!extra.otherworldKingInit) {
+    extra.otherworldKingInit = true;
+    extra.kingBaseAttack = enemy.attack;
+    extra.kingBaseDefense = enemy.defense;
+    extra.kingBaseSpeed = enemy.speed;
+    extra.kingPhase2 = false;
+    extra.kingTargetLockUntil = 0;
+    extra.kingDamageAmp = 1;
+    addLog("異界の王: ここから先は、敗北すら記録になる。", "important", { important: true });
+  }
+
+  const hpRate = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
+  if (!extra.kingPhase2 && hpRate <= 0.45) {
+    extra.kingPhase2 = true;
+    enemy.attack = Math.floor(extra.kingBaseAttack * 1.22);
+    enemy.speed = Math.floor(extra.kingBaseSpeed * 1.18);
+    enemy.defense = Math.max(1, Math.floor(extra.kingBaseDefense * 0.88));
+    extra.kingDamageAmp = 1.18;
+    addLog("異界の王: 第二位相。理が剥離し始めた。", "important", { important: true });
+  }
+
+  if (shouldUseOtherworldSupportLog()) {
+    pushOtherworldSupportLog();
+  }
+
+  const phase2 = !!extra.kingPhase2;
+  const actionTable = phase2
+    ? [
+        { id: "collapse_combo", weight: 28 },
+        { id: "king_ignition", weight: 20 },
+        { id: "rule_break", weight: 18 },
+        { id: "void_cannon", weight: 16 },
+        { id: "royal_combo", weight: 18 }
+      ]
+    : [
+        { id: "royal_combo", weight: 30 },
+        { id: "void_cannon", weight: 22 },
+        { id: "decree_armor", weight: 16 },
+        { id: "target_lock", weight: 16 },
+        { id: "purge", weight: 16 }
+      ];
+
+  const action = weightedPick(actionTable)?.id || "royal_combo";
+  if (action === "decree_armor") {
+    enemy.defense = Math.min(Math.floor(extra.kingBaseDefense * 1.4), Math.floor(enemy.defense * 1.18));
+    addLog("異界の王: 王令装甲（防御上昇）");
+    return;
+  }
+  if (action === "target_lock") {
+    extra.kingTargetLockUntil = Date.now() + 5200;
+    addLog("異界の王: 照準固定（命中・会心上昇）");
+    return;
+  }
+  if (action === "purge") {
+    state.activeEffects = state.activeEffects.filter((effect) => !(effect.target === "enemy" && ["enemyAttack", "enemyAccuracy", "defense", "speed"].includes(effect.stat)));
+    enemy.defense = Math.max(enemy.defense, Math.floor(extra.kingBaseDefense * (phase2 ? 0.88 : 1)));
+    addLog("異界の王: 世界律再編（弱体解除）");
+    return;
+  }
+  if (action === "rule_break") {
+    enemy.attack = Math.floor(enemy.attack * 1.1);
+    enemy.defense = Math.max(1, Math.floor(enemy.defense * 0.9));
+    extra.kingDamageAmp = Math.max(Number(extra.kingDamageAmp || 1), 1.28);
+    addLog("異界の王: 理破壊（与ダメージ増加 / 被ダメージ増加）");
+    return;
+  }
+  if (action === "void_cannon") {
+    otherworldKingStrike({ label: "虚界砲", hits: 1, power: 1.74, critBonus: 0.12 });
+    return;
+  }
+  if (action === "collapse_combo") {
+    otherworldKingStrike({ label: "崩界連断", hits: 3, power: 0.98, critBonus: 0.14, applyDefenseBreakChance: 0.24 });
+    return;
+  }
+  if (action === "king_ignition") {
+    otherworldKingStrike({ label: "王命・終端再演", hits: 1, power: 2.55, critBonus: 0.2 });
+    return;
+  }
+  otherworldKingStrike({ label: "王連撃", hits: 3, power: 0.88, critBonus: 0.1 });
+}
+
+function otherworldKingStrike(options) {
+  const enemy = state.battle.enemy;
+  if (!enemy) return;
+  const effective = getEffectivePlayerStats();
+  const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "otherworld";
+  const evasion = getCappedEffectiveEvasion(effective, regionId);
+  const extra = state.battle.gimmick.extra;
+  const lockOn = (extra.kingTargetLockUntil || 0) > Date.now();
+  let hitChance = (0.94 * getEnemyAccuracyMultiplier()) - evasion + (lockOn ? 0.2 : 0.05);
+  hitChance = clamp(0.52, 0.995, hitChance);
+  let reduction = getDamageReductionMultiplier();
+  reduction *= effective.damageReductionMultiplier || 1;
+  const regionReduction = state.titleEffects.regionDamageReduction?.[regionId] || 0;
+  if (regionReduction > 0) reduction *= 1 - regionReduction;
+  const hits = Math.max(1, Math.floor(options.hits || 1));
+  const multiHitReduction = hits >= 3 ? clamp(0, 0.9, Number(state.titleEffects.multiHitFromSecondDamageReduction || 0)) : 0;
+  for (let i = 0; i < hits; i += 1) {
+    if (!state.battle.isActive || state.battle.playerCurrentHp <= 0) {
+      return;
+    }
+    if (Math.random() > hitChance) {
+      if (state.titleEffects.evadeCounterDamageBonus > 0) {
+        state.titleRuntime.evadeCounterBoostReady = true;
+      }
+      addLog(`異界の王の${options.label} ${i + 1}段目を回避した。`);
+      continue;
+    }
+    const critChance = (options.critBonus || 0) + (lockOn ? 0.14 : 0);
+    const isCrit = Math.random() < critChance;
+    const amp = Math.max(1, Number(extra.kingDamageAmp || 1));
+    const raw = Math.max(1, Math.floor(enemy.attack * (options.power || 1) * amp - effective.defense * 0.48));
+    let damage = Math.max(1, Math.floor(raw * reduction * (isCrit ? 1.68 : 1)));
+    if (multiHitReduction > 0 && i >= 1) {
+      damage = Math.max(1, Math.floor(damage * (1 - multiHitReduction)));
+    }
+    if (state.titleEffects.priestDamageHalfChance > 0 && Math.random() < state.titleEffects.priestDamageHalfChance) {
+      damage = Math.max(1, Math.floor(damage * 0.5));
+      addLog("目覚めた僧侶: 被ダメージ半減が発動");
+    }
+    applyDamage("enemy", damage, isCrit ? `${options.label} 会心` : `${options.label} ${i + 1}段`);
+    if (options.applyDefenseBreakChance && Math.random() < options.applyDefenseBreakChance) {
+      applyEffect("player", "otherworld_king_break", { stat: "defense", multiplier: 0.86, durationMs: 4800, displayNameJa: "理断ち" });
+      addLog("異界の王の理断ちで防御が低下した。");
+    }
+  }
+  if (hits >= 3 && state.titleEffects.afterTripleHitDamageBonus > 0 && state.battle.playerCurrentHp > 0) {
+    state.titleRuntime.afterTripleHitDamageBoostReady = true;
+  }
 }
 
 function useSkill(skill) {
   const display = getSkillDisplayData(skill.id);
   const skillName = display?.nameJa || skill.nameJa || skill.name || skill.id;
+  if (state.battle?.gimmick?.extra?.firstPlayerActionPending) {
+    state.battle.gimmick.extra.firstPlayerActionPending = false;
+  }
   const mpCost = Math.max(0, Math.floor(skill.mpCost * (1 - getTotalMpCostReduction())));
   if (state.battle.playerCurrentMp < mpCost) {
     return;
@@ -6636,7 +7330,8 @@ function useSkill(skill) {
   const equippedSkillCount = getEquippedSkills().length;
   const hasOpenSkillSlot = equippedSkillCount < 4;
   const conditionalRecovery = hasOpenSkillSlot ? (state.titleEffects.skillCooldownRecoveryIfSkillSlotOpen || 0) : 0;
-  const cooldownRecovery = Math.max(0, (state.titleEffects.skillCooldownRecovery || 0) + conditionalRecovery);
+  const finalTierRecovery = isMainJobFinalTier() ? (state.titleEffects.finalJobSkillCooldownRecovery || 0) : 0;
+  const cooldownRecovery = Math.max(0, (state.titleEffects.skillCooldownRecovery || 0) + conditionalRecovery + finalTierRecovery);
   const cooldownScale = Math.max(0.5, 1 - cooldownRecovery);
   state.skillCooldowns[skill.id] = Date.now() + Math.floor((skill.cooldownMs * cooldownScale) / state.battleSpeedMultiplier);
 
@@ -6758,6 +7453,15 @@ function applyDamage(source, amount, actionName, isCrit = false) {
       const mul = Number(state.battle.gimmick?.extra?.protocol3DamageTakenMultiplier || 1);
       damage = Math.max(1, Math.floor(damage * mul));
     }
+    if (state.battle.enemy.id === "otherworldKing" && hasTitleUnlocked("fate_redeemer")) {
+      const erosion = Math.max(
+        1,
+        Math.floor(state.battle.enemy.maxHp * 0.04 + Math.min(5000, (state.otherworldKingDefeatCount || 0) * 18))
+      );
+      damage += erosion;
+      addLog(`運命侵食: 追加 ${erosion} ダメージ`, "important", { important: true });
+      pushOtherworldSupportLog();
+    }
     if (state.titleRuntime.swordsmanChargeReady) {
       const chargeMul = Math.max(1, Number(state.titleEffects.swordsmanChargeDamageMultiplier || 2));
       damage = Math.max(1, Math.floor(damage * chargeMul));
@@ -6811,8 +7515,13 @@ function applyDamage(source, amount, actionName, isCrit = false) {
       state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - selfDamage);
       addLog(`サクリファイス: 反動ダメージ ${selfDamage}`);
       if (state.battle.playerCurrentHp <= 0) {
-        handleDefeat();
-        return;
+        if (canPlayerStayAtOneHpInOtherworldKingBattle()) {
+          state.battle.playerCurrentHp = 1;
+          addLog("運命に贖う者: 反動でも倒れない。", "important", { important: true });
+        } else {
+          handleDefeat();
+          return;
+        }
       }
     }
     if (state.battle.enemy.hp <= 0) {
@@ -6848,6 +7557,12 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     return;
   }
   state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - amount);
+  if (state.battle.playerCurrentHp <= 0 && canPlayerStayAtOneHpInOtherworldKingBattle()) {
+    state.battle.playerCurrentHp = 1;
+    addLog("運命に贖う者: HP1で踏みとどまった。", "important", { important: true });
+    pushOtherworldSupportLog(true);
+    return;
+  }
   state.battle.stageDamageTaken = (state.battle.stageDamageTaken || 0) + amount;
   state.stats.damageTakenTotal += amount;
   if (state.titleRuntime.swordsmanReflectReady && state.titleEffects.swordsmanReflectRate > 0 && state.battle.enemy?.hp > 0) {
@@ -6897,6 +7612,15 @@ function handleEnemyDefeated() {
   state.stats.totalConsecutiveWinsBest = Math.max(state.stats.totalConsecutiveWinsBest || 0, state.stats.currentWinStreak);
   state.stats.totalKills += 1;
   state.stats.enemyKillCounts[enemy.id] = (state.stats.enemyKillCounts[enemy.id] || 0) + 1;
+  if (isMechanicalEnemy(enemy)) {
+    state.stats.mechanicalEnemyKillCount = (state.stats.mechanicalEnemyKillCount || 0) + 1;
+  }
+  if (isGlassCannonEnemy(enemy)) {
+    state.stats.glassCannonWinCount = (state.stats.glassCannonWinCount || 0) + 1;
+  }
+  if (isTripleAttackEnemy(enemy)) {
+    state.stats.tripleAttackEnemyWinCount = (state.stats.tripleAttackEnemyWinCount || 0) + 1;
+  }
   state.stats.winsByRegion[stage.mapId] = (state.stats.winsByRegion[stage.mapId] || 0) + 1;
   if (mapId === "grassland") {
     state.stats.grasslandWinStreakCurrent = (state.stats.grasslandWinStreakCurrent || 0) + 1;
@@ -6915,6 +7639,12 @@ function handleEnemyDefeated() {
   }
   if (state.battle.playerCurrentHp <= getEffectivePlayerStat("maxHp") * 0.2) {
     state.stats.nearDeathWins += 1;
+  }
+  if (state.battle.enemySpawnedAt > 0 && Date.now() - state.battle.enemySpawnedAt <= 10000) {
+    state.stats.quickKill10sCount = (state.stats.quickKill10sCount || 0) + 1;
+  }
+  if ((state.equippedNormalTitleIds || []).length >= 3 && (state.equippedCheatTitleIds || []).length >= 2) {
+    state.stats.titleBuildQualifiedWinCount = (state.stats.titleBuildQualifiedWinCount || 0) + 1;
   }
   const currentWeight = calculateWeightInfo(getEffectivePlayerStat("attack"));
   const weightRatio = currentWeight.capacity > 0 ? currentWeight.totalWeight / currentWeight.capacity : 0;
@@ -7066,6 +7796,23 @@ function handleFieldBossClear(stageId) {
     state.stats.lowHpBossKillCount = (state.stats.lowHpBossKillCount || 0) + 1;
   }
   addLog(`フィールドボス撃破: ${stageId}`);
+  const defeatedEnemyId = state.battle?.enemy?.id || stage?.fieldBoss || null;
+  if (isRageBossEnemy(defeatedEnemyId)) {
+    state.stats.enragedBossKillCount = (state.stats.enragedBossKillCount || 0) + 1;
+  }
+  if (isHighDifficultyStage(stage)) {
+    const weight = calculateWeightInfo(getEffectivePlayerStat("attack"));
+    const ratio = weight.capacity > 0 ? weight.totalWeight / weight.capacity : 0;
+    if (ratio >= 0.8) {
+      state.stats.heavyHighDifficultyBossKillCount = (state.stats.heavyHighDifficultyBossKillCount || 0) + 1;
+    }
+    if (ratio < 0.5) {
+      state.stats.lightHighDifficultyBossKillCount = (state.stats.lightHighDifficultyBossKillCount || 0) + 1;
+    }
+  }
+  if (stageId === "4-10" || stageId === "5-10" || String(defeatedEnemyId || "").startsWith("awakened")) {
+    state.stats.endgamePreparationBossKillCount = (state.stats.endgamePreparationBossKillCount || 0) + 1;
+  }
   const slotReward = stage?.mapId ? claimBossTitleSlotReward(stage.mapId) : null;
   if (slotReward) {
     addLog(`${slotReward.label}報酬！ ノーマル称号枠+${slotReward.reward.normal} / チート称号枠+${slotReward.reward.cheat}`);
@@ -7185,6 +7932,18 @@ function handleFieldBossClear(stageId) {
     addLog("Protocol3撃破報酬: 制御基板x2 / オーバークロック回路x2 / 崩壊装甲片x2 / 天空炉心x1");
     addLog("称号獲得: Protocol3撃破者");
     showCenterPopup({ text: "Protocol3撃破: VIP解放", type: "important" });
+  } else if (stageId === "6-10") {
+    ensureOtherworldState();
+    state.otherworldKingCleared = true;
+    state.hasProtagonistTitle = true;
+    state.endingUnlocked = true;
+    state.otherworldUnlocked = true;
+    state.otherworldKingSupportLogMode = true;
+    unlockTitle("protagonist");
+    addLog("称号『主人公』を獲得した！ すべての限界が解放された。", "important", { important: true });
+    OTHERWORLD_ENDING_CHEER_LOG_DATA.forEach((text) => addLog(text, "board", { important: true }));
+    showCenterPopup({ text: "異界の王撃破: 主人公", type: "important" });
+    state.screen = "otherworldEnding";
   }
   if (!state.player.subJobId) {
     state.stats.subJoblessBossClears += 1;
@@ -7236,9 +7995,52 @@ function handleUniqueVictory(enemy) {
   checkTitleUnlocks("afterUniqueKill");
 }
 
+function handleOtherworldKingDefeatProgress() {
+  ensureOtherworldState();
+  state.otherworldKingDefeatCount = Math.max(0, (state.otherworldKingDefeatCount || 0) + 1);
+  addLog(`異界の王への挑戦敗北: ${state.otherworldKingDefeatCount}回目`, "important", { important: true });
+
+  if (!state.otherworldKingFirstDefeatRewardClaimed) {
+    state.otherworldKingFirstDefeatRewardClaimed = true;
+    state.otherworldLevelCapBonus = Math.max(100, state.otherworldLevelCapBonus || 0);
+    unlockTitle("acknowledged_by_king");
+    addLog("異界の王は、あなたを退けた。だが挑戦者として認めた。", "important", { important: true });
+    addLog("称号『王に認められた者』を獲得した！ レベル上限が300まで解放された！", "important", { important: true });
+    showCenterPopup({ text: "称号獲得: 王に認められた者 (Lv上限300)", type: "important" });
+  }
+
+  if (state.otherworldKingDefeatCount >= 10 && !state.otherworldKingTenDefeatRewardClaimed) {
+    state.otherworldKingTenDefeatRewardClaimed = true;
+    state.otherworldNormalTitleSlotBonus = Math.max(10, state.otherworldNormalTitleSlotBonus || 0);
+    state.otherworldCheatTitleSlotBonus = Math.max(10, state.otherworldCheatTitleSlotBonus || 0);
+    unlockTitle("never_give_up");
+    recalculateTitleSlotCaps();
+    normalizeEquippedTitleSlots({ logOnTrim: false });
+    addLog("称号『諦めないもの』を獲得した！ 称号枠が拡張された。", "important", { important: true });
+    showCenterPopup({ text: "称号獲得: 諦めないもの (称号枠+10/+10)", type: "important" });
+  }
+
+  if (state.otherworldKingDefeatCount >= 100 && !state.otherworldKingHundredDefeatRewardClaimed) {
+    state.otherworldKingHundredDefeatRewardClaimed = true;
+    state.otherworldKingSupportLogMode = true;
+    unlockTitle("fate_redeemer");
+    addLog("称号『運命に贖う者』を獲得した！ 異界の王の理を侵す力が解放された。", "important", { important: true });
+    showCenterPopup({ text: "称号獲得: 運命に贖う者", type: "important" });
+  }
+
+  recalculateTitleEffects();
+  refreshPlayerDerivedStats();
+  autoSaveIfNeeded("endingProgress");
+}
+
 function handleDefeat() {
   const stage = STAGE_DATA[state.battle.stageId];
+  const enemyId = state.battle?.enemy?.id || null;
   const wasUniqueBattle = !!state.battle.isUniqueBattle;
+  const wasOtherworldKing = enemyId === "otherworldKing" || (stage?.id === "6-10" && stage?.mapId === "otherworld");
+  if (wasOtherworldKing) {
+    handleOtherworldKingDefeatProgress();
+  }
   if (stage?.finalContentId) {
     state.currentMap = TOWN_DATA[state.currentTown]?.mapId || "grassland";
     const fallbackStage = getFirstSelectableStage(state.currentMap) || state.currentStage;
@@ -7260,6 +8062,7 @@ function handleDefeat() {
   }
   if (stage?.isFieldBossStage) {
     recordBossFirstTryResult(stage.id, false);
+    state.stats.bossDefeatCount = (state.stats.bossDefeatCount || 0) + 1;
   }
 
   const defeatStageId = state.battle.stageId;
@@ -7292,6 +8095,8 @@ function handleDefeat() {
   state.titleRuntime.comboReflectReady = false;
   state.titleRuntime.comboInvincibleUntil = 0;
   state.titleRuntime.comboExtraStrikeDepth = 0;
+  state.titleRuntime.afterTripleHitDamageBoostReady = false;
+  state.titleRuntime.evadeCounterBoostReady = false;
   state.titleRuntime.reviveBuffPending = true;
   state.battle.isActive = false;
   state.battle.status = "敗北";
@@ -7309,7 +8114,8 @@ function handleDefeat() {
 function gainRewards(enemy) {
   const speedExpBonus = getSpeedModeExpBonus();
   const loopBonus = Math.min(BALANCE_CONFIG.reward.maxLoopBonus, state.loop.loopCount * BALANCE_CONFIG.reward.perLoopBonus);
-  const expGain = Math.floor(enemy.exp * BALANCE_CONFIG.reward.baseExpMultiplier * (1 + loopBonus + state.titleEffects.expMultiplier + speedExpBonus));
+  const bossExpBonus = state.battle?.isFieldBossBattle ? Math.max(0, Number(state.titleEffects.bossExpMultiplier || 0)) : 0;
+  const expGain = Math.floor(enemy.exp * BALANCE_CONFIG.reward.baseExpMultiplier * (1 + loopBonus + state.titleEffects.expMultiplier + speedExpBonus + bossExpBonus));
   const goldGain = Math.floor(enemy.gold * BALANCE_CONFIG.reward.baseGoldMultiplier * (1 + loopBonus + state.titleEffects.goldMultiplier));
   state.player.exp += expGain;
   state.player.gold += goldGain;
@@ -7343,7 +8149,8 @@ function gainRewards(enemy) {
 
 function checkLevelUp() {
   let leveled = false;
-  while (state.player.exp >= expToNextLevel()) {
+  const levelCap = getPlayerLevelCap();
+  while (state.player.level < levelCap && state.player.exp >= expToNextLevel()) {
     state.player.exp -= expToNextLevel();
     state.player.level += 1;
     state.player.maxHp += 8;
@@ -7748,10 +8555,14 @@ function syncLegacyActiveTitles() {
 }
 
 function recalculateTitleSlotCaps() {
+  ensureOtherworldState();
   const tier = getTitleSlotTierValue();
   const bossClearBonus = getBossClearTitleSlotBonus();
   const guildRankBonus = syncGuildRankTitleSlotBonus();
   const cheatShopBonus = getCheatTitleShopSlotBonus();
+  const otherworldNormalBonus = Math.max(0, Number(state.otherworldNormalTitleSlotBonus || 0));
+  const otherworldCheatBonus = Math.max(0, Number(state.otherworldCheatTitleSlotBonus || 0));
+  const protagonistUnlimited = hasTitleUnlocked("protagonist") || !!state.hasProtagonistTitle;
   state.normalTitleTierBonus = getTitleTierBonusByCategory("normal", tier);
   state.cheatTitleTierBonus = getTitleTierBonusByCategory("cheat", tier);
   state.bossClearNormalTitleSlotBonus = bossClearBonus.normal;
@@ -7762,7 +8573,8 @@ function recalculateTitleSlotCaps() {
     (state.baseNormalTitleSlots || 1) +
       state.bossClearNormalTitleSlotBonus +
       state.normalTitleTierBonus +
-      guildRankBonus.normal
+      guildRankBonus.normal +
+      otherworldNormalBonus
   );
   state.maxCheatTitleSlots = Math.max(
     1,
@@ -7770,8 +8582,13 @@ function recalculateTitleSlotCaps() {
       state.bossClearCheatTitleSlotBonus +
       state.cheatTitleTierBonus +
       guildRankBonus.cheat +
-      cheatShopBonus
+      cheatShopBonus +
+      otherworldCheatBonus
   );
+  if (protagonistUnlimited) {
+    state.maxNormalTitleSlots = 999;
+    state.maxCheatTitleSlots = 999;
+  }
 }
 
 function normalizeEquippedTitleSlots(options = {}) {
@@ -7881,6 +8698,11 @@ function unlockTitle(titleId) {
   }
   applyLoopTitleLimitUpgrades();
   addLog(`新たな称号を獲得: ${title.name}`, "title", { important: true });
+  if (titleId === "cheat_causality_exposed") {
+    addLog("その選択に、もはや迷いはなかった。", "important", { important: true });
+    addLog("積み重ねられた偏りは、ついに偶然を壊した。", "important", { important: true });
+    addLog("確率は、お前の前で意味を失う。", "important", { important: true });
+  }
   showTitleUnlockPopup(title);
   showCenterPopup({ text: `称号獲得: ${title.name}`, type: "title" });
   autoSaveIfNeeded("titleUnlock");
@@ -7931,6 +8753,9 @@ function toggleTitle(titleId) {
 
 function getCurrentTitleLimit() {
   ensureTitleSlotState();
+  if (hasTitleUnlocked("protagonist") || state.hasProtagonistTitle) {
+    return 9999;
+  }
   return Math.max(1, (state.maxNormalTitleSlots || 0) + (state.maxCheatTitleSlots || 0));
 }
 
@@ -8442,6 +9267,111 @@ function mergeTitleEffect(target, effect) {
   }
   if (typeof effect.sellPriceMultiplier === "number") {
     target.sellPriceMultiplier += effect.sellPriceMultiplier;
+  }
+  if (typeof effect.auctionSellPriceMultiplier === "number") {
+    target.auctionSellPriceMultiplier += effect.auctionSellPriceMultiplier;
+  }
+  if (typeof effect.auctionBuyPriceReduction === "number") {
+    target.auctionBuyPriceReduction += effect.auctionBuyPriceReduction;
+  }
+  if (typeof effect.auctionBargainChance === "number") {
+    target.auctionBargainChance += effect.auctionBargainChance;
+  }
+  if (typeof effect.chipGainMultiplier === "number") {
+    target.chipGainMultiplier += effect.chipGainMultiplier;
+  }
+  if (typeof effect.gambleJackpotDoubleChance === "number") {
+    target.gambleJackpotDoubleChance += effect.gambleJackpotDoubleChance;
+  }
+  if (typeof effect.gambleGuaranteedWin === "boolean") {
+    target.gambleGuaranteedWin = target.gambleGuaranteedWin || effect.gambleGuaranteedWin;
+  }
+  if (typeof effect.gambleLossReduction === "number") {
+    target.gambleLossReduction += effect.gambleLossReduction;
+  }
+  if (typeof effect.gambleHitChanceBonus === "number") {
+    target.gambleHitChanceBonus += effect.gambleHitChanceBonus;
+  }
+  if (typeof effect.gambleMinPayoutMultiplier === "number") {
+    target.gambleMinPayoutMultiplier += effect.gambleMinPayoutMultiplier;
+  }
+  if (typeof effect.bossExpMultiplier === "number") {
+    target.bossExpMultiplier += effect.bossExpMultiplier;
+  }
+  if (typeof effect.finalJobAllStatsMultiplier === "number") {
+    target.finalJobAllStatsMultiplier += effect.finalJobAllStatsMultiplier;
+  }
+  if (typeof effect.finalJobMaxHpMultiplier === "number") {
+    target.finalJobMaxHpMultiplier += effect.finalJobMaxHpMultiplier;
+  }
+  if (typeof effect.finalJobSkillDamageBonus === "number") {
+    target.finalJobSkillDamageBonus += effect.finalJobSkillDamageBonus;
+  }
+  if (typeof effect.finalJobSkillCooldownRecovery === "number") {
+    target.finalJobSkillCooldownRecovery += effect.finalJobSkillCooldownRecovery;
+  }
+  if (typeof effect.multiHitFromSecondDamageReduction === "number") {
+    target.multiHitFromSecondDamageReduction += effect.multiHitFromSecondDamageReduction;
+  }
+  if (typeof effect.afterTripleHitDamageBonus === "number") {
+    target.afterTripleHitDamageBonus += effect.afterTripleHitDamageBonus;
+  }
+  if (typeof effect.lowHpEnemyDamageBonus === "number") {
+    target.lowHpEnemyDamageBonus += effect.lowHpEnemyDamageBonus;
+  }
+  if (typeof effect.evasionWhenEnemyEnraged === "number") {
+    target.evasionWhenEnemyEnraged += effect.evasionWhenEnemyEnraged;
+  }
+  if (typeof effect.machineDamageBonus === "number") {
+    target.machineDamageBonus += effect.machineDamageBonus;
+  }
+  if (typeof effect.machineDefenseIgnore === "number") {
+    target.machineDefenseIgnore += effect.machineDefenseIgnore;
+  }
+  if (typeof effect.highDefenseEnemyDamageBonus === "number") {
+    target.highDefenseEnemyDamageBonus += effect.highDefenseEnemyDamageBonus;
+  }
+  if (typeof effect.quickBattleAttackBonus === "number") {
+    target.quickBattleAttackBonus += effect.quickBattleAttackBonus;
+  }
+  if (typeof effect.quickBattleSpeedBonus === "number") {
+    target.quickBattleSpeedBonus += effect.quickBattleSpeedBonus;
+  }
+  if (typeof effect.postQuickBattleDefensePenalty === "number") {
+    target.postQuickBattleDefensePenalty += effect.postQuickBattleDefensePenalty;
+  }
+  if (typeof effect.firstStrikeCritBonus === "number") {
+    target.firstStrikeCritBonus += effect.firstStrikeCritBonus;
+  }
+  if (typeof effect.bossDefeatAdaptiveDamageMax === "number") {
+    target.bossDefeatAdaptiveDamageMax += effect.bossDefeatAdaptiveDamageMax;
+  }
+  if (typeof effect.perEquippedAllStatsBonus === "number") {
+    target.perEquippedAllStatsBonus += effect.perEquippedAllStatsBonus;
+  }
+  if (typeof effect.perEquippedAllStatsBonusCap === "number") {
+    target.perEquippedAllStatsBonusCap = Math.max(target.perEquippedAllStatsBonusCap || 0, effect.perEquippedAllStatsBonusCap);
+  }
+  if (typeof effect.titleSynergyBoost === "number") {
+    target.titleSynergyBoost += effect.titleSynergyBoost;
+  }
+  if (typeof effect.heavyWeightDefenseBonus === "number") {
+    target.heavyWeightDefenseBonus += effect.heavyWeightDefenseBonus;
+  }
+  if (typeof effect.heavyWeightDamageReduction === "number") {
+    target.heavyWeightDamageReduction += effect.heavyWeightDamageReduction;
+  }
+  if (typeof effect.lightWeightEvasionBonus === "number") {
+    target.lightWeightEvasionBonus += effect.lightWeightEvasionBonus;
+  }
+  if (typeof effect.lightWeightSpeedBonus === "number") {
+    target.lightWeightSpeedBonus += effect.lightWeightSpeedBonus;
+  }
+  if (typeof effect.evadeCounterDamageBonus === "number") {
+    target.evadeCounterDamageBonus += effect.evadeCounterDamageBonus;
+  }
+  if (typeof effect.highDifficultyBossDamageBonus === "number") {
+    target.highDifficultyBossDamageBonus += effect.highDifficultyBossDamageBonus;
   }
   if (typeof effect.productionExpRateBonus === "number") {
     target.productionExpRateBonus += effect.productionExpRateBonus;
@@ -9339,6 +10269,21 @@ function getEffectivePlayerStats() {
     stats.intelligence *= mul;
     stats.luck *= mul;
   }
+  if (isMainJobFinalTier()) {
+    if (state.titleEffects.finalJobAllStatsMultiplier > 0) {
+      const mul = 1 + state.titleEffects.finalJobAllStatsMultiplier;
+      stats.maxHp *= mul;
+      stats.maxMp *= mul;
+      stats.attack *= mul;
+      stats.defense *= mul;
+      stats.speed *= mul;
+      stats.intelligence *= mul;
+      stats.luck *= mul;
+    }
+    if (state.titleEffects.finalJobMaxHpMultiplier > 0) {
+      stats.maxHp *= 1 + state.titleEffects.finalJobMaxHpMultiplier;
+    }
+  }
 
   stats.attack *= (1 + state.titleEffects.attackMultiplier + weightMods.attackMultiplier + slotScale);
   stats.defense *= (1 + state.titleEffects.defenseMultiplier + weightMods.defenseMultiplier + slotScale);
@@ -9422,6 +10367,29 @@ function getEffectivePlayerStats() {
     stats.attack *= 1 + bonus;
     stats.defense *= 1 + bonus;
   }
+  if (state.titleEffects.perEquippedAllStatsBonus > 0) {
+    const equippedCount = Math.max(0, (state.activeTitles || []).filter((id) => !!getTitleById(id)).length);
+    const cap = state.titleEffects.perEquippedAllStatsBonusCap || 0.2;
+    const bonus = Math.min(cap, equippedCount * state.titleEffects.perEquippedAllStatsBonus);
+    const mul = 1 + bonus;
+    stats.maxHp *= mul;
+    stats.maxMp *= mul;
+    stats.attack *= mul;
+    stats.defense *= mul;
+    stats.speed *= mul;
+    stats.intelligence *= mul;
+    stats.luck *= mul;
+  }
+  if (state.titleEffects.titleSynergyBoost > 0 && (state.activeTitles || []).length > 0) {
+    const mul = 1 + state.titleEffects.titleSynergyBoost;
+    stats.maxHp *= mul;
+    stats.maxMp *= mul;
+    stats.attack *= mul;
+    stats.defense *= mul;
+    stats.speed *= mul;
+    stats.intelligence *= mul;
+    stats.luck *= mul;
+  }
   if (state.titleEffects.weaponEnhanceAttackPerLevel > 0 || state.titleEffects.armorEnhanceDefensePerLevel > 0) {
     const breakdown = equipStats.breakdownBySlot || {};
     let weaponEnh = 0;
@@ -9455,6 +10423,38 @@ function getEffectivePlayerStats() {
   if (heavyBonus && weightRatio >= Number(heavyBonus.thresholdRatio || 0.8)) {
     stats.defense *= 1 + Number(heavyBonus.defenseMultiplier || 0);
     extraDamageReductionMultiplier *= 1 - Number(heavyBonus.damageReduction || 0);
+  }
+  if (weightRatio >= 0.8) {
+    if (state.titleEffects.heavyWeightDefenseBonus > 0) {
+      stats.defense *= 1 + state.titleEffects.heavyWeightDefenseBonus;
+    }
+    if (state.titleEffects.heavyWeightDamageReduction > 0) {
+      extraDamageReductionMultiplier *= 1 - state.titleEffects.heavyWeightDamageReduction;
+    }
+  }
+  if (weightRatio < 0.5) {
+    if (state.titleEffects.lightWeightEvasionBonus > 0) {
+      stats.evasion += state.titleEffects.lightWeightEvasionBonus;
+    }
+    if (state.titleEffects.lightWeightSpeedBonus > 0) {
+      stats.speed *= 1 + state.titleEffects.lightWeightSpeedBonus;
+    }
+  }
+  if (state.battle?.isActive && state.battle.enemySpawnedAt > 0) {
+    const elapsed = Date.now() - state.battle.enemySpawnedAt;
+    if (elapsed <= 10000) {
+      if (state.titleEffects.quickBattleAttackBonus > 0) {
+        stats.attack *= 1 + state.titleEffects.quickBattleAttackBonus;
+      }
+      if (state.titleEffects.quickBattleSpeedBonus > 0) {
+        stats.speed *= 1 + state.titleEffects.quickBattleSpeedBonus;
+      }
+    } else if (state.titleEffects.postQuickBattleDefensePenalty > 0) {
+      stats.defense *= Math.max(0.4, 1 - state.titleEffects.postQuickBattleDefensePenalty);
+    }
+    if (state.titleEffects.evasionWhenEnemyEnraged > 0 && isEnemyEnragedState()) {
+      stats.evasion += state.titleEffects.evasionWhenEnemyEnraged;
+    }
   }
   if (state.titleEffects.noReturnCombatBonus && state.stats.noReturnExpeditionActive) {
     const noReturn = state.titleEffects.noReturnCombatBonus;
@@ -9521,9 +10521,35 @@ function applyPlayerDamageBonuses(baseDamage, enemy) {
   }
   if (enemy.rarity === "fieldBoss" || enemy.rarity === "loopBoss" || enemy.rarity === "finalBoss") {
     damage = Math.floor(damage * (1 + state.titleEffects.damageToBoss + state.titleEffects.bossDamageBonus));
+    if (state.titleEffects.highDifficultyBossDamageBonus > 0 && isHighDifficultyStage()) {
+      damage = Math.floor(damage * (1 + state.titleEffects.highDifficultyBossDamageBonus));
+    }
+    if (state.titleEffects.bossDefeatAdaptiveDamageMax > 0) {
+      const adaptive = Math.min(state.titleEffects.bossDefeatAdaptiveDamageMax, Math.max(0, Number(state.stats.bossDefeatCount || 0)) * 0.01);
+      damage = Math.floor(damage * (1 + adaptive));
+    }
   }
   if (enemy.rarity === "unique") {
     damage = Math.floor(damage * (1 + state.titleEffects.damageToUnique + state.titleEffects.uniqueDamageBonus));
+  }
+  if (state.titleEffects.lowHpEnemyDamageBonus > 0 && Number(enemy.hp || 0) <= Number(enemy.maxHp || 0) * 0.7) {
+    damage = Math.floor(damage * (1 + state.titleEffects.lowHpEnemyDamageBonus));
+  }
+  if (state.titleEffects.highDefenseEnemyDamageBonus > 0 && Number(enemy.defense || 0) >= Math.max(1, getEffectivePlayerStat("attack") * 0.9)) {
+    damage = Math.floor(damage * (1 + state.titleEffects.highDefenseEnemyDamageBonus));
+  }
+  if (state.titleEffects.machineDamageBonus > 0 && isMechanicalEnemy(enemy)) {
+    damage = Math.floor(damage * (1 + state.titleEffects.machineDamageBonus));
+  }
+  if (state.titleRuntime.evadeCounterBoostReady && state.titleEffects.evadeCounterDamageBonus > 0) {
+    damage = Math.floor(damage * (1 + state.titleEffects.evadeCounterDamageBonus));
+    state.titleRuntime.evadeCounterBoostReady = false;
+    addLog("空蝉戦法: 回避カウンター強化が発動");
+  }
+  if (state.titleRuntime.afterTripleHitDamageBoostReady && state.titleEffects.afterTripleHitDamageBonus > 0) {
+    damage = Math.floor(damage * (1 + state.titleEffects.afterTripleHitDamageBonus));
+    state.titleRuntime.afterTripleHitDamageBoostReady = false;
+    addLog("連撃看破: 連撃返しが発動");
   }
   return Math.max(1, damage);
 }
@@ -10005,12 +11031,17 @@ function getCurrentSkillList() {
 }
 
 function calculateSkillDamage(skill) {
-  const enemyDef = state.battle.enemy ? state.battle.enemy.defense : 0;
+  const enemyDefRaw = state.battle.enemy ? state.battle.enemy.defense : 0;
+  const machineDefenseIgnore = isMechanicalEnemy(state.battle.enemy) ? clamp(0, 0.9, Number(state.titleEffects.machineDefenseIgnore || 0)) : 0;
+  const enemyDef = enemyDefRaw * (1 - machineDefenseIgnore);
   const equippedSkillCount = getEquippedSkills().length;
   const hasOpenSkillSlot = equippedSkillCount < 4;
   const slotOpenMul = hasOpenSkillSlot ? 1 + (state.titleEffects.skillPowerIfSkillSlotOpen || 0) : 1;
   const mainLineId = getCurrentMainBattleLineId();
   let skillMul = slotOpenMul * (1 + (state.titleEffects.skillDamageMultiplier || 0));
+  if (isMainJobFinalTier() && state.titleEffects.finalJobSkillDamageBonus > 0) {
+    skillMul *= 1 + state.titleEffects.finalJobSkillDamageBonus;
+  }
   if (mainLineId === "swordsman_line") {
     skillMul *= 1 + (state.titleEffects.swordsmanSkillDamageMultiplier || 0);
   }
@@ -10210,7 +11241,9 @@ function exchangeGoldToChips(goldAmount) {
   const chips = Math.max(1, Math.floor(amount / Math.max(1e-9, NEVEREND_CHIP_EXCHANGE_DATA.buyRateGoldPerChip)));
   state.player.gold -= amount;
   state.chips += chips;
+  state.stats.casinoExchangeCount = (state.stats.casinoExchangeCount || 0) + 1;
   addLog(`カジノ交換: ${amount}G -> ${chips}チップ`);
+  checkTitleUnlocks("afterCasinoPlay");
   render();
 }
 
@@ -10228,12 +11261,43 @@ function exchangeChipsToGold(chipAmount) {
   const gold = Math.max(1, Math.floor(amount * NEVEREND_CHIP_EXCHANGE_DATA.sellRateGoldPerChip));
   state.chips -= amount;
   state.player.gold += gold;
+  state.stats.casinoExchangeCount = (state.stats.casinoExchangeCount || 0) + 1;
   addLog(`カジノ交換: ${amount}チップ -> ${gold}G`);
+  checkTitleUnlocks("afterCasinoPlay");
   render();
 }
 
 function getAuctionItemById(auctionId) {
   return NEVEREND_AUCTION_ITEM_TABLE.find((row) => row.id === auctionId);
+}
+
+function refreshNeverendAuctionBargain(options = {}) {
+  ensureNeverendState();
+  const force = !!options.force;
+  const now = Date.now();
+  const refreshIntervalMs = 120000;
+  if (!force && now - (state.auctionRefreshState.lastRefreshAt || 0) < refreshIntervalMs) {
+    return;
+  }
+  state.auctionRefreshState.lastRefreshAt = now;
+  state.auctionRefreshState.refreshCount = (state.auctionRefreshState.refreshCount || 0) + 1;
+  state.auctionRefreshState.bargainAuctionId = null;
+  const bargainChance = clamp(0, 0.95, Number(state.titleEffects.auctionBargainChance || 0));
+  if (bargainChance <= 0 || Math.random() >= bargainChance || NEVEREND_AUCTION_ITEM_TABLE.length === 0) {
+    return;
+  }
+  const idx = Math.floor(Math.random() * NEVEREND_AUCTION_ITEM_TABLE.length);
+  state.auctionRefreshState.bargainAuctionId = NEVEREND_AUCTION_ITEM_TABLE[idx]?.id || null;
+}
+
+function getAuctionBuyPrice(row) {
+  const basePrice = Math.max(1, Math.floor(Number(row?.chipPrice || 0)));
+  const reduction = clamp(0, 0.9, Number(state.titleEffects.auctionBuyPriceReduction || 0));
+  let price = Math.floor(basePrice * (1 - reduction));
+  if (row?.id && row.id === state.auctionRefreshState?.bargainAuctionId) {
+    price = Math.floor(price * 0.3);
+  }
+  return Math.max(1, price);
 }
 
 function calculateAuctionSellPrice(itemId) {
@@ -10253,6 +11317,9 @@ function calculateAuctionSellPrice(itemId) {
   if (tags.includes("high_quality")) multiplier += 0.8;
   if (tags.includes("neverend")) multiplier += 0.9;
   if (tags.includes("boss_series")) multiplier += 0.7;
+  if (state.titleEffects.auctionSellPriceMultiplier > 0) {
+    multiplier *= 1 + state.titleEffects.auctionSellPriceMultiplier;
+  }
   return Math.max(50, Math.floor(baseSell * multiplier));
 }
 
@@ -10272,15 +11339,28 @@ function canAuctionSellItem(itemId) {
 
 function buyAuctionItem(auctionId) {
   ensureNeverendState();
+  ensureOtherworldState();
   const row = getAuctionItemById(auctionId);
   if (!row) return;
-  if (state.chips < row.chipPrice) {
+  const buyPrice = getAuctionBuyPrice(row);
+  if (state.chips < buyPrice) {
     addLog(`オークション購入失敗: ${ITEM_DATA[row.itemId]?.name || row.itemId} のチップ不足。`);
     return;
   }
-  state.chips -= row.chipPrice;
+  state.chips -= buyPrice;
   addItem(row.itemId, 1);
-  addLog(`オークション落札: ${ITEM_DATA[row.itemId]?.name || row.itemId} x1 (-${row.chipPrice}チップ)`);
+  if (row.itemId === "otherworldKey") {
+    state.hasOtherworldKey = true;
+    syncOtherworldUnlockState({ silent: false });
+  }
+  state.stats.auctionTradeCount = (state.stats.auctionTradeCount || 0) + 1;
+  state.stats.auctionChipSpentTotal = (state.stats.auctionChipSpentTotal || 0) + buyPrice;
+  if (buyPrice >= 100000) {
+    state.stats.auctionHighValuePurchaseCount = (state.stats.auctionHighValuePurchaseCount || 0) + 1;
+  }
+  state.stats.totalShopTrades = (state.stats.totalShopTrades || 0) + 1;
+  addLog(`オークション落札: ${ITEM_DATA[row.itemId]?.name || row.itemId} x1 (-${buyPrice}チップ)`);
+  checkTitleUnlocks("afterShopTrade");
   render();
 }
 
@@ -10295,7 +11375,10 @@ function sellAuctionItem(itemId) {
   }
   const price = calculateAuctionSellPrice(itemId);
   state.chips += price;
+  state.stats.auctionTradeCount = (state.stats.auctionTradeCount || 0) + 1;
+  state.stats.totalShopTrades = (state.stats.totalShopTrades || 0) + 1;
   addLog(`オークション売却: ${ITEM_DATA[itemId]?.name || itemId} x1 (+${price}チップ)`);
+  checkTitleUnlocks("afterShopTrade");
   render();
 }
 
@@ -10325,18 +11408,47 @@ function spinNeverendRoulette(vip = false) {
     return;
   }
   const selected = vip ? state.neverendUi.vipRouletteNumber : state.neverendUi.rouletteNumber;
-  const rolled = 1 + Math.floor(Math.random() * 5);
-  state.chips -= bet;
+  if (state.stats.rouletteSameNumberLastPick === selected) {
+    state.stats.rouletteSameNumberStreak = (state.stats.rouletteSameNumberStreak || 0) + 1;
+  } else {
+    state.stats.rouletteSameNumberStreak = 1;
+    state.stats.rouletteSameNumberLastPick = selected;
+  }
+  state.stats.rouletteSameNumberBest = Math.max(
+    state.stats.rouletteSameNumberBest || 0,
+    state.stats.rouletteSameNumberStreak || 0
+  );
+  let rolled = 1 + Math.floor(Math.random() * 5);
+  const lossReduction = clamp(0, 0.7, Number(state.titleEffects.gambleLossReduction || 0));
+  const actualBetLoss = Math.max(1, Math.floor(bet * (1 - lossReduction)));
+  state.chips -= actualBetLoss;
   let totalGain = 0;
   let won = false;
-  const hit = rolled === selected && Math.random() < rules.hitChance;
+  const guaranteedWin = !!state.titleEffects.gambleGuaranteedWin;
+  if (guaranteedWin) {
+    rolled = selected;
+  }
+  const hitChance = clamp(0, 0.95, rules.hitChance + Number(state.titleEffects.gambleHitChanceBonus || 0));
+  const hit = guaranteedWin || (rolled === selected && Math.random() < hitChance);
   if (hit) {
     totalGain = Math.floor(bet * rules.payoutMultiplier);
+    const minPayoutMul = Math.max(1, 1 + Number(state.titleEffects.gambleMinPayoutMultiplier || 0));
+    totalGain = Math.max(totalGain, Math.floor(bet * minPayoutMul));
+    if (state.titleEffects.chipGainMultiplier > 0) {
+      totalGain = Math.floor(totalGain * (1 + state.titleEffects.chipGainMultiplier));
+    }
+    const jackpotChance = clamp(0, 0.95, Number(state.titleEffects.gambleJackpotDoubleChance || 0));
+    const jackpot = jackpotChance > 0 && Math.random() < jackpotChance;
+    if (jackpot) {
+      totalGain *= 2;
+      addLog("胴元崩壊: 配当がさらに2倍化した！");
+    }
     state.chips += totalGain;
     won = true;
   }
   if (vip && !won && Math.random() < rules.crashChance) {
-    const extraLoss = Math.min(state.chips, Math.floor(bet * rules.crashLossRate));
+    const extraLossBase = Math.floor(bet * rules.crashLossRate);
+    const extraLoss = Math.min(state.chips, Math.max(0, Math.floor(extraLossBase * (1 - lossReduction))));
     state.chips -= extraLoss;
     state.rouletteStats.chipsLost += extraLoss;
     addLog(`VIP暴落: 追加で${extraLoss}チップを失った。`);
@@ -10348,9 +11460,19 @@ function spinNeverendRoulette(vip = false) {
     state.rouletteStats.spins += 1;
     if (won) state.rouletteStats.wins += 1;
   }
-  state.rouletteStats.chipsLost += bet;
+  state.rouletteStats.chipsLost += actualBetLoss;
   state.rouletteStats.chipsWon += totalGain;
-  addLog(`${vip ? "VIP" : "ルーレット"}: 予想${selected} / 結果${rolled} / ${won ? `的中 +${totalGain}チップ` : `ハズレ -${bet}チップ`}`);
+  if (won && guaranteedWin) {
+    const flavor = [
+      "因果が晒された",
+      "確率が壊れた",
+      "もう負けは起こらない",
+      "カジノがざわついている……"
+    ];
+    addLog(flavor[Math.floor(Math.random() * flavor.length)]);
+  }
+  addLog(`${vip ? "VIP" : "ルーレット"}: 予想${selected} / 結果${rolled} / ${won ? `的中 +${totalGain}チップ` : `ハズレ -${actualBetLoss}チップ`}`);
+  checkTitleUnlocks("afterCasinoPlay");
   render();
 }
 
@@ -10370,6 +11492,7 @@ function renderNeverendCasinoView() {
 
 function renderNeverendAuctionView() {
   ensureNeverendState();
+  refreshNeverendAuctionBargain();
   const activeMode = state.guild.shopMode === "sell" ? "sell" : "buy";
   const modeButtons = `
     <button class="btn shop-mode-tab-btn ${activeMode === "buy" ? "active" : ""}" data-shop-mode="buy">落札</button>
@@ -10379,12 +11502,14 @@ function renderNeverendAuctionView() {
     .map((row) => {
       const item = ITEM_DATA[row.itemId];
       const name = item?.name || row.itemId;
+      const isBargain = row.id === state.auctionRefreshState?.bargainAuctionId;
+      const price = getAuctionBuyPrice(row);
       return `
         <div class="shop-card">
           <h4>${escapeHtml(name)}</h4>
           <p class="tiny">${escapeHtml(item?.description || "説明なし")}</p>
-          <p class="tiny">価格: ${row.chipPrice}チップ</p>
-          <button class="btn auction-buy-chip-btn" data-auction-id="${row.id}" ${state.chips >= row.chipPrice ? "" : "disabled"}>落札</button>
+          <p class="tiny">価格: ${price}チップ${isBargain ? " / 掘り出し物(-70%)" : ""}</p>
+          <button class="btn auction-buy-chip-btn" data-auction-id="${row.id}" ${state.chips >= price ? "" : "disabled"}>落札</button>
         </div>
       `;
     })
@@ -11973,6 +13098,7 @@ function unlockStoryFragment(fragmentId, options = {}) {
 function syncStoryProgress(options = {}) {
   const silent = !!options.silent;
   const skipBoardRefresh = !!options.skipBoardRefresh;
+  syncOtherworldUnlockState({ silent });
   let unlockedAny = false;
   Object.entries(STORY_UNLOCK_CONDITIONS).forEach(([fragmentId, condition]) => {
     if (evaluateBoardCondition(condition)) {
@@ -12476,6 +13602,48 @@ function getTitleProgress(titleId) {
     rare_hunter_nose: { current: state.stats.uniqueEncounterCount, target: 1, label: "ユニーク遭遇" },
     title_combo_breaker: { current: state.stats.totalTitleCombosTried, target: 25, label: "称号コンボ数" },
     unique_theorist: { current: state.stats.totalUniqueTypesDefeated, target: 5, label: "ユニーク種類" },
+    cheat_gamble_king: { current: Math.min(getTotalRouletteSpins(), Math.floor((state.rouletteStats?.chipsWon || 0) / 10000)), target: 100, label: "ギャンブル進捗" },
+    cheat_gold_law_breaker: { current: state.stats.totalGoldLifetime || 0, target: 10000000, label: "累計GOLD" },
+    cheat_exp_usurper: { current: Math.min(state.player.level || 0, state.stats.totalBattles || 0, state.stats.fieldBossKillCount || 0), target: 200, label: "複合進捗(簡易)" },
+    cheat_final_job_overlord: { current: state.stats.enhancedBossKillCount || 0, target: 20, label: "高難易度ボス撃破" },
+    cheat_fate_rewriter: { current: Math.min(getTotalRouletteSpins(), state.stats.auctionTradeCount || 0, state.stats.fieldBossKillCount || 0, state.stats.uniqueEncounterCount || 0), target: 30, label: "複合進捗(簡易)" },
+    normal_auction_appraiser: { current: state.stats.auctionTradeCount || 0, target: 20, label: "オークション取引" },
+    normal_money_maker: { current: state.stats.totalGoldLifetime || 0, target: 1000000, label: "累計GOLD" },
+    normal_stack_builder: { current: state.stats.totalWins || 0, target: 500, label: "累計勝利" },
+    normal_gambler_instinct: { current: getTotalRouletteWins(), target: 50, label: "ギャンブル勝利" },
+    cheat_multi_hit_read: { current: state.stats.tripleAttackEnemyWinCount || 0, target: 50, label: "3連撃敵勝利" },
+    normal_multi_battle_wall: { current: state.stats.tripleAttackEnemyWinCount || 0, target: 50, label: "3連撃敵勝利" },
+    cheat_rage_breaker: { current: state.stats.enragedBossKillCount || 0, target: 20, label: "激怒系ボス撃破" },
+    normal_endgame_habituated: { current: state.stats.enragedBossKillCount || 0, target: 20, label: "激怒系ボス撃破" },
+    cheat_machine_slayer: { current: state.stats.mechanicalEnemyKillCount || 0, target: 200, label: "機械系撃破" },
+    normal_armor_breaker: { current: state.stats.mechanicalEnemyKillCount || 0, target: 200, label: "機械系撃破" },
+    cheat_instant_kill_doctrine: { current: state.stats.quickKill10sCount || 0, target: 100, label: "10秒以内撃破" },
+    normal_fast_resolution: { current: state.stats.quickKill10sCount || 0, target: 100, label: "10秒以内撃破" },
+    cheat_paper_edge_hunter: { current: state.stats.glassCannonWinCount || 0, target: 100, label: "低HP高火力敵勝利" },
+    normal_first_strike_focus: { current: state.stats.glassCannonWinCount || 0, target: 100, label: "低HP高火力敵勝利" },
+    cheat_defeat_adapt: { current: state.stats.bossDefeatCount || 0, target: 20, label: "ボス敗北回数" },
+    normal_indomitable: { current: state.stats.bossDefeatCount || 0, target: 20, label: "ボス敗北回数" },
+    cheat_build_completer: { current: state.stats.titleBuildQualifiedWinCount || 0, target: 50, label: "複合称号勝利" },
+    normal_title_familiarity: { current: state.stats.titleBuildQualifiedWinCount || 0, target: 50, label: "複合称号勝利" },
+    cheat_overweight_fortress: { current: state.stats.heavyHighDifficultyBossKillCount || 0, target: 10, label: "重装高難易度ボス" },
+    normal_heavy_armor_mastery: { current: state.stats.heavyHighDifficultyBossKillCount || 0, target: 10, label: "重装高難易度ボス" },
+    cheat_utsusemi_tactic: { current: state.stats.lightHighDifficultyBossKillCount || 0, target: 10, label: "軽装高難易度ボス" },
+    normal_light_step: { current: state.stats.lightHighDifficultyBossKillCount || 0, target: 10, label: "軽装高難易度ボス" },
+    cheat_end_of_world_solver: { current: state.stats.endgamePreparationBossKillCount || 0, target: 10, label: "終末ボス撃破" },
+    normal_keep_breaking_walls: { current: state.stats.endgamePreparationBossKillCount || 0, target: 10, label: "終末ボス撃破" },
+    cheat_house_edge_breaker: { current: getTotalRouletteWins(), target: 200, label: "ギャンブル累計勝利" },
+    cheat_market_meltdown: { current: state.stats.auctionChipSpentTotal || 0, target: 5000000, label: "オークション消費チップ" },
+    cheat_shadow_dealer: {
+      current: Math.min(
+        Math.floor((state.stats.casinoExchangeCount || 0) / 8),
+        Math.floor((state.stats.auctionTradeCount || 0) / 6),
+        Math.floor((state.rouletteStats?.vipSpins || 0) / 8),
+        state.stats.auctionHighValuePurchaseCount || 0
+      ),
+      target: 5,
+      label: "複合経済進捗(簡易)"
+    },
+    cheat_causality_exposed: { current: state.stats.rouletteSameNumberBest || 0, target: 100, label: "同数字連続選択" },
     workshop_commuter: { current: state.stats.productionWorkshopButtonPressCount || 0, target: 100, label: "工房ボタン" },
     workshop_maniac: { current: state.stats.productionWorkshopButtonPressCount || 0, target: 1000, label: "工房ボタン" },
     workshop_lodger: { current: state.stats.productionWorkshopStaySeconds || 0, target: 180, label: "工房滞在秒" },
@@ -12654,6 +13822,8 @@ function renderTitleCatalog() {
   const baseCheat = TITLE_SLOT_RULES.cheat.baseDefault;
   const loopNormal = Math.max(0, Number(state.titleSlotUnlocks?.normalBasePlus || 0));
   const loopCheat = Math.max(0, Number(state.titleSlotUnlocks?.cheatBasePlus || 0));
+  const otherworldNormal = Math.max(0, Number(state.otherworldNormalTitleSlotBonus || 0));
+  const otherworldCheat = Math.max(0, Number(state.otherworldCheatTitleSlotBonus || 0));
   const bossNormal = Math.max(0, Number(state.bossClearNormalTitleSlotBonus || 0));
   const bossCheat = Math.max(0, Number(state.bossClearCheatTitleSlotBonus || 0));
   const cheatShop = Math.max(0, Number(state.cheatTitleShopSlotBonus || 0));
@@ -12673,8 +13843,8 @@ function renderTitleCatalog() {
         summaryCollapsed
           ? ""
           : `
-      <p class="tiny">内訳(N): 初期${baseNormal} + 周回${loopNormal} + 地域突破${bossNormal} + Tier${tierNormal} + ギルドランク${guildNormal}</p>
-      <p class="tiny">内訳(C): 初期${baseCheat} + 周回${loopCheat} + 地域突破${bossCheat} + Tier${tierCheat} + ギルドランク${guildCheat} + 神殿購入${cheatShop}</p>
+      <p class="tiny">内訳(N): 初期${baseNormal} + 周回${loopNormal} + 地域突破${bossNormal} + Tier${tierNormal} + ギルドランク${guildNormal} + 異界${otherworldNormal}</p>
+      <p class="tiny">内訳(C): 初期${baseCheat} + 周回${loopCheat} + 地域突破${bossCheat} + Tier${tierCheat} + ギルドランク${guildCheat} + 神殿購入${cheatShop} + 異界${otherworldCheat}</p>
       <p class="tiny">ノーマル装備中: ${escapeHtml(normalEquippedNames || "なし")}</p>
       <p class="tiny">チート装備中: ${escapeHtml(cheatEquippedNames || "なし")}</p>
       <p class="tiny">解放条件: ${escapeHtml(normalTierHint)} / ${escapeHtml(cheatTierHint)}</p>
@@ -13099,6 +14269,19 @@ function splitRunAndPersistentState() {
     hasNeverendTicket: !!state.hasNeverendTicket,
     neverendUnlocked: !!state.neverendUnlocked,
     neverendVipUnlocked: !!state.neverendVipUnlocked,
+    hasOtherworldKey: !!state.hasOtherworldKey,
+    otherworldUnlocked: !!state.otherworldUnlocked,
+    otherworldKingDefeatCount: Math.max(0, Math.floor(Number(state.otherworldKingDefeatCount || 0))),
+    otherworldKingFirstDefeatRewardClaimed: !!state.otherworldKingFirstDefeatRewardClaimed,
+    otherworldKingTenDefeatRewardClaimed: !!state.otherworldKingTenDefeatRewardClaimed,
+    otherworldKingHundredDefeatRewardClaimed: !!state.otherworldKingHundredDefeatRewardClaimed,
+    otherworldKingCleared: !!state.otherworldKingCleared,
+    otherworldKingSupportLogMode: !!state.otherworldKingSupportLogMode,
+    otherworldLevelCapBonus: Math.max(0, Math.floor(Number(state.otherworldLevelCapBonus || 0))),
+    otherworldNormalTitleSlotBonus: Math.max(0, Math.floor(Number(state.otherworldNormalTitleSlotBonus || 0))),
+    otherworldCheatTitleSlotBonus: Math.max(0, Math.floor(Number(state.otherworldCheatTitleSlotBonus || 0))),
+    hasProtagonistTitle: !!state.hasProtagonistTitle,
+    endingUnlocked: !!state.endingUnlocked,
     chips: Math.max(0, Math.floor(Number(state.chips || 0))),
     neverendBossClearFlags: deepCopyPlain(state.neverendBossClearFlags || {}),
     auctionRefreshState: deepCopyPlain(state.auctionRefreshState || createDefaultAuctionRefreshState()),
@@ -13249,6 +14432,19 @@ function applyLoadedState(payload) {
   state.hasNeverendTicket = !!run.hasNeverendTicket;
   state.neverendUnlocked = !!run.neverendUnlocked;
   state.neverendVipUnlocked = !!run.neverendVipUnlocked;
+  state.hasOtherworldKey = !!run.hasOtherworldKey;
+  state.otherworldUnlocked = !!run.otherworldUnlocked;
+  state.otherworldKingDefeatCount = Math.max(0, Math.floor(Number(run.otherworldKingDefeatCount || 0)));
+  state.otherworldKingFirstDefeatRewardClaimed = !!run.otherworldKingFirstDefeatRewardClaimed;
+  state.otherworldKingTenDefeatRewardClaimed = !!run.otherworldKingTenDefeatRewardClaimed;
+  state.otherworldKingHundredDefeatRewardClaimed = !!run.otherworldKingHundredDefeatRewardClaimed;
+  state.otherworldKingCleared = !!run.otherworldKingCleared;
+  state.otherworldKingSupportLogMode = !!run.otherworldKingSupportLogMode;
+  state.otherworldLevelCapBonus = Math.max(0, Math.floor(Number(run.otherworldLevelCapBonus || 0)));
+  state.otherworldNormalTitleSlotBonus = Math.max(0, Math.floor(Number(run.otherworldNormalTitleSlotBonus || 0)));
+  state.otherworldCheatTitleSlotBonus = Math.max(0, Math.floor(Number(run.otherworldCheatTitleSlotBonus || 0)));
+  state.hasProtagonistTitle = !!run.hasProtagonistTitle;
+  state.endingUnlocked = !!run.endingUnlocked;
   state.chips = Math.max(0, Math.floor(Number(run.chips || 0)));
   state.neverendBossClearFlags = run.neverendBossClearFlags && typeof run.neverendBossClearFlags === "object" ? run.neverendBossClearFlags : {};
   state.auctionRefreshState = run.auctionRefreshState && typeof run.auctionRefreshState === "object"
@@ -13322,6 +14518,23 @@ function applyLoadedState(payload) {
   if (typeof state.stats.productionWorkshopButtonPressCount !== "number") state.stats.productionWorkshopButtonPressCount = 0;
   if (typeof state.stats.productionWorkshopStaySeconds !== "number") state.stats.productionWorkshopStaySeconds = 0;
   if (typeof state.stats.productionWorkshopStayMs !== "number") state.stats.productionWorkshopStayMs = 0;
+  if (typeof state.stats.auctionTradeCount !== "number") state.stats.auctionTradeCount = 0;
+  if (typeof state.stats.auctionChipSpentTotal !== "number") state.stats.auctionChipSpentTotal = 0;
+  if (typeof state.stats.auctionHighValuePurchaseCount !== "number") state.stats.auctionHighValuePurchaseCount = 0;
+  if (typeof state.stats.casinoExchangeCount !== "number") state.stats.casinoExchangeCount = 0;
+  if (typeof state.stats.rouletteSameNumberStreak !== "number") state.stats.rouletteSameNumberStreak = 0;
+  if (typeof state.stats.rouletteSameNumberBest !== "number") state.stats.rouletteSameNumberBest = 0;
+  if (typeof state.stats.rouletteSameNumberLastPick !== "number") state.stats.rouletteSameNumberLastPick = null;
+  if (typeof state.stats.tripleAttackEnemyWinCount !== "number") state.stats.tripleAttackEnemyWinCount = 0;
+  if (typeof state.stats.enragedBossKillCount !== "number") state.stats.enragedBossKillCount = 0;
+  if (typeof state.stats.mechanicalEnemyKillCount !== "number") state.stats.mechanicalEnemyKillCount = 0;
+  if (typeof state.stats.quickKill10sCount !== "number") state.stats.quickKill10sCount = 0;
+  if (typeof state.stats.glassCannonWinCount !== "number") state.stats.glassCannonWinCount = 0;
+  if (typeof state.stats.bossDefeatCount !== "number") state.stats.bossDefeatCount = 0;
+  if (typeof state.stats.titleBuildQualifiedWinCount !== "number") state.stats.titleBuildQualifiedWinCount = 0;
+  if (typeof state.stats.heavyHighDifficultyBossKillCount !== "number") state.stats.heavyHighDifficultyBossKillCount = 0;
+  if (typeof state.stats.lightHighDifficultyBossKillCount !== "number") state.stats.lightHighDifficultyBossKillCount = 0;
+  if (typeof state.stats.endgamePreparationBossKillCount !== "number") state.stats.endgamePreparationBossKillCount = 0;
   state.jobEvolutionFlags = { ...state.jobEvolutionFlags, ...(run.jobEvolutionFlags || {}) };
   state.unlockedSkills = { ...state.unlockedSkills, ...(run.unlockedSkills || {}) };
   state.stats.defeatsByStage = state.stats.defeatsByStage || {};
@@ -13353,10 +14566,16 @@ function applyLoadedState(payload) {
   state.guild.shopRegionTab = SHOP_REGION_TABS.some((tab) => tab.id === state.guild.shopRegionTab) ? state.guild.shopRegionTab : "grassland";
   state.guild.shopMode = state.guild.shopMode === "sell" ? "sell" : "buy";
   ensureNeverendState();
+  ensureOtherworldState();
   if (state.hasNeverendTicket || state.neverendUnlocked) {
     unlockNeverendAccess({ silent: true });
   }
+  syncOtherworldUnlockState({ silent: true });
   if (state.currentTown === "neverend" && !canEnterNeverend()) {
+    state.currentTown = "balladore";
+    state.currentMap = TOWN_DATA.balladore.mapId;
+  }
+  if (state.currentTown === "otherworld" && !canEnterOtherworld()) {
     state.currentTown = "balladore";
     state.currentMap = TOWN_DATA.balladore.mapId;
   }
@@ -14611,6 +15830,10 @@ function addItem(itemId, qty) {
   } else {
     state.player.inventory.push({ itemId, quantity: qty });
   }
+  if (itemId === "otherworldKey") {
+    state.hasOtherworldKey = true;
+    syncOtherworldUnlockState({ silent: true });
+  }
 }
 
 function removeItem(itemId, qty) {
@@ -14787,6 +16010,41 @@ function renderLoopResultView() {
   });
 }
 
+function renderOtherworldEndingView() {
+  app.innerHTML = `
+    <section class="screen title-screen">
+      <h1 class="game-title">異界エンディング</h1>
+      <p class="subtitle">世界は救われた。そう主人公によって</p>
+      <div class="panel loop-summary-panel">
+        <p>称号: 主人公</p>
+        <p>異界の王敗北回数: ${state.otherworldKingDefeatCount || 0}</p>
+        <p>到達レベル: ${state.player.level}</p>
+        <p>掲示板は歓喜で埋め尽くされている。</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+        <button id="otherworld-loop-btn" class="btn btn-primary">周回する</button>
+        <button id="otherworld-reset-btn" class="btn">リセットする</button>
+      </div>
+    </section>
+  `;
+  const loopBtn = document.getElementById("otherworld-loop-btn");
+  if (loopBtn) {
+    loopBtn.addEventListener("click", () => {
+      prepareLoopResult();
+      state.screen = "clearResult";
+      render();
+    });
+  }
+  const resetBtn = document.getElementById("otherworld-reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      const ok = window.confirm("全データをリセットしますか？");
+      if (!ok) return;
+      resetAllData();
+    });
+  }
+}
+
 function renderClearResultView() {
   renderLoopResultView();
 }
@@ -14893,6 +16151,19 @@ function resetForNewLoop() {
   state.hasNeverendTicket = false;
   state.neverendUnlocked = false;
   state.neverendVipUnlocked = false;
+  state.hasOtherworldKey = false;
+  state.otherworldUnlocked = false;
+  state.otherworldKingDefeatCount = 0;
+  state.otherworldKingFirstDefeatRewardClaimed = false;
+  state.otherworldKingTenDefeatRewardClaimed = false;
+  state.otherworldKingHundredDefeatRewardClaimed = false;
+  state.otherworldKingCleared = false;
+  state.otherworldKingSupportLogMode = false;
+  state.otherworldLevelCapBonus = 0;
+  state.otherworldNormalTitleSlotBonus = 0;
+  state.otherworldCheatTitleSlotBonus = 0;
+  state.hasProtagonistTitle = false;
+  state.endingUnlocked = false;
   state.chips = 0;
   state.neverendBossClearFlags = {};
   state.auctionRefreshState = createDefaultAuctionRefreshState();
@@ -14959,7 +16230,8 @@ function resetForNewLoop() {
     critFinishThisBoss: false,
     stageDamageTaken: 0,
     loopChallengeId: null,
-    autoItemGlobalCooldownUntil: 0
+    autoItemGlobalCooldownUntil: 0,
+    enemySpawnedAt: 0
   };
   Object.keys(STAGE_DATA).forEach((stageId) => {
     state.stageProgressById[stageId] = { kills: 0, target: STAGE_DATA[stageId].targetKills, cleared: false };
@@ -15046,6 +16318,13 @@ function resetForNewLoop() {
   state.stats.enemyKillCounts = {};
   state.stats.damageTakenTotal = 0;
   state.stats.totalCraftExp = 0;
+  state.stats.auctionTradeCount = 0;
+  state.stats.auctionChipSpentTotal = 0;
+  state.stats.auctionHighValuePurchaseCount = 0;
+  state.stats.casinoExchangeCount = 0;
+  state.stats.rouletteSameNumberStreak = 0;
+  state.stats.rouletteSameNumberBest = 0;
+  state.stats.rouletteSameNumberLastPick = null;
   state.stats.craftCountByType = {};
   state.stats.craftCountByRecipe = {};
   state.stats.craftSuccessCount = 0;
@@ -15143,6 +16422,16 @@ function resetForNewLoop() {
   state.stats.seaSpecialEnemyKillCount = 0;
   state.stats.volcanoBurnWinCount = 0;
   state.stats.seaEvadeSuccessCount = 0;
+  state.stats.tripleAttackEnemyWinCount = 0;
+  state.stats.enragedBossKillCount = 0;
+  state.stats.mechanicalEnemyKillCount = 0;
+  state.stats.quickKill10sCount = 0;
+  state.stats.glassCannonWinCount = 0;
+  state.stats.bossDefeatCount = 0;
+  state.stats.titleBuildQualifiedWinCount = 0;
+  state.stats.heavyHighDifficultyBossKillCount = 0;
+  state.stats.lightHighDifficultyBossKillCount = 0;
+  state.stats.endgamePreparationBossKillCount = 0;
   state.stats.volcanoDefenseSkillUseCount = 0;
   state.stats.weaponEnhanceCount = 0;
   state.stats.armorEnhanceCount = 0;
@@ -15304,6 +16593,9 @@ function toPercent(value, max) {
 function getCappedEffectiveEvasion(stats, regionId) {
   const base = Number(stats?.evasion || 0);
   const regionBonus = Number(state.titleEffects.evadeByRegion?.[regionId] || 0);
+  if (hasTitleUnlocked("protagonist") || state.hasProtagonistTitle) {
+    return Math.max(0, base + regionBonus);
+  }
   return clamp(0, 0.75, base + regionBonus);
 }
 
@@ -15337,10 +16629,12 @@ function bootstrapStoredPreferences() {
 setInterval(handleSecondTick, 1000);
 
 bootstrapStoredPreferences();
+ensureOtherworldState();
 recalculateTitleEffects();
 applyLoopUnlocks();
 applyLoopTitleLimitUpgrades();
 updateUnlockedBattleSpeeds();
+syncOtherworldUnlockState({ silent: true });
 updateBoardThreadsFromProgress();
 refreshGuildQuests(false);
 render();
