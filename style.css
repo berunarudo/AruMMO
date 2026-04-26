@@ -252,6 +252,27 @@ body {
   font-size: 0.95rem;
 }
 
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.panel-title-row .panel-title {
+  border-bottom: 0;
+  background: transparent;
+  padding-right: 8px;
+}
+
+.mobile-log-close-btn {
+  display: none;
+  margin-right: 8px;
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
 .log-toolbar {
   border-bottom: 1px solid rgba(100, 116, 139, 0.45);
   padding: 8px 10px;
@@ -1190,11 +1211,28 @@ body {
     position: fixed;
     left: 8px;
     right: 8px;
-    bottom: 140px;
-    max-height: 52vh;
+    top: 8px;
+    bottom: auto;
+    max-height: 68vh;
     z-index: 23;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
     border-width: 2px;
+  }
+
+  .game-layout-wrap.mobile-log-open .log-toolbar {
+    display: none;
+  }
+
+  .game-layout-wrap.mobile-log-open .panel-title-row {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .game-layout-wrap.mobile-log-open .mobile-log-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .game-layout-wrap.mobile-log-open .mobile-log-toggle-btn {
@@ -1208,7 +1246,7 @@ body {
   .log-list {
     font-size: 0.9rem;
     line-height: 1.45;
-    max-height: 40vh;
+    max-height: 58vh;
   }
 
   .bottom-panel {

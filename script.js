@@ -78,7 +78,7 @@ const BALANCE_CONFIG = {
     expCurvePerLevel: 24
   },
   crafting: {
-    baseProductionExpMultiplier: 1.45,
+    baseProductionExpMultiplier: 3.0,
     perLoopSuccessBonus: 0.006,
     perLoopGodBonus: 0.0015
   },
@@ -7902,7 +7902,10 @@ function renderGameScreen() {
 
       <section class="screen game-layout">
         <aside class="log-panel">
-          <h3 class="panel-title">ログ</h3>
+          <div class="panel-title-row">
+            <h3 class="panel-title">ログ</h3>
+            <button id="mobile-log-close-btn" class="btn mobile-log-close-btn">閉じる</button>
+          </div>
           ${renderLogFilters()}
           <ul id="log-list" class="log-list"></ul>
         </aside>
@@ -17540,7 +17543,10 @@ function applyLoadedState(payload) {
   }
   const run = data.runState;
   const persistent = data.persistentState;
-  const settings = data.settingsState;
+  const latestSettings = safeLoadJson(STORAGE_KEYS.SETTINGS);
+  const settings = latestSettings && typeof latestSettings === "object"
+    ? { ...data.settingsState, ...latestSettings }
+    : data.settingsState;
 
   state.screen = run.screen || "game";
   state.introIndex = run.introIndex || 0;
@@ -18310,6 +18316,13 @@ function bindGameEvents() {
   if (mobileLogToggleBtn) {
     mobileLogToggleBtn.addEventListener("click", () => {
       state.ui.mobileLogOpen = !state.ui.mobileLogOpen;
+      renderPreservingWindowScroll();
+    });
+  }
+  const mobileLogCloseBtn = document.getElementById("mobile-log-close-btn");
+  if (mobileLogCloseBtn) {
+    mobileLogCloseBtn.addEventListener("click", () => {
+      state.ui.mobileLogOpen = false;
       renderPreservingWindowScroll();
     });
   }
