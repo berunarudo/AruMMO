@@ -634,8 +634,17 @@ function isOtherworldNonKingEnemy(enemy) {
 
 function isEnemyDamageNullifiedByTitle(enemy = state.battle?.enemy) {
   if (!enemy) return false;
-  if (state.titleEffects.nullifyMachineBossDamage && isMachineBossEnemy(enemy)) return true;
-  if (state.titleEffects.nullifyOtherworldNonKingDamage && isOtherworldNonKingEnemy(enemy)) return true;
+  const unlockedTitles = Array.isArray(state.unlockedTitles) ? state.unlockedTitles : [];
+  const hasGodsCradle =
+    !!state.titleEffects.nullifyMachineBossDamage ||
+    unlockedTitles.includes("cheat_gods_cradle") ||
+    (state.stats.neverendMachineBossDefeatCount || 0) >= 100;
+  const hasGodsBlessing =
+    !!state.titleEffects.nullifyOtherworldNonKingDamage ||
+    unlockedTitles.includes("cheat_gods_blessing") ||
+    (state.stats.otherworldNonKingDefeatCount || 0) >= 100;
+  if (hasGodsCradle && isMachineBossEnemy(enemy)) return true;
+  if (hasGodsBlessing && isOtherworldNonKingEnemy(enemy)) return true;
   return false;
 }
 
