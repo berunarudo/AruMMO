@@ -561,6 +561,39 @@ function hasTitleUnlocked(titleId) {
   return Array.isArray(state.unlockedTitles) && state.unlockedTitles.includes(titleId);
 }
 
+function syncProtagonistUniversalTitleUnlock() {
+  const protagonistUnlocked = !!(state.hasProtagonistTitle || state.otherworldKingCleared || hasTitleUnlocked("protagonist"));
+  if (!protagonistUnlocked) {
+    return false;
+  }
+  if (!Array.isArray(state.unlockedTitles)) {
+    state.unlockedTitles = [];
+  }
+  const titleSource = Array.isArray(state.world?.titles) ? state.world.titles : TITLE_DATA;
+  const allTitleIds = [...new Set(titleSource.map((title) => title?.id).filter((id) => !!id))];
+  const missing = allTitleIds.filter((id) => !state.unlockedTitles.includes(id));
+  if (missing.length <= 0) {
+    return false;
+  }
+  state.unlockedTitles.push(...missing);
+  if (Array.isArray(state.loop?.titleHistory)) {
+    missing.forEach((id) => {
+      if (!state.loop.titleHistory.includes(id)) {
+        state.loop.titleHistory.push(id);
+      }
+    });
+  }
+  ensureGuildFameState();
+  const fameMissing = missing.filter((id) => String(id).startsWith("fame_"));
+  fameMissing.forEach((id) => {
+    if (!state.guild.claimedFameTitleIds.includes(id)) {
+      state.guild.claimedFameTitleIds.push(id);
+    }
+  });
+  state.worldStateFlags = { ...(state.worldStateFlags || {}), protagonistAllTitlesUnlocked: true };
+  return true;
+}
+
 function getPlayerLevelCap() {
   if (hasTitleUnlocked("protagonist") || state.hasProtagonistTitle) return OTHERWORLD_UNLOCK_RULES.protagonistLevelCap;
   if (hasTitleUnlocked("acknowledged_by_king") || (state.otherworldLevelCapBonus || 0) >= 100) return OTHERWORLD_UNLOCK_RULES.kingRecognizedLevelCap;
@@ -1875,8 +1908,7 @@ const OTHERWORLD_TITLE_SLOT_FORGE_RULE = {
   maxBuys: 10,
   bonusPerBuy: 1,
   materialNeed: [
-    { itemId: "deepShard", qty: 10 },
-    { itemId: "warpedCore", qty: 1 }
+    { itemId: "deepShard", qty: 10 }
   ]
 };
 
@@ -2045,7 +2077,7 @@ function purchaseCheatTitleSlotOffer(offerId) {
   recalculateTitleEffects();
   refreshPlayerDerivedStats();
   addLog(`ギルドショップ購入: ${offer.label} を購入。チート称号枠 +${offer.bonus}`);
-  render();
+  renderPreservingWindowScroll();
 }
 
 function normalizeRegionBossSlotRewardState(source) {
@@ -10907,7 +10939,7 @@ function evaluateTitleUnlockCondition(title) {
 }
 
 function checkTitleUnlocks(triggerType) {
-  let unlockedAny = false;
+  let unlockedAny = syncProtagonistUniversalTitleUnlock();
   state.world.titles.forEach((title) => {
     if (state.unlockedTitles.includes(title.id)) {
       return;
@@ -11083,6 +11115,7 @@ function applyTitleSlotUnlocksFromLoop() {
 
 function ensureTitleSlotState() {
   if (!Array.isArray(state.unlockedTitles)) state.unlockedTitles = [];
+  syncProtagonistUniversalTitleUnlock();
   if (!Array.isArray(state.activeTitles)) state.activeTitles = [];
   if (!Array.isArray(state.equippedNormalTitleIds)) state.equippedNormalTitleIds = [];
   if (!Array.isArray(state.equippedCheatTitleIds)) state.equippedCheatTitleIds = [];
@@ -11140,6 +11173,9 @@ function unlockTitle(titleId) {
     return;
   }
   state.unlockedTitles.push(titleId);
+  if (titleId === "protagonist") {
+    syncProtagonistUniversalTitleUnlock();
+  }
   if (String(titleId).startsWith("fame_")) {
     ensureGuildFameState();
     if (!state.guild.claimedFameTitleIds.includes(titleId)) {
@@ -19382,11 +19418,20 @@ function confirmCarryOverSelection() {
 
 function applyCarryOverSelections() {
   const selected = [...state.loop.selectedCarryOverTitleIds];
+  const hasProtagonistRecord =
+    selected.includes("protagonist") ||
+    state.loop.titleHistory.includes("protagonist") ||
+    !!state.hasProtagonistTitle;
+  if (hasProtagonistRecord && !selected.includes("protagonist")) {
+    selected.push("protagonist");
+  }
   const timerTitles = ["time_nibbler", "time_keeper_1", "time_keeper_2", "time_keeper_3", "time_lord"].filter((id) =>
     state.loop.titleHistory.includes(id)
   );
   state.loop.carriedTitles = selected;
   state.unlockedTitles = [...new Set([...selected, ...timerTitles])];
+  state.hasProtagonistTitle = hasProtagonistRecord;
+  syncProtagonistUniversalTitleUnlock();
   state.equippedNormalTitleIds = [];
   state.equippedCheatTitleIds = [];
   syncLegacyActiveTitles();
@@ -19430,7 +19475,7 @@ function resetForNewLoop() {
   state.otherworldLevelCapBonus = 0;
   state.otherworldNormalTitleSlotBonus = 0;
   state.otherworldCheatTitleSlotBonus = 0;
-  state.hasProtagonistTitle = false;
+  state.hasProtagonistTitle = state.unlockedTitles.includes("protagonist");
   state.endingUnlocked = false;
   state.chips = 0;
   state.neverendBossClearFlags = {};
@@ -19804,6 +19849,10 @@ function startNewLoop() {
   applyCarryOverSelections();
   state.loop.loopCount += 1;
   resetForNewLoop();
+  if (state.unlockedTitles.includes("protagonist")) {
+    state.hasProtagonistTitle = true;
+    syncProtagonistUniversalTitleUnlock();
+  }
   applyLoopUnlocks();
   applyLoopTitleLimitUpgrades();
   recalculateTitleEffects();
