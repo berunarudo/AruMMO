@@ -9080,27 +9080,32 @@ function enemyActionProtocol3() {
     extra.protocol3BaseAttack = enemy.attack;
     extra.protocol3BaseDefense = enemy.defense;
     extra.protocol3BaseSpeed = enemy.speed;
+    extra.protocol3AttackCapNormal = Math.floor(extra.protocol3BaseAttack * 1.02);
+    extra.protocol3AttackCapEnraged = Math.floor(extra.protocol3BaseAttack * 1.46);
     extra.protocol3Rage = false;
     extra.protocol3TargetLockUntil = 0;
     extra.protocol3DamageTakenMultiplier = 1;
+    enemy.attack = Math.max(1, Math.floor(extra.protocol3BaseAttack * 0.62));
+    enemy.speed = Math.max(1, Math.floor(extra.protocol3BaseSpeed * 0.92));
   }
   const hpRate = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
   if (!extra.protocol3Rage && hpRate <= 0.3) {
     extra.protocol3Rage = true;
-    enemy.attack = Math.floor(extra.protocol3BaseAttack * 1.48);
-    enemy.speed = Math.floor(extra.protocol3BaseSpeed * 1.2);
-    enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.68);
-    extra.protocol3DamageTakenMultiplier = 1.42;
+    enemy.attack = Math.max(enemy.attack, Math.floor(extra.protocol3BaseAttack * 0.98));
+    enemy.speed = Math.max(enemy.speed, Math.floor(extra.protocol3BaseSpeed * 1.14));
+    enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.66);
+    extra.protocol3DamageTakenMultiplier = 1.45;
     addLog("Protocol3 が激怒状態へ移行。火力が激増し、装甲が脆化した。");
     refreshSceneBgm({ force: true, useFade: true });
   }
   const enraged = !!extra.protocol3Rage;
   const normalActions = [
-    { id: "tri_burst", weight: 28 },
-    { id: "pulse_cannon", weight: 24 },
+    { id: "tri_burst", weight: 26 },
+    { id: "pulse_cannon", weight: 20 },
+    { id: "overclock", weight: 10 },
     { id: "armor_deploy", weight: 16 },
-    { id: "target_lock", weight: 16 },
-    { id: "cool_restart", weight: 16 }
+    { id: "target_lock", weight: 14 },
+    { id: "cool_restart", weight: 14 }
   ];
   const enragedActions = [
     { id: "overclock", weight: 16 },
@@ -9127,20 +9132,22 @@ function enemyActionProtocol3() {
     return;
   }
   if (action === "overclock") {
-    enemy.attack = Math.floor(enemy.attack * 1.12);
-    enemy.speed = Math.floor(enemy.speed * 1.08);
+    const attackCap = Math.max(1, Math.floor(enraged ? (extra.protocol3AttackCapEnraged || extra.protocol3BaseAttack) : (extra.protocol3AttackCapNormal || extra.protocol3BaseAttack)));
+    const speedCap = Math.max(1, Math.floor(extra.protocol3BaseSpeed * (enraged ? 1.24 : 1.04)));
+    enemy.attack = Math.min(attackCap, Math.floor(enemy.attack * (enraged ? 1.12 : 1.15)));
+    enemy.speed = Math.min(speedCap, Math.floor(enemy.speed * (enraged ? 1.07 : 1.09)));
     addLog("Protocol3: オーバークロック（攻撃・速度上昇）");
     return;
   }
   if (action === "control_break") {
-    enemy.attack = Math.floor(enemy.attack * 1.15);
+    enemy.attack = Math.min(Math.max(1, Math.floor(extra.protocol3AttackCapEnraged || extra.protocol3BaseAttack)), Math.floor(enemy.attack * 1.08));
     enemy.defense = Math.max(1, Math.floor(enemy.defense * 0.86));
-    extra.protocol3DamageTakenMultiplier = Math.max(extra.protocol3DamageTakenMultiplier || 1, 1.45);
+    extra.protocol3DamageTakenMultiplier = Math.max(extra.protocol3DamageTakenMultiplier || 1, 1.48);
     addLog("Protocol3: 制御崩壊（与ダメ上昇 / 被ダメ上昇）");
     return;
   }
   if (action === "pulse_cannon") {
-    protocol3Strike({ label: "パルスキャノン", hits: 1, power: 1.42, critBonus: 0.08 });
+    protocol3Strike({ label: "パルスキャノン", hits: 1, power: 1.3, critBonus: 0.06 });
     return;
   }
   if (action === "break_burst") {
@@ -9148,10 +9155,10 @@ function enemyActionProtocol3() {
     return;
   }
   if (action === "ignition") {
-    protocol3Strike({ label: "プロトコル・イグニッション", hits: 1, power: 2.02, critBonus: 0.16 });
+    protocol3Strike({ label: "プロトコル・イグニッション", hits: 1, power: 1.82, critBonus: 0.14 });
     return;
   }
-  protocol3Strike({ label: "トライバースト", hits: 3, power: 0.82, critBonus: 0.1 });
+  protocol3Strike({ label: "トライバースト", hits: 3, power: 0.78, critBonus: 0.08 });
 }
 
 function protocol3Strike(options) {
@@ -10104,6 +10111,9 @@ function handleFieldBossClear(stageId) {
       addFame(30000, "Protocol3初回撃破");
       setMinimumFameRank(5, "Protocol3撃破");
     }
+    state.player.gold += 200000;
+    state.stats.totalGoldEarned = (state.stats.totalGoldEarned || 0) + 200000;
+    state.stats.totalGoldLifetime = (state.stats.totalGoldLifetime || 0) + 200000;
     addItem("controlBoard", 2);
     addItem("overclockCircuit", 2);
     addItem("collapseArmorShard", 2);
@@ -10111,6 +10121,7 @@ function handleFieldBossClear(stageId) {
     state.neverendBossClearFlags = { ...(state.neverendBossClearFlags || {}), protocol3: true };
     state.worldStateFlags = { ...(state.worldStateFlags || {}), protocol3Slayer: true };
     state.neverendVipUnlocked = true;
+    addLog("Protocol3撃破ボーナス: GOLD +200000");
     addLog("Protocol3撃破報酬: 制御基板x2 / オーバークロック回路x2 / 崩壊装甲片x2 / 天空炉心x1");
     addLog("称号獲得: Protocol3撃破者");
     showCenterPopup({ text: "Protocol3撃破: VIP解放", type: "important" });
