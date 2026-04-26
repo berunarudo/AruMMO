@@ -116,6 +116,316 @@ const OTHERWORLD_ENDING_CHEER_LOG_DATA = [
   "全員: 世界は救われた"
 ];
 
+const BGM_TRACK_DATA = {
+  title: { id: "title", label: "タイトル", path: "assets/audio/bgm/title.mp3" },
+  town: { id: "town", label: "町", path: "assets/audio/bgm/town.mp3" },
+  grassland: { id: "grassland", label: "草原", path: "assets/audio/bgm/grassland.mp3" },
+  desert: { id: "desert", label: "砂漠", path: "assets/audio/bgm/desert.mp3" },
+  sea: { id: "sea", label: "海", path: "assets/audio/bgm/sea.mp3" },
+  volcano: { id: "volcano", label: "火山", path: "assets/audio/bgm/volcano.mp3" },
+  neverend: { id: "neverend", label: "天空都市ネバーエンド", path: "assets/audio/bgm/neverend.mp3" },
+  otherworld: { id: "otherworld", label: "異界", path: "assets/audio/bgm/otherworld.mp3" },
+  normalBattle: { id: "normalBattle", label: "通常戦闘", path: "assets/audio/bgm/normal_battle.mp3" },
+  bossBattle: { id: "bossBattle", label: "ボス戦", path: "assets/audio/bgm/boss_battle.mp3" },
+  uniqueBattle: { id: "uniqueBattle", label: "ユニーク戦", path: "assets/audio/bgm/unique_battle.mp3" },
+  protocol3: { id: "protocol3", label: "Protocol3戦", path: "assets/audio/bgm/protocol3.mp3" },
+  protocol3Rage: { id: "protocol3Rage", label: "Protocol3 激怒", path: "assets/audio/bgm/protocol3_rage.mp3" },
+  otherworldKing: { id: "otherworldKing", label: "異界の王", path: "assets/audio/bgm/otherworld_king.mp3" },
+  supportFinalBattle: { id: "supportFinalBattle", label: "掲示板応援", path: "assets/audio/bgm/support_final_battle.mp3" },
+  ending: { id: "ending", label: "エンディング", path: "assets/audio/bgm/ending.mp3" }
+};
+
+function createDefaultAudioSettings() {
+  return {
+    bgmEnabled: true,
+    bgmVolume: 0.5,
+    currentBgmId: null,
+    audioUnlocked: false
+  };
+}
+
+const bgmManager = {
+  audio: null,
+  currentBgmId: null,
+  pendingBgmId: null,
+  currentSrc: "",
+  initialized: false,
+  warnedMissing: {},
+  fadeToken: 0,
+
+  initAudio() {
+    if (this.initialized) return;
+    try {
+      this.audio = new Audio();
+      this.audio.loop = true;
+      this.audio.preload = "none";
+      this.audio.addEventListener("error", () => {
+        const src = this.audio?.src || this.currentSrc;
+        if (!src) return;
+        if (!this.warnedMissing[src]) {
+          this.warnedMissing[src] = true;
+          console.warn(`[audio] BGMファイルが見つからない可能性があります: ${src}`);
+        }
+      });
+    } catch (error) {
+      console.warn("[audio] init failed", error);
+      this.audio = null;
+    }
+    this.initialized = true;
+  },
+
+  getCurrentBgmId() {
+    return this.currentBgmId || state.audioSettings?.currentBgmId || null;
+  },
+
+  syncVolume() {
+    if (!this.audio) return;
+    const volume = clamp(0, 1, Number(state.audioSettings?.bgmVolume ?? 0.5));
+    this.audio.volume = volume;
+  },
+
+  unlockAudioByUserGesture() {
+    ensureAudioSettings();
+    this.initAudio();
+    if (state.audioSettings.audioUnlocked) return;
+    state.audioSettings.audioUnlocked = true;
+    if (!this.audio) return;
+    try {
+      this.audio.muted = true;
+      const p = this.audio.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          try {
+            this.audio.pause();
+            this.audio.currentTime = 0;
+            this.audio.muted = false;
+          } catch (error) {
+            console.warn("[audio] unlock post-play failed", error);
+          }
+        }).catch((error) => {
+          this.audio.muted = false;
+          console.warn("[audio] unlock play blocked", error);
+        });
+      } else {
+        this.audio.muted = false;
+      }
+    } catch (error) {
+      this.audio.muted = false;
+      console.warn("[audio] unlock failed", error);
+    }
+  },
+
+  safePlayAudio() {
+    if (!this.audio) return;
+    try {
+      this.syncVolume();
+      const p = this.audio.play();
+      if (p && typeof p.catch === "function") {
+        p.catch((error) => {
+          console.warn("[audio] BGM再生失敗（継続）", error);
+        });
+      }
+    } catch (error) {
+      console.warn("[audio] BGM再生失敗（継続）", error);
+    }
+  },
+
+  stopBgm() {
+    this.fadeToken += 1;
+    this.pendingBgmId = null;
+    if (this.audio) {
+      try {
+        this.audio.pause();
+      } catch (error) {
+        console.warn("[audio] stop failed", error);
+      }
+    }
+    this.currentBgmId = null;
+    state.audioSettings.currentBgmId = null;
+  },
+
+  playBgm(bgmId, options = {}) {
+    ensureAudioSettings();
+    this.initAudio();
+    const force = !!options.force;
+    const track = BGM_TRACK_DATA[bgmId];
+    if (!track || !this.audio) return;
+    state.audioSettings.currentBgmId = bgmId;
+    if (!state.audioSettings.bgmEnabled) {
+      this.stopBgm();
+      return;
+    }
+    if (!state.audioSettings.audioUnlocked) return;
+    if (!force && this.currentBgmId === bgmId && this.audio.src && this.audio.src.includes(track.path)) {
+      this.syncVolume();
+      return;
+    }
+    this.fadeToken += 1;
+    this.pendingBgmId = null;
+    try {
+      this.audio.src = track.path;
+      this.audio.loop = true;
+      this.currentSrc = track.path;
+      this.currentBgmId = bgmId;
+      this.syncVolume();
+      this.safePlayAudio();
+    } catch (error) {
+      console.warn(`[audio] BGM切替失敗: ${bgmId}`, error);
+    }
+  },
+
+  fadeToBgm(bgmId) {
+    ensureAudioSettings();
+    this.initAudio();
+    const track = BGM_TRACK_DATA[bgmId];
+    if (!track || !this.audio) return;
+    if (this.pendingBgmId === bgmId) return;
+    if (!state.audioSettings.bgmEnabled) {
+      this.stopBgm();
+      return;
+    }
+    if (!state.audioSettings.audioUnlocked) {
+      state.audioSettings.currentBgmId = bgmId;
+      return;
+    }
+    if (this.currentBgmId === bgmId) {
+      this.syncVolume();
+      return;
+    }
+    this.pendingBgmId = bgmId;
+    state.audioSettings.currentBgmId = bgmId;
+    const token = ++this.fadeToken;
+    const targetVolume = clamp(0, 1, Number(state.audioSettings.bgmVolume ?? 0.5));
+    const hasCurrent = !!(this.audio.src && this.currentBgmId);
+    const stepMs = 60;
+    const steps = 8;
+    if (!hasCurrent) {
+      this.playBgm(bgmId, { force: true });
+      return;
+    }
+    let downStep = 0;
+    const fadeOut = () => {
+      if (token !== this.fadeToken) return;
+      downStep += 1;
+      this.audio.volume = Math.max(0, targetVolume * (1 - downStep / steps));
+      if (downStep < steps) {
+        setTimeout(fadeOut, stepMs);
+        return;
+      }
+      this.playBgm(bgmId, { force: true });
+      this.audio.volume = 0;
+      let upStep = 0;
+      const fadeIn = () => {
+        if (token !== this.fadeToken) return;
+        upStep += 1;
+        this.audio.volume = Math.min(targetVolume, targetVolume * (upStep / steps));
+        if (upStep < steps) {
+          setTimeout(fadeIn, stepMs);
+        }
+      };
+      setTimeout(fadeIn, stepMs);
+    };
+    fadeOut();
+  },
+
+  setBgmVolume(value) {
+    ensureAudioSettings();
+    state.audioSettings.bgmVolume = clamp(0, 1, Number(value ?? 0.5));
+    this.syncVolume();
+  },
+
+  setBgmEnabled(enabled) {
+    ensureAudioSettings();
+    state.audioSettings.bgmEnabled = !!enabled;
+    state.settings.bgmOn = state.audioSettings.bgmEnabled;
+    if (!state.audioSettings.bgmEnabled) {
+      this.stopBgm();
+      return;
+    }
+    refreshSceneBgm({ force: true, useFade: false });
+  }
+};
+
+function ensureAudioSettings() {
+  const defaults = createDefaultAudioSettings();
+  const hadAudioSettings = !!(state.audioSettings && typeof state.audioSettings === "object");
+  if (!state.audioSettings || typeof state.audioSettings !== "object") {
+    state.audioSettings = { ...defaults };
+  } else {
+    state.audioSettings = { ...defaults, ...state.audioSettings };
+  }
+  if (!hadAudioSettings && typeof state.settings?.bgmOn === "boolean") {
+    state.audioSettings.bgmEnabled = !!state.settings.bgmOn;
+  }
+  state.audioSettings.bgmEnabled = !!state.audioSettings.bgmEnabled;
+  state.audioSettings.bgmVolume = clamp(0, 1, Number(state.audioSettings.bgmVolume ?? 0.5));
+  state.audioSettings.currentBgmId = typeof state.audioSettings.currentBgmId === "string" ? state.audioSettings.currentBgmId : null;
+  state.audioSettings.audioUnlocked = !!state.audioSettings.audioUnlocked;
+  state.settings.bgmOn = state.audioSettings.bgmEnabled;
+}
+
+function getBgmLabelById(bgmId) {
+  return BGM_TRACK_DATA[bgmId]?.label || bgmId || "なし";
+}
+
+function resolveSceneBgmId() {
+  if (state.screen === "title") return "title";
+  if (state.screen === "otherworldEnding") return "ending";
+  if (state.screen === "clearResult" || state.screen === "carryOverSelection") return "ending";
+  if (state.screen === "intro" || state.screen === "jobSelect") return "title";
+  if (state.battle?.isActive) {
+    const enemyId = state.battle.enemy?.id || "";
+    if (enemyId === "otherworldKing") {
+      return shouldUseOtherworldSupportLog() ? "supportFinalBattle" : "otherworldKing";
+    }
+    if (enemyId === "protocol3") {
+      return state.battle?.gimmick?.extra?.protocol3Rage ? "protocol3Rage" : "protocol3";
+    }
+    if (state.battle.isUniqueBattle) return "uniqueBattle";
+    if (state.battle.isFieldBossBattle) return "bossBattle";
+    return "normalBattle";
+  }
+  if (state.currentTown === "neverend") return "neverend";
+  if (state.currentTown === "otherworld") return "otherworld";
+  if (state.currentTab !== "adventure") return "town";
+  const mapId = state.currentMap || TOWN_DATA[state.currentTown]?.mapId || "grassland";
+  if (mapId === "grassland") return "grassland";
+  if (mapId === "desert") return "desert";
+  if (mapId === "sea") return "sea";
+  if (mapId === "volcano") return "volcano";
+  if (mapId === "neverend") return "neverend";
+  if (mapId === "otherworld") return "otherworld";
+  return "town";
+}
+
+function refreshSceneBgm(options = {}) {
+  ensureAudioSettings();
+  const bgmId = resolveSceneBgmId();
+  if (!bgmId) return;
+  if (!state.audioSettings.bgmEnabled) {
+    bgmManager.stopBgm();
+    return;
+  }
+  const force = !!options.force;
+  const useFade = options.useFade !== false;
+  if (useFade) {
+    bgmManager.fadeToBgm(bgmId);
+  } else {
+    bgmManager.playBgm(bgmId, { force });
+  }
+}
+
+function setupAudioUnlockListeners() {
+  const unlock = () => {
+    ensureAudioSettings();
+    if (state.audioSettings.audioUnlocked) return;
+    bgmManager.unlockAudioByUserGesture();
+    refreshSceneBgm({ force: true, useFade: false });
+  };
+  document.addEventListener("pointerdown", unlock, { passive: true });
+  document.addEventListener("keydown", unlock, { passive: true });
+}
+
 function hasClearedVolcano() {
   return Array.isArray(state.fieldBossCleared) && state.fieldBossCleared.includes("4-10");
 }
@@ -4971,6 +5281,7 @@ const state = {
     lightweightMode: false,
     saveConfirmDialog: false
   },
+  audioSettings: createDefaultAudioSettings(),
   loop: {
     clearedGame: false,
     loopCount: 0,
@@ -5418,6 +5729,7 @@ Object.keys(STAGE_DATA).forEach((stageId) => {
 });
 initializeJobEvolutionState({ silent: true });
 ensureTitleSlotState();
+ensureAudioSettings();
 
 function createDefaultTitleEffects() {
   return {
@@ -5727,29 +6039,36 @@ function goBackOneView() {
 function render() {
   if (state.screen === "title") {
     renderTitleScreen();
+    refreshSceneBgm();
     return;
   }
   if (state.screen === "intro") {
     renderIntroScreen();
+    refreshSceneBgm();
     return;
   }
   if (state.screen === "jobSelect") {
     renderJobSelectScreen();
+    refreshSceneBgm();
     return;
   }
   if (state.screen === "clearResult") {
     renderLoopResultView();
+    refreshSceneBgm();
     return;
   }
   if (state.screen === "carryOverSelection") {
     renderCarryOverSelectionView();
+    refreshSceneBgm();
     return;
   }
   if (state.screen === "otherworldEnding") {
     renderOtherworldEndingView();
+    refreshSceneBgm();
     return;
   }
   renderGameScreen();
+  refreshSceneBgm();
 }
 
 function renderPreservingWindowScroll() {
@@ -5778,6 +6097,7 @@ function renderTitleScreen() {
   const continueBtn = document.getElementById("continue-btn");
   if (continueBtn) {
     continueBtn.addEventListener("click", () => {
+      bgmManager.unlockAudioByUserGesture();
       const ok = loadGame();
       if (ok) {
         addLog("セーブデータをロードしました。");
@@ -5787,6 +6107,7 @@ function renderTitleScreen() {
     });
   }
   document.getElementById("start-btn").addEventListener("click", () => {
+    bgmManager.unlockAudioByUserGesture();
     state.screen = "intro";
     state.introIndex = 0;
     addLog("ゲーム開始。導入シーケンスを開始しました。");
@@ -5795,6 +6116,7 @@ function renderTitleScreen() {
   const settingsBtn = document.getElementById("title-settings-btn");
   if (settingsBtn) {
     settingsBtn.addEventListener("click", () => {
+      bgmManager.unlockAudioByUserGesture();
       state.screen = "game";
       state.currentTab = "system";
       state.ui.systemSubTab = "settings";
@@ -5804,6 +6126,7 @@ function renderTitleScreen() {
   const dataBtn = document.getElementById("title-data-btn");
   if (dataBtn) {
     dataBtn.addEventListener("click", () => {
+      bgmManager.unlockAudioByUserGesture();
       state.screen = "game";
       state.currentTab = "system";
       state.ui.systemSubTab = "save";
@@ -5854,7 +6177,7 @@ function chooseMainJob(jobId) {
   if (!job) {
     return;
   }
-  syncMainJobState(job.id, 1, job.id, true);
+  syncMainJobState(job.id, 1, job.id, false);
   initializeJobEvolutionState({ silent: true });
   state.player.equippedSkills = getUnlockedSkillIdsForLine(getJobDataById(job.id)?.baseLineId).slice(0, 4);
   recalculateTitleEffects();
@@ -5927,7 +6250,7 @@ function renderTopBar() {
     <div class="hud-top panel">
       <div class="hud-actions">
         ${renderSpeedControl()}
-        <button id="bgm-toggle-btn" class="btn">${state.settings.bgmOn ? "BGM:ON" : "BGM:OFF"}</button>
+        <button id="bgm-toggle-btn" class="btn">${state.audioSettings.bgmEnabled ? "BGM:ON" : "BGM:OFF"}</button>
         <button id="help-toggle-btn" class="btn">${state.ui.helpOpen ? "ヘルプを閉じる" : "ヘルプ"}</button>
         <button id="topbar-toggle-btn" class="btn">閉じる</button>
       </div>
@@ -6567,6 +6890,7 @@ function spawnStageEnemy() {
       }
     }
   }
+  refreshSceneBgm({ force: true, useFade: true });
 }
 
 function rollUniqueEncounter() {
@@ -7070,6 +7394,7 @@ function enemyActionProtocol3() {
     enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.72);
     extra.protocol3DamageTakenMultiplier = 1.36;
     addLog("Protocol3 が激怒状態へ移行。火力が激増し、装甲が脆化した。");
+    refreshSceneBgm({ force: true, useFade: true });
   }
   const enraged = !!extra.protocol3Rage;
   const normalActions = [
@@ -14161,6 +14486,10 @@ function renderSystemView(container) {
         ? renderSettingsView()
         : renderSaveLoadView(summary)
     }
+    <div class="card" style="margin-top:10px;">
+      <h4>お借りした素材</h4>
+      <p class="tiny">音楽：魔王魂</p>
+    </div>
   `;
 }
 
@@ -14191,16 +14520,24 @@ function renderSaveLoadView(summary = exportSaveSummary()) {
 }
 
 function renderSettingsView() {
+  ensureAudioSettings();
+  const volumePercent = Math.round((state.audioSettings.bgmVolume || 0.5) * 100);
+  const currentBgm = getBgmLabelById(state.audioSettings.currentBgmId || resolveSceneBgmId());
   return `
     <div class="card">
       <h4>設定</h4>
       <div class="guild-grid">
-        <label class="tiny"><input id="setting-bgm" type="checkbox" ${state.settings.bgmOn ? "checked" : ""}/> BGM ON</label>
+        <label class="tiny"><input id="setting-bgm" type="checkbox" ${state.audioSettings.bgmEnabled ? "checked" : ""}/> BGM ON</label>
         <label class="tiny"><input id="setting-log-autoscroll" type="checkbox" ${state.ui.logAutoScroll ? "checked" : ""}/> ログ自動スクロール</label>
         <label class="tiny"><input id="setting-help" type="checkbox" ${state.ui.helpOpen ? "checked" : ""}/> ヘルプ表示</label>
         <label class="tiny"><input id="setting-speed-emphasis" type="checkbox" ${state.settings.speedEffectEmphasis ? "checked" : ""}/> 倍速演出強調</label>
         <label class="tiny"><input id="setting-lightweight" type="checkbox" ${state.settings.lightweightMode ? "checked" : ""}/> 軽量表示モード</label>
         <label class="tiny"><input id="setting-save-confirm" type="checkbox" ${state.settings.saveConfirmDialog ? "checked" : ""}/> セーブ確認ダイアログ</label>
+      </div>
+      <div style="margin-top:10px;">
+        <label class="tiny" for="setting-bgm-volume">BGM音量: <span id="setting-bgm-volume-label">${volumePercent}%</span></label>
+        <input id="setting-bgm-volume" type="range" min="0" max="100" step="1" value="${volumePercent}" style="width:100%;" />
+        <p class="tiny">現在BGM: ${escapeHtml(currentBgm)}</p>
       </div>
       <div style="margin-top:10px;">
         <label class="tiny">通知量
@@ -14358,6 +14695,7 @@ function splitRunAndPersistentState() {
 
   const settingsState = {
     settings: deepCopyPlain(state.settings),
+    audioSettings: deepCopyPlain(state.audioSettings || createDefaultAudioSettings()),
     ui: {
       logAutoScroll: state.ui.logAutoScroll,
       logFilter: state.ui.logFilter,
@@ -14617,6 +14955,10 @@ function applyLoadedState(payload) {
   state.unlockedUniqueSkills = persistent.unique?.unlockedUniqueSkills || [];
 
   state.settings = { ...state.settings, ...(settings.settings || {}) };
+  state.audioSettings = settings.audioSettings && typeof settings.audioSettings === "object"
+    ? { ...createDefaultAudioSettings(), ...settings.audioSettings }
+    : null;
+  ensureAudioSettings();
   state.ui.logAutoScroll = settings.ui?.logAutoScroll ?? state.ui.logAutoScroll;
   state.ui.logFilter = settings.ui?.logFilter || state.ui.logFilter;
   state.ui.helpOpen = settings.ui?.helpOpen ?? state.ui.helpOpen;
@@ -15093,8 +15435,9 @@ function bindGameEvents() {
   const bgmBtn = document.getElementById("bgm-toggle-btn");
   if (bgmBtn) {
     bgmBtn.addEventListener("click", () => {
-      state.settings.bgmOn = !state.settings.bgmOn;
-      addLog(`BGM設定: ${state.settings.bgmOn ? "ON" : "OFF"}`);
+      bgmManager.unlockAudioByUserGesture();
+      bgmManager.setBgmEnabled(!state.audioSettings.bgmEnabled);
+      addLog(`BGM設定: ${state.audioSettings.bgmEnabled ? "ON" : "OFF"}`);
       safeSaveJson(STORAGE_KEYS.SETTINGS, buildSavePayload().settingsState);
       render();
     });
@@ -15633,15 +15976,26 @@ function bindGameEvents() {
     }
     const saveSettingsBtn = document.getElementById("save-settings-btn");
     if (saveSettingsBtn) {
+      const bgmVolumeRange = document.getElementById("setting-bgm-volume");
+      const bgmVolumeLabel = document.getElementById("setting-bgm-volume-label");
+      if (bgmVolumeRange && bgmVolumeLabel) {
+        bgmVolumeRange.addEventListener("input", () => {
+          const value = clamp(0, 100, Number(bgmVolumeRange.value || 50));
+          bgmVolumeLabel.textContent = `${Math.round(value)}%`;
+          bgmManager.setBgmVolume(value / 100);
+        });
+      }
       saveSettingsBtn.addEventListener("click", () => {
         const bgm = document.getElementById("setting-bgm");
+        const bgmVolume = document.getElementById("setting-bgm-volume");
         const autoLog = document.getElementById("setting-log-autoscroll");
         const help = document.getElementById("setting-help");
         const speedFx = document.getElementById("setting-speed-emphasis");
         const light = document.getElementById("setting-lightweight");
         const saveConfirm = document.getElementById("setting-save-confirm");
         const notify = document.getElementById("setting-notification-level");
-        state.settings.bgmOn = !!bgm?.checked;
+        bgmManager.setBgmEnabled(!!bgm?.checked);
+        bgmManager.setBgmVolume(clamp(0, 100, Number(bgmVolume?.value || 50)) / 100);
         state.ui.logAutoScroll = !!autoLog?.checked;
         state.ui.helpOpen = !!help?.checked;
         state.settings.speedEffectEmphasis = !!speedFx?.checked;
@@ -16612,6 +16966,13 @@ function bootstrapStoredPreferences() {
   if (settings?.settings) {
     state.settings = { ...state.settings, ...settings.settings };
   }
+  if (settings?.audioSettings) {
+    state.audioSettings = { ...createDefaultAudioSettings(), ...settings.audioSettings };
+  } else {
+    state.audioSettings = null;
+  }
+  ensureAudioSettings();
+  state.audioSettings.audioUnlocked = false;
   if (settings?.ui) {
     state.ui.logAutoScroll = settings.ui.logAutoScroll ?? state.ui.logAutoScroll;
     state.ui.logFilter = settings.ui.logFilter || state.ui.logFilter;
@@ -16630,6 +16991,9 @@ setInterval(handleSecondTick, 1000);
 
 bootstrapStoredPreferences();
 ensureOtherworldState();
+ensureAudioSettings();
+bgmManager.initAudio();
+setupAudioUnlockListeners();
 recalculateTitleEffects();
 applyLoopUnlocks();
 applyLoopTitleLimitUpgrades();
