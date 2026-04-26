@@ -426,10 +426,10 @@ function resolveSceneBgmId() {
   if (state.screen === "intro" || state.screen === "nameEntry" || state.screen === "jobSelect") return "title";
   if (state.battle?.isActive) {
     const enemyId = state.battle.enemy?.id || "";
-    if (enemyId === "otherworldKing") {
+    if (enemyId === "otherworldKing" || enemyId === "grarude") {
       return shouldUseOtherworldSupportLog() ? "supportFinalBattle" : "otherworldKing";
     }
-    if (enemyId === "protocol3") {
+    if (enemyId === "protocol3" || enemyId === "fullOpenProtocol3") {
       return state.battle?.gimmick?.extra?.protocol3Rage ? "protocol3Rage" : "protocol3";
     }
     if (state.battle.isUniqueBattle) return "uniqueBattle";
@@ -554,7 +554,7 @@ function isOtherworldStage(stageId = state?.battle?.stageId) {
 }
 
 function isOtherworldKingBattle() {
-  return !!state.battle?.isActive && state.battle?.enemy?.id === "otherworldKing";
+  return !!state.battle?.isActive && ["otherworldKing", "grarude"].includes(state.battle?.enemy?.id);
 }
 
 function hasTitleUnlocked(titleId) {
@@ -618,16 +618,20 @@ const TRIPLE_ATTACK_ENEMY_IDS = new Set([
   "bladeWorker",
   "overloadFrame",
   "protocol3",
+  "fullOpenProtocol3",
   "awakenedProtocol3",
-  "otherworldKing"
+  "otherworldKing",
+  "grarude"
 ]);
 
 const RAGE_BOSS_IDS = new Set([
   "volkazard",
   "volkazardInferno",
   "protocol3",
+  "fullOpenProtocol3",
   "awakenedProtocol3",
   "otherworldKing",
+  "grarude",
   "awakenedBehemothBison",
   "awakenedDuneHydra",
   "awakenedLeviathan",
@@ -654,7 +658,7 @@ function isMechanicalEnemy(enemy) {
 function isMachineBossEnemy(enemy) {
   const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
   if (!e) return false;
-  if (["protocol3", "awakenedProtocol3", "overloadFrame"].includes(e.id)) return true;
+  if (["protocol3", "fullOpenProtocol3", "awakenedProtocol3", "overloadFrame"].includes(e.id)) return true;
   if (!isMechanicalEnemy(e)) return false;
   return ["fieldBoss", "boss", "loopBoss", "finalBoss"].includes(String(e.rarity || ""));
 }
@@ -662,7 +666,7 @@ function isMachineBossEnemy(enemy) {
 function isOtherworldNonKingEnemy(enemy) {
   const e = typeof enemy === "string" ? ENEMY_DATA[enemy] : enemy;
   if (!e) return false;
-  return e.region === "otherworld" && e.id !== "otherworldKing";
+  return e.region === "otherworld" && e.id !== "otherworldKing" && e.id !== "grarude";
 }
 
 function hasGodsCradleRescue() {
@@ -2334,7 +2338,8 @@ const ADVENTURE_REGION_BALANCE_CONFIG = {
       dataEater: { hp: 0.88, attack: 1.22, defense: 1.12, speed: 1.18, intelligence: 1.28, luck: 1.12 },
       guardianArm: { hp: 1.12, attack: 1.3, defense: 1.42, speed: 0.92, intelligence: 1.1, luck: 1.04 },
       overloadFrame: { hp: 1.18, attack: 1.36, defense: 1.4, speed: 0.95, intelligence: 1.14, luck: 1.06 },
-      protocol3: { hp: 1.02, attack: 1.24, defense: 0.42, speed: 1.12, intelligence: 1.16, luck: 1.1 }
+      protocol3: { hp: 1.02, attack: 1.24, defense: 0.42, speed: 1.12, intelligence: 1.16, luck: 1.1 },
+      fullOpenProtocol3: { hp: 1.12, attack: 1.36, defense: 1.14, speed: 1.18, intelligence: 1.22, luck: 1.12 }
     }
   },
   otherworld: {
@@ -2346,7 +2351,8 @@ const ADVENTURE_REGION_BALANCE_CONFIG = {
     gimmick: { damageMultiplier: 1.6, attackBoostMultiplier: 1.28 },
     enemySpecific: {
       otherworldKing: { hp: 1.2, attack: 1.4, defense: 1.34, speed: 1.22, intelligence: 1.28, luck: 1.2 },
-      awakenedProtocol3: { hp: 1.14, attack: 1.34, defense: 1.3, speed: 1.2, intelligence: 1.24, luck: 1.16 }
+      awakenedProtocol3: { hp: 1.14, attack: 1.34, defense: 1.3, speed: 1.2, intelligence: 1.24, luck: 1.16 },
+      grarude: { hp: 1.26, attack: 1.48, defense: 1.4, speed: 1.26, intelligence: 1.34, luck: 1.22 }
     }
   }
 };
@@ -2701,7 +2707,9 @@ const ENEMY_DATA = {
   awakenedLeviathan: enemyTemplate({ id: "awakenedLeviathan", name: "覚醒リヴァイアサン", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 30000, attack: 1940, defense: 1420, speed: 152, intelligence: 202, luck: 86, exp: 62000, gold: 50000, aiType: "boss" }),
   awakenedVolkazard: enemyTemplate({ id: "awakenedVolkazard", name: "覚醒ヴォルカザード", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 34000, attack: 2100, defense: 1560, speed: 160, intelligence: 214, luck: 90, exp: 68000, gold: 56000, aiType: "boss" }),
   awakenedProtocol3: enemyTemplate({ id: "awakenedProtocol3", name: "覚醒Protocol3", species: "otherworldBoss", region: "otherworld", rarity: "boss", hp: 36000, attack: 2280, defense: 1680, speed: 172, intelligence: 228, luck: 94, exp: 76000, gold: 64000, aiType: "boss" }),
+  fullOpenProtocol3: enemyTemplate({ id: "fullOpenProtocol3", name: "全開Protocol3", species: "machineBoss", region: "neverend", rarity: "loopBoss", hp: 30000, attack: 2600, defense: 1700, speed: 188, intelligence: 236, luck: 98, exp: 98000, gold: 82000, aiType: "boss" }),
   otherworldKing: enemyTemplate({ id: "otherworldKing", name: "異界の王", species: "otherworldKing", region: "otherworld", rarity: "fieldBoss", hp: 88000, attack: 3300, defense: 2400, speed: 208, intelligence: 280, luck: 120, exp: 180000, gold: 120000, aiType: "boss" }),
+  grarude: enemyTemplate({ id: "grarude", name: "異界の神グラルード", species: "otherworldGod", region: "otherworld", rarity: "loopBoss", hp: 140000, attack: 4200, defense: 3200, speed: 236, intelligence: 340, luck: 150, exp: 260000, gold: 180000, aiType: "boss" }),
 
   behemothBisonReborn: enemyTemplate({ id: "behemothBisonReborn", name: "ベヒモスバイソン・再臨", species: "boss", region: "grassland", rarity: "loopBoss", hp: 1600, attack: 118, defense: 74, speed: 28, intelligence: 22, luck: 18, exp: 2200, gold: 1800, aiType: "boss" }),
   duneHydraAbyss: enemyTemplate({ id: "duneHydraAbyss", name: "デューンヒドラ・深層種", species: "boss", region: "desert", rarity: "loopBoss", hp: 3200, attack: 186, defense: 118, speed: 34, intelligence: 46, luck: 24, exp: 4800, gold: 3900, aiType: "boss" }),
@@ -2815,6 +2823,30 @@ const LOOP_CHALLENGE_DATA = [
     requiredFieldBossStage: "4-10",
     rewards: { exp: 9000, gold: 7600, specialItemId: "warpedCore", specialFlag: "inferno_return_clear" },
     gimmickScale: 1.4
+  },
+  {
+    id: "fullopen_protocol3",
+    stageId: "LC-5",
+    name: "全開Protocol3（弱体化前）",
+    category: "周回限定高難易度",
+    mapId: "neverend",
+    bossId: "fullOpenProtocol3",
+    requiredLoop: 4,
+    requiredFieldBossStage: "5-10",
+    rewards: { exp: 18000, gold: 16000, specialItemId: "overclockCircuit", specialFlag: "fullopen_protocol3_clear" },
+    gimmickScale: 1.62
+  },
+  {
+    id: "otherworld_god_grarude",
+    stageId: "LC-6",
+    name: "異界の神グラルード",
+    category: "周回限定高難易度",
+    mapId: "otherworld",
+    bossId: "grarude",
+    requiredLoop: 5,
+    requiredFieldBossStage: "6-10",
+    rewards: { exp: 32000, gold: 28000, specialItemId: "skyFurnaceCore", specialFlag: "grarude_clear" },
+    gimmickScale: 1.78
   }
 ];
 
@@ -9132,11 +9164,11 @@ function enemyAction() {
   if (!state.battle.enemy || state.battle.enemy.hp <= 0) {
     return;
   }
-  if (state.battle.enemy.id === "otherworldKing") {
+  if (["otherworldKing", "grarude"].includes(state.battle.enemy.id)) {
     enemyActionOtherworldKing();
     return;
   }
-  if (state.battle.enemy.id === "protocol3") {
+  if (["protocol3", "fullOpenProtocol3"].includes(state.battle.enemy.id)) {
     enemyActionProtocol3();
     return;
   }
@@ -9264,6 +9296,7 @@ function enemyAction() {
 function enemyActionProtocol3() {
   const enemy = state.battle.enemy;
   if (!enemy) return;
+  const isFullOpen = enemy.id === "fullOpenProtocol3";
   const extra = state.battle.gimmick.extra;
   const now = Date.now();
   if (!extra.protocol3Init) {
@@ -9271,22 +9304,30 @@ function enemyActionProtocol3() {
     extra.protocol3BaseAttack = enemy.attack;
     extra.protocol3BaseDefense = enemy.defense;
     extra.protocol3BaseSpeed = enemy.speed;
-    extra.protocol3AttackCapNormal = Math.floor(extra.protocol3BaseAttack * 1.02);
-    extra.protocol3AttackCapEnraged = Math.floor(extra.protocol3BaseAttack * 1.46);
+    extra.protocol3AttackCapNormal = Math.floor(extra.protocol3BaseAttack * (isFullOpen ? 1.28 : 1.02));
+    extra.protocol3AttackCapEnraged = Math.floor(extra.protocol3BaseAttack * (isFullOpen ? 1.72 : 1.46));
     extra.protocol3Rage = false;
     extra.protocol3TargetLockUntil = 0;
     extra.protocol3DamageTakenMultiplier = 1;
-    enemy.attack = Math.max(1, Math.floor(extra.protocol3BaseAttack * 0.62));
-    enemy.speed = Math.max(1, Math.floor(extra.protocol3BaseSpeed * 0.92));
+    if (isFullOpen) {
+      enemy.attack = Math.max(1, Math.floor(extra.protocol3BaseAttack * 1.0));
+      enemy.speed = Math.max(1, Math.floor(extra.protocol3BaseSpeed * 1.06));
+      enemy.defense = Math.max(1, Math.floor(extra.protocol3BaseDefense * 1.08));
+      extra.protocol3DamageTakenMultiplier = 0.92;
+    } else {
+      enemy.attack = Math.max(1, Math.floor(extra.protocol3BaseAttack * 0.62));
+      enemy.speed = Math.max(1, Math.floor(extra.protocol3BaseSpeed * 0.92));
+    }
   }
   const hpRate = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
-  if (!extra.protocol3Rage && hpRate <= 0.3) {
+  const rageThreshold = isFullOpen ? 0.55 : 0.3;
+  if (!extra.protocol3Rage && hpRate <= rageThreshold) {
     extra.protocol3Rage = true;
-    enemy.attack = Math.max(enemy.attack, Math.floor(extra.protocol3BaseAttack * 0.98));
-    enemy.speed = Math.max(enemy.speed, Math.floor(extra.protocol3BaseSpeed * 1.14));
-    enemy.defense = Math.floor(extra.protocol3BaseDefense * 0.66);
-    extra.protocol3DamageTakenMultiplier = 1.45;
-    addLog("Protocol3 が激怒状態へ移行。火力が激増し、装甲が脆化した。");
+    enemy.attack = Math.max(enemy.attack, Math.floor(extra.protocol3BaseAttack * (isFullOpen ? 1.22 : 0.98)));
+    enemy.speed = Math.max(enemy.speed, Math.floor(extra.protocol3BaseSpeed * (isFullOpen ? 1.24 : 1.14)));
+    enemy.defense = Math.floor(extra.protocol3BaseDefense * (isFullOpen ? 0.9 : 0.66));
+    extra.protocol3DamageTakenMultiplier = isFullOpen ? 1.18 : 1.45;
+    addLog(`${enemy.name} が激怒状態へ移行。火力が激増し、装甲が脆化した。`);
     refreshSceneBgm({ force: true, useFade: true });
   }
   const enraged = !!extra.protocol3Rage;
@@ -9308,33 +9349,33 @@ function enemyActionProtocol3() {
   const action = weightedPick(enraged ? enragedActions : normalActions)?.id || "tri_burst";
   if (action === "armor_deploy") {
     enemy.defense = Math.min(Math.floor(extra.protocol3BaseDefense * 1.2), Math.floor(enemy.defense * 1.1));
-    addLog("Protocol3: 装甲展開（防御上昇）");
+    addLog(`${enemy.name}: 装甲展開（防御上昇）`);
     return;
   }
   if (action === "target_lock") {
     extra.protocol3TargetLockUntil = now + 5000;
-    addLog("Protocol3: ターゲットロック（命中・会心上昇）");
+    addLog(`${enemy.name}: ターゲットロック（命中・会心上昇）`);
     return;
   }
   if (action === "cool_restart") {
     state.activeEffects = state.activeEffects.filter((effect) => !(effect.target === "enemy" && ["enemyAttack", "enemyAccuracy", "defense", "speed"].includes(effect.stat)));
     enemy.defense = Math.max(enemy.defense, Math.floor(extra.protocol3BaseDefense * (enraged ? 0.72 : 1)));
-    addLog("Protocol3: 冷却再起動（弱体一部解除）");
+    addLog(`${enemy.name}: 冷却再起動（弱体一部解除）`);
     return;
   }
   if (action === "overclock") {
     const attackCap = Math.max(1, Math.floor(enraged ? (extra.protocol3AttackCapEnraged || extra.protocol3BaseAttack) : (extra.protocol3AttackCapNormal || extra.protocol3BaseAttack)));
-    const speedCap = Math.max(1, Math.floor(extra.protocol3BaseSpeed * (enraged ? 1.24 : 1.04)));
-    enemy.attack = Math.min(attackCap, Math.floor(enemy.attack * (enraged ? 1.12 : 1.15)));
-    enemy.speed = Math.min(speedCap, Math.floor(enemy.speed * (enraged ? 1.07 : 1.09)));
-    addLog("Protocol3: オーバークロック（攻撃・速度上昇）");
+    const speedCap = Math.max(1, Math.floor(extra.protocol3BaseSpeed * (enraged ? (isFullOpen ? 1.35 : 1.24) : (isFullOpen ? 1.16 : 1.04))));
+    enemy.attack = Math.min(attackCap, Math.floor(enemy.attack * (enraged ? (isFullOpen ? 1.16 : 1.12) : (isFullOpen ? 1.18 : 1.15))));
+    enemy.speed = Math.min(speedCap, Math.floor(enemy.speed * (enraged ? (isFullOpen ? 1.1 : 1.07) : (isFullOpen ? 1.12 : 1.09))));
+    addLog(`${enemy.name}: オーバークロック（攻撃・速度上昇）`);
     return;
   }
   if (action === "control_break") {
-    enemy.attack = Math.min(Math.max(1, Math.floor(extra.protocol3AttackCapEnraged || extra.protocol3BaseAttack)), Math.floor(enemy.attack * 1.08));
-    enemy.defense = Math.max(1, Math.floor(enemy.defense * 0.86));
-    extra.protocol3DamageTakenMultiplier = Math.max(extra.protocol3DamageTakenMultiplier || 1, 1.48);
-    addLog("Protocol3: 制御崩壊（与ダメ上昇 / 被ダメ上昇）");
+    enemy.attack = Math.min(Math.max(1, Math.floor(extra.protocol3AttackCapEnraged || extra.protocol3BaseAttack)), Math.floor(enemy.attack * (isFullOpen ? 1.12 : 1.08)));
+    enemy.defense = Math.max(1, Math.floor(enemy.defense * (isFullOpen ? 0.92 : 0.86)));
+    extra.protocol3DamageTakenMultiplier = Math.max(extra.protocol3DamageTakenMultiplier || 1, isFullOpen ? 1.36 : 1.48);
+    addLog(`${enemy.name}: 制御崩壊（与ダメ上昇 / 被ダメ上昇）`);
     return;
   }
   if (action === "pulse_cannon") {
@@ -9380,7 +9421,7 @@ function protocol3Strike(options) {
       if (state.titleEffects.evadeCounterDamageBonus > 0) {
         state.titleRuntime.evadeCounterBoostReady = true;
       }
-      addLog(`Protocol3の${options.label} ${i + 1}段目を回避した。`);
+      addLog(`${enemy.name}の${options.label} ${i + 1}段目を回避した。`);
       continue;
     }
     const critChance = (options.critBonus || 0) + (lockOn ? 0.12 : 0);
@@ -9398,7 +9439,7 @@ function protocol3Strike(options) {
     if (options.applyDefenseBreakChance && Math.random() < options.applyDefenseBreakChance) {
       if (!isEnemyDamageNullifiedByTitle(enemy)) {
         applyEffect("player", "protocol3_break", { stat: "defense", multiplier: 0.88, durationMs: 4200, displayNameJa: "防御破壊" });
-        addLog("Protocol3の破壊信号で防御が低下した。");
+        addLog(`${enemy.name}の破壊信号で防御が低下した。`);
       } else {
         addLog("神の揺り籠: 破壊信号を無効化");
       }
@@ -9412,6 +9453,8 @@ function protocol3Strike(options) {
 function enemyActionOtherworldKing() {
   const enemy = state.battle.enemy;
   if (!enemy) return;
+  const isGod = enemy.id === "grarude";
+  const bossLabel = enemy.name || "異界の王";
   const extra = state.battle.gimmick.extra;
   if (!extra.otherworldKingInit) {
     extra.otherworldKingInit = true;
@@ -9421,17 +9464,18 @@ function enemyActionOtherworldKing() {
     extra.kingPhase2 = false;
     extra.kingTargetLockUntil = 0;
     extra.kingDamageAmp = 1;
-    addLog("異界の王: ここから先は、敗北すら記録になる。", "important", { important: true });
+    addLog(`${bossLabel}: ここから先は、敗北すら記録になる。`, "important", { important: true });
   }
 
   const hpRate = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
-  if (!extra.kingPhase2 && hpRate <= 0.45) {
+  const phase2Threshold = isGod ? 0.62 : 0.45;
+  if (!extra.kingPhase2 && hpRate <= phase2Threshold) {
     extra.kingPhase2 = true;
-    enemy.attack = Math.floor(extra.kingBaseAttack * 1.22);
-    enemy.speed = Math.floor(extra.kingBaseSpeed * 1.18);
-    enemy.defense = Math.max(1, Math.floor(extra.kingBaseDefense * 0.88));
-    extra.kingDamageAmp = 1.18;
-    addLog("異界の王: 第二位相。理が剥離し始めた。", "important", { important: true });
+    enemy.attack = Math.floor(extra.kingBaseAttack * (isGod ? 1.3 : 1.22));
+    enemy.speed = Math.floor(extra.kingBaseSpeed * (isGod ? 1.24 : 1.18));
+    enemy.defense = Math.max(1, Math.floor(extra.kingBaseDefense * (isGod ? 0.92 : 0.88)));
+    extra.kingDamageAmp = isGod ? 1.26 : 1.18;
+    addLog(`${bossLabel}: 第二位相。理が剥離し始めた。`, "important", { important: true });
   }
 
   if (shouldUseOtherworldSupportLog()) {
@@ -9441,42 +9485,42 @@ function enemyActionOtherworldKing() {
   const phase2 = !!extra.kingPhase2;
   const actionTable = phase2
     ? [
-        { id: "collapse_combo", weight: 28 },
-        { id: "king_ignition", weight: 20 },
-        { id: "rule_break", weight: 18 },
+        { id: "collapse_combo", weight: isGod ? 30 : 28 },
+        { id: "king_ignition", weight: isGod ? 24 : 20 },
+        { id: "rule_break", weight: isGod ? 20 : 18 },
         { id: "void_cannon", weight: 16 },
-        { id: "royal_combo", weight: 18 }
+        { id: "royal_combo", weight: isGod ? 10 : 18 }
       ]
     : [
-        { id: "royal_combo", weight: 30 },
-        { id: "void_cannon", weight: 22 },
-        { id: "decree_armor", weight: 16 },
-        { id: "target_lock", weight: 16 },
-        { id: "purge", weight: 16 }
+        { id: "royal_combo", weight: isGod ? 24 : 30 },
+        { id: "void_cannon", weight: isGod ? 24 : 22 },
+        { id: "decree_armor", weight: isGod ? 12 : 16 },
+        { id: "target_lock", weight: isGod ? 20 : 16 },
+        { id: "purge", weight: isGod ? 20 : 16 }
       ];
 
   const action = weightedPick(actionTable)?.id || "royal_combo";
   if (action === "decree_armor") {
     enemy.defense = Math.min(Math.floor(extra.kingBaseDefense * 1.4), Math.floor(enemy.defense * 1.18));
-    addLog("異界の王: 王令装甲（防御上昇）");
+    addLog(`${bossLabel}: 王令装甲（防御上昇）`);
     return;
   }
   if (action === "target_lock") {
     extra.kingTargetLockUntil = Date.now() + 5200;
-    addLog("異界の王: 照準固定（命中・会心上昇）");
+    addLog(`${bossLabel}: 照準固定（命中・会心上昇）`);
     return;
   }
   if (action === "purge") {
     state.activeEffects = state.activeEffects.filter((effect) => !(effect.target === "enemy" && ["enemyAttack", "enemyAccuracy", "defense", "speed"].includes(effect.stat)));
     enemy.defense = Math.max(enemy.defense, Math.floor(extra.kingBaseDefense * (phase2 ? 0.88 : 1)));
-    addLog("異界の王: 世界律再編（弱体解除）");
+    addLog(`${bossLabel}: 世界律再編（弱体解除）`);
     return;
   }
   if (action === "rule_break") {
-    enemy.attack = Math.floor(enemy.attack * 1.1);
-    enemy.defense = Math.max(1, Math.floor(enemy.defense * 0.9));
-    extra.kingDamageAmp = Math.max(Number(extra.kingDamageAmp || 1), 1.28);
-    addLog("異界の王: 理破壊（与ダメージ増加 / 被ダメージ増加）");
+    enemy.attack = Math.floor(enemy.attack * (isGod ? 1.14 : 1.1));
+    enemy.defense = Math.max(1, Math.floor(enemy.defense * (isGod ? 0.94 : 0.9)));
+    extra.kingDamageAmp = Math.max(Number(extra.kingDamageAmp || 1), isGod ? 1.36 : 1.28);
+    addLog(`${bossLabel}: 理破壊（与ダメージ増加 / 被ダメージ増加）`);
     return;
   }
   if (action === "void_cannon") {
@@ -9497,6 +9541,7 @@ function enemyActionOtherworldKing() {
 function otherworldKingStrike(options) {
   const enemy = state.battle.enemy;
   if (!enemy) return;
+  const bossLabel = enemy.name || "異界の王";
   const effective = getEffectivePlayerStats();
   const regionId = STAGE_DATA[state.battle.stageId]?.mapId || state.currentMap || "otherworld";
   const evasion = getCappedEffectiveEvasion(effective, regionId);
@@ -9519,7 +9564,7 @@ function otherworldKingStrike(options) {
       if (state.titleEffects.evadeCounterDamageBonus > 0) {
         state.titleRuntime.evadeCounterBoostReady = true;
       }
-      addLog(`異界の王の${options.label} ${i + 1}段目を回避した。`);
+      addLog(`${bossLabel}の${options.label} ${i + 1}段目を回避した。`);
       continue;
     }
     const critChance = (options.critBonus || 0) + (lockOn ? 0.14 : 0);
@@ -9537,7 +9582,7 @@ function otherworldKingStrike(options) {
     applyDamage("enemy", damage, isCrit ? `${options.label} 会心` : `${options.label} ${i + 1}段`);
     if (options.applyDefenseBreakChance && Math.random() < options.applyDefenseBreakChance) {
       applyEffect("player", "otherworld_king_break", { stat: "defense", multiplier: 0.86, durationMs: 4800, displayNameJa: "理断ち" });
-      addLog("異界の王の理断ちで防御が低下した。");
+      addLog(`${bossLabel}の理断ちで防御が低下した。`);
     }
   }
   if (hits >= 3 && state.titleEffects.afterTripleHitDamageBonus > 0 && state.battle.playerCurrentHp > 0) {
@@ -9720,11 +9765,11 @@ function applyDamage(source, amount, actionName, isCrit = false) {
       damage = Math.max(1, Math.floor(damage * (1 + Number(state.titleEffects.everyThirdHitDamageBonus || 0))));
       addLog("冥府の三牙: 三連刻印の一撃が発動");
     }
-    if (state.battle.enemy.id === "protocol3") {
+    if (["protocol3", "fullOpenProtocol3"].includes(state.battle.enemy.id)) {
       const mul = Number(state.battle.gimmick?.extra?.protocol3DamageTakenMultiplier || 1);
       damage = Math.max(1, Math.floor(damage * mul));
     }
-    if (state.battle.enemy.id === "otherworldKing" && hasTitleUnlocked("fate_redeemer")) {
+    if (["otherworldKing", "grarude"].includes(state.battle.enemy.id) && hasTitleUnlocked("fate_redeemer")) {
       const erosion = Math.max(
         1,
         Math.floor(state.battle.enemy.maxHp * 0.04 + Math.min(5000, (state.otherworldKingDefeatCount || 0) * 18))
@@ -9876,7 +9921,7 @@ function applyDamage(source, amount, actionName, isCrit = false) {
     return;
   }
   let finalIncomingDamage = amount;
-  if (state.battle.enemy?.id === "otherworldKing" && isOtherworldThreeSacredSetActive()) {
+  if (["otherworldKing", "grarude"].includes(state.battle.enemy?.id) && isOtherworldThreeSacredSetActive()) {
     finalIncomingDamage = Math.max(1, Math.floor(finalIncomingDamage * 0.8));
   }
   state.battle.playerCurrentHp = Math.max(0, state.battle.playerCurrentHp - finalIncomingDamage);
@@ -11333,7 +11378,8 @@ function applyLoopUnlocks() {
       addLog(`周回解放: ${row?.name || id}`);
     });
   }
-  const unlockableChallenges = LOOP_CHALLENGE_DATA.filter((ch) => state.loop.loopCount >= ch.requiredLoop && state.fieldBossCleared.includes(ch.requiredFieldBossStage));
+  // 周回後は周回限定高難易度の全ボスへいつでも挑戦可能にする
+  const unlockableChallenges = LOOP_CHALLENGE_DATA.filter(() => state.loop.loopCount >= 1);
   unlockableChallenges.forEach((ch) => unlockLoopChallenge(ch.id));
   state.stats.highestLoopReached = Math.max(state.stats.highestLoopReached || 0, state.loop.loopCount);
   state.loop.persistentStats.highestLoopReached = Math.max(state.loop.persistentStats.highestLoopReached || 0, state.loop.loopCount);
@@ -11387,7 +11433,7 @@ function renderLoopUnlockSummary() {
 
 function renderHighDifficultyMapView() {
   const cards = LOOP_CHALLENGE_DATA.map((challenge) => {
-    const unlocked = (state.loop.unlockedLoopChallengeIds || []).includes(challenge.id);
+    const unlocked = state.loop.loopCount >= 1 || (state.loop.unlockedLoopChallengeIds || []).includes(challenge.id);
     const cleared = !!state.loop.specialChallengeClearFlags?.[challenge.id];
     const stage = STAGE_DATA[challenge.stageId];
     const boss = ENEMY_DATA[challenge.bossId];
@@ -11395,7 +11441,7 @@ function renderHighDifficultyMapView() {
     return `
       <div class="shop-card">
         <h4>${challenge.name}</h4>
-        <p class="tiny">カテゴリ: ${challenge.category} / 必要周回: ${challenge.requiredLoop}</p>
+        <p class="tiny">カテゴリ: ${challenge.category} / 解放条件: 周回後</p>
         <p class="tiny">推奨Lv: ${stage?.recommendedLevel || "-"} / 対象ボス: ${boss?.name || challenge.bossId}</p>
         <p class="tiny">報酬: EXP+${challenge.rewards.exp} / GOLD+${challenge.rewards.gold} / ${ITEM_DATA[challenge.rewards.specialItemId]?.name || challenge.rewards.specialItemId}</p>
         <p class="tiny">${cleared ? "クリア済み" : unlocked ? "挑戦可能" : "未解放"}</p>
@@ -11414,7 +11460,10 @@ function renderLoopChallengeView() {
 }
 
 function startEnhancedBossBattle(bossId) {
-  const challenge = LOOP_CHALLENGE_DATA.find((row) => row.bossId === bossId && (state.loop.unlockedLoopChallengeIds || []).includes(row.id));
+  const challenge = LOOP_CHALLENGE_DATA.find((row) =>
+    row.bossId === bossId &&
+    (state.loop.loopCount >= 1 || (state.loop.unlockedLoopChallengeIds || []).includes(row.id))
+  );
   if (!challenge) {
     addLog("この強化ボスは未解放です。");
     return;
@@ -13299,7 +13348,7 @@ function applyPlayerDamageBonuses(baseDamage, enemy) {
   if (state.titleEffects.damageToAilmentEnemy > 0 && isEnemyAilmentedByTitle()) {
     damage = Math.floor(damage * (1 + state.titleEffects.damageToAilmentEnemy));
   }
-  if (enemy.id === "otherworldKing" && isOtherworldThreeSacredSetActive()) {
+  if (["otherworldKing", "grarude"].includes(enemy.id) && isOtherworldThreeSacredSetActive()) {
     damage = Math.floor(damage * 1.3);
   }
   if (state.titleRuntime.evadeCounterBoostReady && state.titleEffects.evadeCounterDamageBonus > 0) {
