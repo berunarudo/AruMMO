@@ -1,8 +1,11 @@
 ﻿const MAX_LOG_LINES = 140;
 const BATTLE_TICK_MS = 180;
 
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 const AUTO_SAVE_INTERVAL_MS = 120000;
+const DEFAULT_PLAYER_NAME = "名無しの冒険者";
+const PLAYER_NAME_MAX_LENGTH = 12;
+const FAME_HALL_OF_FAME = "hall_of_fame";
 const STORAGE_KEYS = {
   MAIN: "mmorpg_save_main",
   BACKUP: "mmorpg_save_backup",
@@ -10,6 +13,53 @@ const STORAGE_KEYS = {
   PERSISTENT: "mmorpg_persistent",
   META: "mmorpg_meta"
 };
+
+const FAME_MIN_RANK_RULES = [
+  { id: "grassland_clear", rank: 80, check: () => state.fieldBossCleared.includes("1-10") },
+  { id: "desert_clear", rank: 50, check: () => state.fieldBossCleared.includes("2-10") },
+  { id: "sea_clear", rank: 20, check: () => state.fieldBossCleared.includes("3-10") },
+  { id: "volcano_clear", rank: 10, check: () => state.fieldBossCleared.includes("4-10") },
+  { id: "protocol3_clear", rank: 5, check: () => !!state.neverendBossClearFlags?.protocol3 || !!state.worldStateFlags?.protocol3Slayer },
+  { id: "otherworld_enter", rank: 1, check: () => !!state.otherworldUnlocked },
+  { id: "otherworld_king_clear", rank: FAME_HALL_OF_FAME, check: () => !!state.otherworldKingCleared }
+];
+
+const FAME_RANK_FROM_FAME_TABLE = [
+  { fame: 2000, rank: 95 },
+  { fame: 6000, rank: 80 },
+  { fame: 12000, rank: 65 },
+  { fame: 22000, rank: 50 },
+  { fame: 45000, rank: 30 },
+  { fame: 70000, rank: 20 },
+  { fame: 110000, rank: 10 },
+  { fame: 170000, rank: 5 },
+  { fame: 260000, rank: 3 },
+  { fame: 360000, rank: 2 },
+  { fame: 500000, rank: 1 }
+];
+
+const FAME_RANK_MILESTONES = [
+  { key: "rank80", rank: 80, worldFlag: "fameRank80Reached", popup: "ギルドランキング80位入り！", logs: ["名声が上昇しました！", "ギルドランキングが80位になりました！"] },
+  { key: "rank50", rank: 50, worldFlag: "fameRank50Reached", popup: "ギルドランキング50位入り！", logs: ["砂漠突破で50位入り。注目が集まり始めた。"] },
+  { key: "rank20", rank: 20, worldFlag: "fameRank20Reached", popup: "ギルドランキングTOP20入り！", logs: ["20位入り。もう上位勢として扱われている。"] },
+  { key: "rank10", rank: 10, worldFlag: "fameRank10Reached", popup: "ギルドランキングTOP10入り！", logs: ["上位勢の視線が、あなたに向けられ始めた。"] },
+  { key: "rank5", rank: 5, worldFlag: "fameRank5Reached", popup: "ギルドランキングTOP5入り！", logs: ["Protocol3を越え、TOP5に名を刻んだ。"] },
+  { key: "rank1", rank: 1, worldFlag: "fameRank1Reached", popup: "ギルドランキング1位！", logs: ["すべての冒険者が、あなたの名を知った。"] },
+  { key: "hall", rank: FAME_HALL_OF_FAME, worldFlag: "fameHallOfFame", popup: "殿堂入り", logs: ["その名は、ランキングではなく記録に刻まれた。"] }
+];
+
+const FAME_NPC_LEADERBOARD = [
+  { name: "紅の魔術師", title: "魔神", fame: 999999, comment: "旧兵器すら研究対象にする終盤魔術師。" },
+  { name: "浪漫侍", title: "剣神", fame: 850000, comment: "重装でも切り伏せる実戦派。" },
+  { name: "AKA.ベル", title: "影神", fame: 820000, comment: "速度と会心で戦場を裂く。" },
+  { name: "守り神しめ鯖", title: "聖人", fame: 790000, comment: "最後まで立つ守護者。" },
+  { name: "工房長代理", title: "鍛工覇者", fame: 720000, comment: "装備と強化の覇者。" },
+  { name: "破産騎士", title: "借金王", fame: 680000, comment: "カジノで散っても戻ってくる。" },
+  { name: "検証班A", title: "解析者", fame: 650000, comment: "構成とログから最適解を掘る。" },
+  { name: "草原在住ニキ", title: "草原突破者", fame: 620000, comment: "序盤導線の生き字引。" },
+  { name: "オークション監視員", title: "相場番", fame: 600000, comment: "市場変動を秒で読む。" },
+  { name: "名無しの考察班", title: "観測者", fame: 580000, comment: "世界観と攻略線を接続する。" }
+];
 
 const BALANCE_CONFIG = {
   reward: {
@@ -373,7 +423,7 @@ function resolveSceneBgmId() {
   if (state.screen === "title") return "title";
   if (state.screen === "otherworldEnding") return "ending";
   if (state.screen === "clearResult" || state.screen === "carryOverSelection") return "ending";
-  if (state.screen === "intro" || state.screen === "jobSelect") return "title";
+  if (state.screen === "intro" || state.screen === "nameEntry" || state.screen === "jobSelect") return "title";
   if (state.battle?.isActive) {
     const enemyId = state.battle.enemy?.id || "";
     if (enemyId === "otherworldKing") {
@@ -624,6 +674,7 @@ function ensureOtherworldState() {
 
 function unlockOtherworldAccess(options = {}) {
   ensureOtherworldState();
+  ensureGuildFameState();
   const { silent = false, reason = "" } = options;
   if (state.otherworldUnlocked) return false;
   state.otherworldUnlocked = true;
@@ -634,6 +685,8 @@ function unlockOtherworldAccess(options = {}) {
     addLog(`異界への道が開いた。${reason ? ` (${reason})` : ""}`, "important", { important: true });
     showCenterPopup({ text: "異界 解放", type: "important" });
   }
+  addFame(26000, `異界侵入${reason ? `:${reason}` : ""}`);
+  setMinimumFameRank(1, "異界侵入");
   return true;
 }
 
@@ -2724,6 +2777,257 @@ function getGuildRankDisplayInfo() {
   };
 }
 
+function ensureGuildFameState() {
+  state.guild = state.guild && typeof state.guild === "object" ? state.guild : {};
+  if (!Number.isFinite(Number(state.guild.fame))) state.guild.fame = 0;
+  state.guild.fame = Math.max(0, Math.floor(Number(state.guild.fame || 0)));
+  if (!Number.isFinite(Number(state.guild.fameRank))) state.guild.fameRank = null;
+  if (state.guild.fameRank != null) {
+    state.guild.fameRank = Math.max(1, Math.floor(Number(state.guild.fameRank)));
+  }
+  if (!Number.isFinite(Number(state.guild.fameBestRank))) state.guild.fameBestRank = state.guild.fameRank;
+  if (state.guild.fameBestRank != null) {
+    state.guild.fameBestRank = Math.max(1, Math.floor(Number(state.guild.fameBestRank)));
+  }
+  state.guild.hallOfFame = !!state.guild.hallOfFame;
+  if (!Array.isArray(state.guild.claimedFameTitleIds)) state.guild.claimedFameTitleIds = [];
+  if (!state.guild.rankingReactionFlags || typeof state.guild.rankingReactionFlags !== "object") state.guild.rankingReactionFlags = {};
+  if (!state.guild.rankingForcedRankFlags || typeof state.guild.rankingForcedRankFlags !== "object") state.guild.rankingForcedRankFlags = {};
+  if (!["jobs", "ranking"].includes(state.guild.templeTab)) state.guild.templeTab = "jobs";
+  if (state.otherworldKingCleared) {
+    state.guild.hallOfFame = true;
+  }
+  if (state.guild.hallOfFame) {
+    state.guild.fameRank = null;
+    state.guild.fameBestRank = 1;
+  }
+}
+
+function getCurrentFameRank() {
+  ensureGuildFameState();
+  return state.guild.hallOfFame ? FAME_HALL_OF_FAME : state.guild.fameRank;
+}
+
+function formatFameRankLabel(rank = getCurrentFameRank()) {
+  if (rank === FAME_HALL_OF_FAME || state.guild.hallOfFame) return "殿堂入り";
+  if (typeof rank === "number" && Number.isFinite(rank)) return `${Math.max(1, Math.floor(rank))}位`;
+  return "圏外";
+}
+
+function getFameAlias() {
+  const rank = getCurrentFameRank();
+  if (rank === FAME_HALL_OF_FAME) return "殿堂英雄";
+  if (rank === 1) return "異界踏破者";
+  if (typeof rank === "number" && rank <= 5) return "世界級挑戦者";
+  if (typeof rank === "number" && rank <= 10) return "火山突破者";
+  if (typeof rank === "number" && rank <= 20) return "海域踏破者";
+  if (typeof rank === "number" && rank <= 50) return "砂海突破者";
+  if (typeof rank === "number" && rank <= 80) return "草原突破者";
+  return "無名の冒険者";
+}
+
+function getFameFanFlavor() {
+  const rank = getCurrentFameRank();
+  if (rank === FAME_HALL_OF_FAME) return "掲示板は祝福で埋め尽くされている。";
+  if (rank === 1) return "全冒険者があなたの動向を追っている。";
+  if (typeof rank === "number" && rank <= 5) return "有名プレイヤーとしてファンが増え続けている。";
+  if (typeof rank === "number" && rank <= 20) return "街中でも名前を見かけると言われ始めた。";
+  if (typeof rank === "number" && rank <= 80) return "掲示板であなたの噂が出るようになった。";
+  return "まだ大きな注目は集まっていない。";
+}
+
+function getFameRankByFameValue(fameValue = state.guild.fame) {
+  const fame = Math.max(0, Math.floor(Number(fameValue || 0)));
+  let rank = null;
+  FAME_RANK_FROM_FAME_TABLE.forEach((row) => {
+    if (fame >= row.fame) {
+      rank = row.rank;
+    }
+  });
+  return rank;
+}
+
+function getMinimumRankByProgress() {
+  let best = null;
+  let hall = false;
+  FAME_MIN_RANK_RULES.forEach((rule) => {
+    if (!rule.check()) return;
+    if (rule.rank === FAME_HALL_OF_FAME) {
+      hall = true;
+      return;
+    }
+    if (best == null || rule.rank < best) {
+      best = rule.rank;
+    }
+  });
+  return hall ? FAME_HALL_OF_FAME : best;
+}
+
+function getNextFameRankTargetText() {
+  ensureGuildFameState();
+  if (state.guild.hallOfFame) return "次目標: 殿堂維持";
+  const current = state.guild.fameRank == null ? 999 : state.guild.fameRank;
+  const next = FAME_RANK_FROM_FAME_TABLE
+    .filter((row) => row.rank < current && state.guild.fame < row.fame)
+    .sort((a, b) => a.rank - b.rank)[0];
+  if (!next) return "次目標: 進行達成で上位保証";
+  return `次目標: ${next.rank}位 (名声${next.fame})`;
+}
+
+function triggerRankingBoardReaction(rank) {
+  ensureGuildFameState();
+  const milestone = FAME_RANK_MILESTONES.find((row) => row.rank === rank);
+  if (!milestone) return;
+  if (state.guild.rankingReactionFlags[milestone.key]) return;
+  state.guild.rankingReactionFlags[milestone.key] = true;
+  state.guild.lastRankRewardClaimed = milestone.key;
+  state.worldStateFlags = { ...(state.worldStateFlags || {}), [milestone.worldFlag]: true };
+  milestone.logs.forEach((line) => addLog(line, "important", { important: true }));
+  addLog(`${getPlayerDisplayName()}の名がギルド神殿に刻まれました。`, "important", { important: true });
+  showCenterPopup({ text: milestone.popup, type: "important" });
+  updateBoardThreadsFromProgress();
+}
+
+function syncFameMilestoneFlagsByRank(rank) {
+  ensureGuildFameState();
+  const isHall = rank === FAME_HALL_OF_FAME || state.guild.hallOfFame;
+  FAME_RANK_MILESTONES.forEach((milestone) => {
+    const reached = isHall
+      ? true
+      : (typeof rank === "number" && milestone.rank !== FAME_HALL_OF_FAME && rank <= milestone.rank);
+    if (!reached) return;
+    state.guild.rankingReactionFlags[milestone.key] = true;
+    state.worldStateFlags = { ...(state.worldStateFlags || {}), [milestone.worldFlag]: true };
+  });
+}
+
+function updateFameRankByProgress(options = {}) {
+  ensureGuildFameState();
+  const { silent = false, reason = "" } = options;
+  const minByProgress = getMinimumRankByProgress();
+  const byFame = getFameRankByFameValue(state.guild.fame);
+  let candidate = byFame;
+  if (minByProgress === FAME_HALL_OF_FAME) {
+    state.guild.hallOfFame = true;
+    state.guild.fameRank = null;
+    state.guild.fameBestRank = 1;
+    if (!silent) {
+      triggerRankingBoardReaction(FAME_HALL_OF_FAME);
+      checkTitleUnlocks("afterFameRankChange");
+    } else {
+      syncFameMilestoneFlagsByRank(FAME_HALL_OF_FAME);
+    }
+    return { changed: true, rank: FAME_HALL_OF_FAME, reason };
+  }
+  if (typeof minByProgress === "number") {
+    candidate = candidate == null ? minByProgress : Math.min(candidate, minByProgress);
+  }
+  if (candidate == null) {
+    return { changed: false, rank: state.guild.fameRank, reason };
+  }
+  const before = state.guild.fameRank == null ? null : state.guild.fameRank;
+  if (before != null && candidate > before) {
+    candidate = before;
+  }
+  const changed = before == null || candidate < before;
+  state.guild.fameRank = candidate;
+  state.guild.fameBestRank = state.guild.fameBestRank == null ? candidate : Math.min(state.guild.fameBestRank, candidate);
+  if (changed && !silent) {
+    addLog(`ギルドランキング更新: ${formatFameRankLabel(candidate)}${reason ? ` (${reason})` : ""}`, "important", { important: true });
+    triggerRankingBoardReaction(candidate);
+    checkTitleUnlocks("afterFameRankChange");
+  } else if (silent) {
+    syncFameMilestoneFlagsByRank(candidate);
+  }
+  return { changed, rank: candidate, reason };
+}
+
+function setMinimumFameRank(rank, reason = "") {
+  ensureGuildFameState();
+  if (rank === FAME_HALL_OF_FAME) {
+    return updateFameRankByProgress({ silent: false, reason: reason || "殿堂条件達成" });
+  }
+  const numeric = Number(rank);
+  if (!Number.isFinite(numeric) || numeric <= 0) return { changed: false, rank: state.guild.fameRank };
+  const value = Math.max(1, Math.floor(numeric));
+  const current = state.guild.fameRank == null ? null : state.guild.fameRank;
+  if (current != null && current <= value) return { changed: false, rank: current };
+  state.guild.fameRank = value;
+  state.guild.fameBestRank = state.guild.fameBestRank == null ? value : Math.min(state.guild.fameBestRank, value);
+  addLog(`ギルドランキングが${value}位になりました！${reason ? ` (${reason})` : ""}`, "important", { important: true });
+  triggerRankingBoardReaction(value);
+  checkTitleUnlocks("afterFameRankChange");
+  return { changed: true, rank: value };
+}
+
+function addFame(amount, reason = "") {
+  ensureGuildFameState();
+  const delta = Math.max(0, Math.floor(Number(amount || 0)));
+  if (delta <= 0) return { changed: false, fame: state.guild.fame };
+  state.guild.fame += delta;
+  addLog(`名声が上昇しました！ +${delta}${reason ? ` (${reason})` : ""}`, "important", { important: true });
+  const rankResult = updateFameRankByProgress({ silent: false, reason: reason || "名声上昇" });
+  checkTitleUnlocks("afterFameGain");
+  return { changed: true, fame: state.guild.fame, rank: rankResult.rank };
+}
+
+function getGuildFameLeaderboardRows(limit = 15) {
+  ensureGuildFameState();
+  const rows = FAME_NPC_LEADERBOARD
+    .map((npc, idx) => ({
+      kind: "npc",
+      rank: idx + 1,
+      rankLabel: `${idx + 1}位`,
+      name: npc.name,
+      title: npc.title,
+      fame: npc.fame,
+      comment: npc.comment
+    }));
+  const playerRank = getCurrentFameRank();
+  if (playerRank === FAME_HALL_OF_FAME) {
+    rows.unshift({
+      kind: "player",
+      rank: null,
+      rankLabel: "殿堂",
+      name: state.playerProfile?.playerName || DEFAULT_PLAYER_NAME,
+      title: getDisplayTitleData()?.name || "主人公",
+      fame: state.guild.fame,
+      comment: "ランキングを超えて記録に刻まれた。"
+    });
+    return rows.slice(0, Math.max(1, limit));
+  }
+  if (typeof playerRank === "number" && Number.isFinite(playerRank)) {
+    const insertIndex = Math.max(0, Math.min(rows.length, playerRank - 1));
+    const shifted = rows.map((row) => {
+      if (row.rank >= playerRank) {
+        const rank = row.rank + 1;
+        return { ...row, rank, rankLabel: `${rank}位` };
+      }
+      return row;
+    });
+    shifted.splice(insertIndex, 0, {
+      kind: "player",
+      rank: playerRank,
+      rankLabel: `${playerRank}位`,
+      name: state.playerProfile?.playerName || DEFAULT_PLAYER_NAME,
+      title: getDisplayTitleData()?.name || "称号なし",
+      fame: state.guild.fame,
+      comment: getFameFanFlavor()
+    });
+    return shifted.slice(0, Math.max(1, limit));
+  }
+  rows.push({
+    kind: "player",
+    rank: null,
+    rankLabel: "圏外",
+    name: state.playerProfile?.playerName || DEFAULT_PLAYER_NAME,
+    title: getDisplayTitleData()?.name || "称号なし",
+    fame: state.guild.fame,
+    comment: getFameFanFlavor()
+  });
+  return rows.slice(0, Math.max(1, limit));
+}
+
 function rankInRange(rank, minRank, maxRank) {
   const v = guildRankScore(rank);
   return v >= guildRankScore(minRank) && v <= guildRankScore(maxRank);
@@ -3361,6 +3665,71 @@ const TITLE_DATA = [
   ...UNIQUE_TITLES.map((t) => ({ category: "cheat", description: t.name, isHidden: false, canCarryOver: true, carryOverType: "direct", ...t })),
   ...OTHERWORLD_TITLES
 ];
+
+const FAME_SYSTEM_TITLES = [
+  {
+    id: "fame_popular",
+    name: "人気者",
+    category: "normal",
+    description: "少しずつ名前が知られ始めた冒険者。",
+    conditionDescription: "ランキング80位以内、または名声6000以上",
+    effectDescription: "名声1000ごとに全能力+0.1% (最大+5%)",
+    effect: { fameScalingBonus: { perFame: 1000, percentPerStep: 0.001, cap: 0.05 } },
+    trigger: ["afterFameGain", "afterFameRankChange"],
+    customCheckerId: "fame_popular",
+    tier: "rare",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "fame_everyone_knows",
+    name: "誰もが彼を知る",
+    category: "normal",
+    description: "その名は、ギルドでも掲示板でも語られるようになった。",
+    conditionDescription: "ランキング20位以内、または名声70000以上",
+    effectDescription: "名声1000ごとに全能力+0.15% (最大+10%)",
+    effect: { fameScalingBonus: { perFame: 1000, percentPerStep: 0.0015, cap: 0.1 } },
+    trigger: ["afterFameGain", "afterFameRankChange"],
+    customCheckerId: "fame_everyone_knows",
+    tier: "epic",
+    canCarryOver: false,
+    carryOverType: "recordOnly"
+  },
+  {
+    id: "fame_fan_favorite",
+    name: "ファンだらけ",
+    category: "cheat",
+    description: "もはやただの冒険者ではない。誰もがその名を見ている。",
+    conditionDescription: "ランキング5位以内、または名声170000以上",
+    effectDescription: "名声1000ごとに全能力+0.2% (最大+15%) / 戦闘開始時10%で応援バフ",
+    effect: {
+      fameScalingBonus: { perFame: 1000, percentPerStep: 0.002, cap: 0.15 },
+      fanBattleStartBuff: { chance: 0.1, attackMultiplier: 0.05, defenseMultiplier: 0.05, durationSec: 30 }
+    },
+    trigger: ["afterFameGain", "afterFameRankChange"],
+    customCheckerId: "fame_fan_favorite",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct"
+  },
+  {
+    id: "fame_hall_of_fame",
+    name: "殿堂入り",
+    category: "cheat",
+    description: "ランキングを超え、記録そのものに刻まれた存在。",
+    conditionDescription: "異界の王撃破",
+    effectDescription: "演出用称号",
+    effect: {},
+    trigger: ["afterFieldBossClear", "afterFameRankChange"],
+    customCheckerId: "fame_hall_of_fame",
+    tier: "legend",
+    canCarryOver: true,
+    carryOverType: "direct",
+    isHidden: true
+  }
+];
+
+TITLE_DATA.push(...FAME_SYSTEM_TITLES);
 
 const TITLE_CHECKERS = {
   grass_observer: () => state.stats.idleGrasslandSeconds >= 30,
@@ -5108,6 +5477,47 @@ Object.entries(BOARD_RESPONSE_SET_EXPANSIONS).forEach(([setId, extraRows]) => {
   BOARD_RESPONSE_SETS[setId].push(...extraRows);
 });
 
+const FAME_BOARD_RESPONSE_SET_EXPANSIONS = {
+  fame_rank_80_reaction: [
+    { author: "名無しの冒険者", body: "あの人、ランキング載ったらしいぞ。", tone: "chat" },
+    { author: "名無しの冒険者", body: "草原ボス突破者か。最近名前見るな。", tone: "chat" }
+  ],
+  fame_rank_50_reaction: [
+    { author: "名無しの冒険者", body: "砂漠突破で50位入りは早くない？", tone: "chat" },
+    { author: "名無しの冒険者", body: "あの人、称号構成かなり変わってるらしい。", tone: "chat" }
+  ],
+  fame_rank_20_reaction: [
+    { author: "名無しの冒険者", body: "20位入り来た。もう普通に上位勢じゃん。", tone: "legend", important: true },
+    { author: "ファンA", body: "今日、町で見かけた。表示称号かっこよかった。", tone: "chat" }
+  ],
+  fame_rank_10_reaction: [
+    { author: "名無しの冒険者", body: "TOP10入りしたぞ。", tone: "legend", important: true },
+    { author: "浪漫侍", body: "ここまで来たなら、もはや偶然ではない。", tone: "guide", important: true }
+  ],
+  fame_rank_5_reaction: [
+    { author: "名無しの冒険者", body: "Protocol3撃破で5位ってマジ？", tone: "legend", important: true },
+    { author: "ファンB", body: "あの人やっぱかっこいい。", tone: "chat" },
+    { author: "紅の魔術師", body: "旧兵器を越えた者か。次は何を越える？", tone: "theory" }
+  ],
+  fame_rank_1_reaction: [
+    { author: "名無しの冒険者", body: "1位、入れ替わった。", tone: "legend", important: true },
+    { author: "名無しの冒険者", body: "あの人、異界に入ったらしい。", tone: "chat" },
+    { author: "考察班", body: "ランキングでは測れない領域に入った可能性がある。", tone: "theory", important: true }
+  ],
+  fame_hall_reaction: [
+    { author: "名無しの冒険者", body: "殿堂入り、おめでとう。", tone: "legend", important: true },
+    { author: "名無しの冒険者", body: "もうランキングじゃなくて伝説枠。", tone: "chat" },
+    { author: "守り神しめ鯖", body: "最後まで見ていました。", tone: "chat", important: true }
+  ]
+};
+
+Object.entries(FAME_BOARD_RESPONSE_SET_EXPANSIONS).forEach(([setId, extraRows]) => {
+  if (!Array.isArray(BOARD_RESPONSE_SETS[setId])) {
+    BOARD_RESPONSE_SETS[setId] = [];
+  }
+  BOARD_RESPONSE_SETS[setId].push(...extraRows);
+});
+
 const BOARD_THREAD_DEFS = [
   { id: "th_job", category: "beginner", title: "【初心者向け】最初に選ぶならどの職？", visibleIf: { minStage: "1-1" }, responseSetId: "starter_job" },
   { id: "th_bee", category: "beginner", title: "草原の蜂、序盤にしては強くない？", visibleIf: { minStage: "1-1" }, responseSetId: "bee_warning" },
@@ -5197,6 +5607,16 @@ const BOARD_THREAD_DEFS = [
   { id: "th_hidden_end_clear", category: "loop", title: "裏エンド、世界観が別物すぎる", visibleIf: { unlockedEnding: "hidden_end" }, responseSetId: "endgame_titles" },
   { id: "th_chaos_end_clear", category: "loop", title: "混沌エンド行ったら掲示板まで壊れた", visibleIf: { unlockedEnding: "chaos_end" }, responseSetId: "endgame_titles" }
 ];
+
+BOARD_THREAD_DEFS.push(
+  { id: "th_fame_rank_80", category: "legend", title: "【ランキング】最近80位入りした冒険者の話", visibleIf: { worldStateFlag: "fameRank80Reached" }, responseSetId: "fame_rank_80_reaction" },
+  { id: "th_fame_rank_50", category: "legend", title: "【ランキング】50位入り、砂漠突破勢の勢いがすごい", visibleIf: { worldStateFlag: "fameRank50Reached" }, responseSetId: "fame_rank_50_reaction" },
+  { id: "th_fame_rank_20", category: "legend", title: "【ランキング】20位入り報告と現地目撃情報", visibleIf: { worldStateFlag: "fameRank20Reached" }, responseSetId: "fame_rank_20_reaction" },
+  { id: "th_fame_rank_10", category: "legend", title: "【ランキング】TOP10に新顔が来た", visibleIf: { worldStateFlag: "fameRank10Reached" }, responseSetId: "fame_rank_10_reaction" },
+  { id: "th_fame_rank_5", category: "legend", title: "【ランキング】Protocol3撃破者、5位入り", visibleIf: { worldStateFlag: "fameRank5Reached" }, responseSetId: "fame_rank_5_reaction" },
+  { id: "th_fame_rank_1", category: "legend", title: "【ランキング】1位交代、異界挑戦者の名が広がる", visibleIf: { worldStateFlag: "fameRank1Reached" }, responseSetId: "fame_rank_1_reaction" },
+  { id: "th_fame_hall", category: "legend", title: "【殿堂入り】ランキングではなく記録へ", visibleIf: { worldStateFlag: "fameHallOfFame" }, responseSetId: "fame_hall_reaction" }
+);
 
 const STORY_FRAGMENTS = {
   grassland_clear: {
@@ -5634,6 +6054,11 @@ const state = {
   activeTitles: [],
   equippedNormalTitleIds: [],
   equippedCheatTitleIds: [],
+  playerProfile: {
+    playerName: DEFAULT_PLAYER_NAME,
+    displayTitleId: null,
+    nameChangedCount: 0
+  },
   titleLimit: 1,
   titleLimitBase: 1,
   titleLimitBonus: 0,
@@ -5793,7 +6218,9 @@ const state = {
     selectedSkillSlot: 0,
     skillVisualEffects: {},
     systemSubTab: "save",
-    titleCatalogSummaryCollapsed: false
+    titleCatalogSummaryCollapsed: false,
+    profileNameEditMode: false,
+    profilePendingName: ""
   },
   titleRuntime: {
     reviveBuffPending: false,
@@ -6030,7 +6457,16 @@ const state = {
     maxActiveQuests: 3,
     workshopTab: "craft",
     shopRegionTab: "grassland",
-    shopMode: "buy"
+    shopMode: "buy",
+    templeTab: "jobs",
+    fame: 0,
+    fameRank: null,
+    hallOfFame: false,
+    fameBestRank: null,
+    lastRankRewardClaimed: null,
+    claimedFameTitleIds: [],
+    rankingReactionFlags: {},
+    rankingForcedRankFlags: {}
   },
   battle: {
     isActive: false,
@@ -6065,7 +6501,7 @@ const state = {
     enemySpawnedAt: 0
   },
   player: {
-    name: "プレイヤー",
+    name: DEFAULT_PLAYER_NAME,
     level: 1,
     exp: 0,
     gold: 100,
@@ -6164,6 +6600,7 @@ Object.keys(STAGE_DATA).forEach((stageId) => {
 });
 initializeJobEvolutionState({ silent: true });
 ensureTitleSlotState();
+ensureGuildFameState();
 ensureAudioSettings();
 
 function createDefaultTitleEffects() {
@@ -6207,6 +6644,9 @@ function createDefaultTitleEffects() {
     conditionalBuffByLoop: null,
     conditionalBuffByNoTitle: null,
     randomBattleStartBuff: null,
+    fanBattleStartBuff: null,
+    fameScalingBonuses: [],
+    fameBasedAllStatsBonus: 0,
     statusAilmentResist: 0,
     accuracyBonus: 0,
     statusResistByType: {},
@@ -6332,6 +6772,81 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function sanitizePlayerNameInput(value) {
+  const noTags = String(value ?? "").replace(/<[^>]*>/g, "");
+  const compact = noTags.replace(/[\r\n\t]/g, " ").trim();
+  return Array.from(compact).slice(0, PLAYER_NAME_MAX_LENGTH).join("");
+}
+
+function normalizePlayerName(value, options = {}) {
+  const fallback = options.fallback || DEFAULT_PLAYER_NAME;
+  const sanitized = sanitizePlayerNameInput(value);
+  return sanitized || fallback;
+}
+
+function ensurePlayerProfileState() {
+  const profile = state.playerProfile && typeof state.playerProfile === "object"
+    ? { ...state.playerProfile }
+    : {};
+  const merged = {
+    playerName: DEFAULT_PLAYER_NAME,
+    displayTitleId: null,
+    nameChangedCount: 0,
+    ...profile
+  };
+  merged.playerName = normalizePlayerName(merged.playerName);
+  merged.nameChangedCount = Math.max(0, Math.floor(Number(merged.nameChangedCount || 0)));
+  const hasDisplayTitle = !!(merged.displayTitleId && getTitleById(merged.displayTitleId) && (state.unlockedTitles || []).includes(merged.displayTitleId));
+  merged.displayTitleId = hasDisplayTitle ? merged.displayTitleId : null;
+  state.playerProfile = merged;
+  state.player.name = merged.playerName;
+}
+
+function getDisplayTitleData(titleId = state.playerProfile?.displayTitleId) {
+  if (!titleId) return null;
+  const title = getTitleById(titleId);
+  if (!title) return null;
+  if (!(state.unlockedTitles || []).includes(titleId)) return null;
+  return title;
+}
+
+function getPlayerDisplayName(options = {}) {
+  ensurePlayerProfileState();
+  const includeTitle = options.includeTitle !== false;
+  const playerName = state.playerProfile.playerName || DEFAULT_PLAYER_NAME;
+  const title = includeTitle ? getDisplayTitleData() : null;
+  if (!title) return playerName;
+  return `${playerName}【${title.name}】`;
+}
+
+function updatePlayerName(rawName, options = {}) {
+  ensurePlayerProfileState();
+  const previous = state.playerProfile.playerName || DEFAULT_PLAYER_NAME;
+  const next = normalizePlayerName(rawName, { fallback: DEFAULT_PLAYER_NAME });
+  const changed = next !== previous;
+  state.playerProfile.playerName = next;
+  state.player.name = next;
+  if (changed && options.incrementCount !== false) {
+    state.playerProfile.nameChangedCount = Math.max(0, Math.floor(Number(state.playerProfile.nameChangedCount || 0))) + 1;
+  }
+  return { changed, previous, next };
+}
+
+function setDisplayTitleId(titleId) {
+  ensurePlayerProfileState();
+  if (!titleId) {
+    state.playerProfile.displayTitleId = null;
+    return true;
+  }
+  const canSet = !!(getTitleById(titleId) && (state.unlockedTitles || []).includes(titleId));
+  if (!canSet) {
+    addLog("未取得の称号は表示称号に設定できません。");
+    return false;
+  }
+  state.playerProfile.displayTitleId = titleId;
+  return true;
 }
 
 function inferLogCategory(text) {
@@ -6508,6 +7023,11 @@ function render() {
     refreshSceneBgm();
     return;
   }
+  if (state.screen === "nameEntry") {
+    renderNameEntryScreen();
+    refreshSceneBgm();
+    return;
+  }
   if (state.screen === "jobSelect") {
     renderJobSelectScreen();
     refreshSceneBgm();
@@ -6650,9 +7170,53 @@ function renderIntroScreen() {
       render();
       return;
     }
-    state.screen = "jobSelect";
+    state.screen = "nameEntry";
     render();
   });
+}
+
+function renderNameEntryScreen() {
+  ensurePlayerProfileState();
+  const current = state.ui.profilePendingName || state.playerProfile.playerName || "";
+  app.innerHTML = `
+    <section class="screen intro-box">
+      <h2>プレイヤー名の入力</h2>
+      <div class="panel">
+        <p class="tiny">最大${PLAYER_NAME_MAX_LENGTH}文字。未入力の場合は「${DEFAULT_PLAYER_NAME}」になります。</p>
+        <input id="player-name-entry-input" class="title-search-input" type="text" maxlength="${PLAYER_NAME_MAX_LENGTH}" value="${escapeHtml(current)}" placeholder="${DEFAULT_PLAYER_NAME}" />
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button id="player-name-entry-confirm-btn" class="btn btn-primary">この名前で開始</button>
+        <button id="player-name-entry-default-btn" class="btn">未入力で進む</button>
+      </div>
+    </section>
+  `;
+  const input = document.getElementById("player-name-entry-input");
+  const applyAndContinue = (useInput) => {
+    const source = useInput ? (input?.value || "") : "";
+    updatePlayerName(source, { incrementCount: false });
+    state.ui.profilePendingName = "";
+    state.screen = "jobSelect";
+    render();
+  };
+  if (input) {
+    input.addEventListener("input", () => {
+      state.ui.profilePendingName = input.value || "";
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        applyAndContinue(true);
+      }
+    });
+  }
+  const confirmBtn = document.getElementById("player-name-entry-confirm-btn");
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", () => applyAndContinue(true));
+  }
+  const defaultBtn = document.getElementById("player-name-entry-default-btn");
+  if (defaultBtn) {
+    defaultBtn.addEventListener("click", () => applyAndContinue(false));
+  }
 }
 
 function renderJobSelectScreen() {
@@ -6732,6 +7296,7 @@ function renderTopBar() {
   const normalCount = state.equippedNormalTitleIds.length;
   const cheatCount = state.equippedCheatTitleIds.length;
   const effective = getEffectivePlayerStats();
+  const playerDisplayName = getPlayerDisplayName();
   const weightInfo = effective.weightInfo;
   const stageLabel = STAGE_DATA[state.currentStage]?.name || state.currentStage;
   const collapsed = !!state.ui.topHudCollapsed;
@@ -6754,6 +7319,7 @@ function renderTopBar() {
       </div>
       <div class="hud-stats">
         <div class="hud-item">町: <strong>${escapeHtml(TOWN_DATA[state.currentTown].name)}</strong></div>
+        <div class="hud-item">冒険者: <strong>${escapeHtml(playerDisplayName)}</strong></div>
         <div class="hud-item">MAP/STAGE: <strong>${escapeHtml(state.currentMap)}</strong> / <strong>${escapeHtml(stageLabel)}</strong></div>
         <div class="hud-item">GOLD: <strong>${state.player.gold}</strong></div>
         <div class="hud-item">チップ: <strong>${state.chips}</strong></div>
@@ -7332,6 +7898,30 @@ function startStageBattle() {
     state.titleRuntime.comboInvincibleUntil = Date.now() + state.titleEffects.comboBattleStartInvincibleMs;
     addLog(`聖騎士: ${Math.floor(state.titleEffects.comboBattleStartInvincibleMs / 1000)}秒間無敵`);
   }
+  if (state.titleEffects.fanBattleStartBuff) {
+    const support = state.titleEffects.fanBattleStartBuff;
+    const chance = clamp(0, 1, Number(support.chance || 0));
+    if (chance > 0 && Math.random() < chance) {
+      const durationMs = Math.max(1000, Math.floor(Number(support.durationSec || 30) * 1000));
+      if (Number(support.attackMultiplier || 0) > 0) {
+        applyEffect("player", "fame_fan_support_atk", {
+          stat: "attack",
+          multiplier: 1 + Number(support.attackMultiplier || 0),
+          durationMs,
+          displayNameJa: "ファンの声援"
+        });
+      }
+      if (Number(support.defenseMultiplier || 0) > 0) {
+        applyEffect("player", "fame_fan_support_def", {
+          stat: "defense",
+          multiplier: 1 + Number(support.defenseMultiplier || 0),
+          durationMs,
+          displayNameJa: "ファンの声援"
+        });
+      }
+      addLog("応援バフ発動: ファンの声援が戦闘力を底上げした。", "important", { important: true });
+    }
+  }
 
   addLog(`戦闘開始: ${stage.id} (${state.battle.stageKillCount}/${progress.target})`);
   spawnStageEnemy();
@@ -7399,6 +7989,7 @@ function spawnStageEnemy() {
     }
     if (master.id === "otherworldKing") {
       addLog("異界の王が出現した。世界の終着点が目前にある。", "important", { important: true });
+      addLog(`システム：${getPlayerDisplayName()}は、異界の王へ挑む。`, "important", { important: true });
       emitStoryDirectionEvent("otherworld_king_spawn");
       if (shouldUseOtherworldSupportLog()) {
         pushOtherworldSupportLog(true);
@@ -8621,6 +9212,7 @@ function handleStageClear() {
 
 function handleFieldBossClear(stageId) {
   const stage = STAGE_DATA[stageId];
+  const firstClear = !state.fieldBossCleared.includes(stageId);
   if (stage?.finalContentId) {
     addLog(`最終ボス撃破: ${stageId}`);
     handleFinalBossVictory();
@@ -8649,6 +9241,8 @@ function handleFieldBossClear(stageId) {
     state.stats.lowHpBossKillCount = (state.stats.lowHpBossKillCount || 0) + 1;
   }
   addLog(`フィールドボス撃破: ${stageId}`);
+  addLog(`撃破演出：${getPlayerDisplayName()}が ${stage?.name || stageId} を突破した。`, "important", { important: true });
+  addFame(180, `${stageId} ボス撃破`);
   const defeatedEnemyId = state.battle?.enemy?.id || stage?.fieldBoss || null;
   if (isRageBossEnemy(defeatedEnemyId)) {
     state.stats.enragedBossKillCount = (state.stats.enragedBossKillCount || 0) + 1;
@@ -8739,9 +9333,17 @@ function handleFieldBossClear(stageId) {
   }
 
   if (stageId === "1-10") {
+    if (firstClear) {
+      addFame(3000, "草原マップボス初回撃破");
+      setMinimumFameRank(80, "草原マップボス撃破");
+    }
     emitStoryDirectionEvent("boss_behemoth_clear");
     unlockTown("dustria");
   } else if (stageId === "2-10") {
+    if (firstClear) {
+      addFame(6000, "砂漠マップボス初回撃破");
+      setMinimumFameRank(50, "砂漠マップボス撃破");
+    }
     emitStoryDirectionEvent("boss_hydra_clear");
     if (getCurrentMainBattleLineId() === "priest_line") {
       state.stats.priestDesertBossClearCount = (state.stats.priestDesertBossClearCount || 0) + 1;
@@ -8754,11 +9356,19 @@ function handleFieldBossClear(stageId) {
     addLog("ボス素材獲得: ヒドラ鱗 x2");
     unlockTown("akamatsu");
   } else if (stageId === "3-10") {
+    if (firstClear) {
+      addFame(12000, "海マップボス初回撃破");
+      setMinimumFameRank(20, "海マップボス撃破");
+    }
     emitStoryDirectionEvent("boss_leviathan_clear");
     addItem("leviathanFin", 2);
     addLog("ボス素材獲得: リヴァイア鰭 x2");
     unlockTown("rulacia");
   } else if (stageId === "4-10") {
+    if (firstClear) {
+      addFame(20000, "火山マップボス初回撃破");
+      setMinimumFameRank(10, "火山マップボス撃破");
+    }
     emitStoryDirectionEvent("boss_volkazard_clear");
     addItem("volkaCore", 2);
     addLog("ボス素材獲得: ヴォルカ核 x2");
@@ -8779,6 +9389,10 @@ function handleFieldBossClear(stageId) {
     prepareLoopResult();
     state.screen = "clearResult";
   } else if (stageId === "5-10") {
+    if (firstClear) {
+      addFame(30000, "Protocol3初回撃破");
+      setMinimumFameRank(5, "Protocol3撃破");
+    }
     addItem("controlBoard", 2);
     addItem("overclockCircuit", 2);
     addItem("collapseArmorShard", 2);
@@ -8792,6 +9406,10 @@ function handleFieldBossClear(stageId) {
     emitStoryDirectionEvent("protocol3_clear");
     emitStoryDirectionEvent("vip_unlock");
   } else if (stageId === "6-10") {
+    if (firstClear) {
+      addFame(50000, "異界の王初回撃破");
+      setMinimumFameRank(FAME_HALL_OF_FAME, "異界の王撃破");
+    }
     ensureOtherworldState();
     state.otherworldKingCleared = true;
     state.hasProtagonistTitle = true;
@@ -8799,6 +9417,8 @@ function handleFieldBossClear(stageId) {
     state.otherworldUnlocked = true;
     state.otherworldKingSupportLogMode = true;
     unlockTitle("protagonist");
+    setDisplayTitleId("protagonist");
+    addLog(`システム：${getPlayerDisplayName()}は、異界の王を撃破した。`, "important", { important: true });
     addLog("称号『主人公』を獲得した！ すべての限界が解放された。", "important", { important: true });
     OTHERWORLD_ENDING_CHEER_LOG_DATA.forEach((text) => addLog(text, "board", { important: true }));
     showCenterPopup({ text: "異界の王撃破: 主人公", type: "important" });
@@ -8850,6 +9470,7 @@ function handleUniqueVictory(enemy) {
     state.unlockedUniqueSkills.push(skillTag);
   }
   addLog(`ユニーク撃破: ${enemy.name} / 特別報酬 EXP+${uniqueBonusExp}, GOLD+${uniqueBonusGold}`);
+  addFame(220, `ユニーク撃破:${enemy.name}`);
   showToast(`ユニーク撃破: ${enemy.name}`, "important");
   syncStoryProgress();
   if (firstUniqueBefore) {
@@ -8866,6 +9487,7 @@ function handleOtherworldKingDefeatProgress() {
   ensureOtherworldState();
   state.otherworldKingDefeatCount = Math.max(0, (state.otherworldKingDefeatCount || 0) + 1);
   addLog(`異界の王への挑戦敗北: ${state.otherworldKingDefeatCount}回目`, "important", { important: true });
+  addLog(`システム：${getPlayerDisplayName()}は、再び異界の王へ挑む。`, "system", { important: true });
 
   if (!state.otherworldKingFirstDefeatRewardClaimed) {
     state.otherworldKingFirstDefeatRewardClaimed = true;
@@ -9305,6 +9927,25 @@ function evolveProductionJob() {
   render();
 }
 
+Object.assign(TITLE_CHECKERS, {
+  fame_popular: () => {
+    ensureGuildFameState();
+    return state.guild.hallOfFame || (typeof state.guild.fameRank === "number" && state.guild.fameRank <= 80) || (state.guild.fame || 0) >= 6000;
+  },
+  fame_everyone_knows: () => {
+    ensureGuildFameState();
+    return state.guild.hallOfFame || (typeof state.guild.fameRank === "number" && state.guild.fameRank <= 20) || (state.guild.fame || 0) >= 70000;
+  },
+  fame_fan_favorite: () => {
+    ensureGuildFameState();
+    return state.guild.hallOfFame || (typeof state.guild.fameRank === "number" && state.guild.fameRank <= 5) || (state.guild.fame || 0) >= 170000;
+  },
+  fame_hall_of_fame: () => {
+    ensureGuildFameState();
+    return !!state.guild.hallOfFame || !!state.otherworldKingCleared;
+  }
+});
+
 const TITLE_CUSTOM_CHECKERS = {
   chain_champion_200: () => state.stats.currentWinStreak >= 200 || state.stats.totalConsecutiveWinsBest >= 200,
   ailment_behemoth: () =>
@@ -9540,6 +10181,7 @@ function ensureTitleSlotState() {
   applyTitleSlotUnlocksFromLoop();
   recalculateTitleSlotCaps();
   normalizeEquippedTitleSlots({ logOnTrim: false });
+  ensurePlayerProfileState();
 }
 
 function getMaxTitleSlots(category) {
@@ -9564,6 +10206,12 @@ function unlockTitle(titleId) {
     return;
   }
   state.unlockedTitles.push(titleId);
+  if (String(titleId).startsWith("fame_")) {
+    ensureGuildFameState();
+    if (!state.guild.claimedFameTitleIds.includes(titleId)) {
+      state.guild.claimedFameTitleIds.push(titleId);
+    }
+  }
   if (!state.loop.titleHistory.includes(titleId)) {
     state.loop.titleHistory.push(titleId);
   }
@@ -10078,6 +10726,7 @@ function updateBoardThreadsFromEndingProgress() {
 
 function recalculateTitleEffects() {
   ensureTitleSlotState();
+  ensureGuildFameState();
   const next = createDefaultTitleEffects();
   const equippedTitles = getCombinedEquippedTitleIds();
   equippedTitles.forEach((titleId) => {
@@ -10096,6 +10745,18 @@ function recalculateTitleEffects() {
   if (state.unlockedTitles.includes("first_death") && Date.now() < state.titleRuntime.reviveAttackBuffUntil) {
     next.attackMultiplier += 0.1;
   }
+  const fame = Math.max(0, Number(state.guild.fame || 0));
+  let fameBonusTotal = 0;
+  (next.fameScalingBonuses || []).forEach((row) => {
+    const perFame = Math.max(1, Number(row.perFame || 1000));
+    const perStep = Math.max(0, Number(row.percentPerStep || 0));
+    const cap = Math.max(0, Number(row.cap || 0));
+    const steps = Math.floor(fame / perFame);
+    const bonus = Math.min(cap, steps * perStep);
+    fameBonusTotal += bonus;
+  });
+  next.fameBasedAllStatsBonus = fameBonusTotal;
+  next.allStatsMultiplier += fameBonusTotal;
   state.titleEffects = next;
 }
 
@@ -10330,6 +10991,17 @@ function mergeTitleEffect(target, effect) {
   }
   if (effect.comboBattleStartRandomBuff) {
     target.comboBattleStartRandomBuff = effect.comboBattleStartRandomBuff;
+  }
+  if (effect.fanBattleStartBuff) {
+    target.fanBattleStartBuff = {
+      chance: Math.max(Number(target.fanBattleStartBuff?.chance || 0), Number(effect.fanBattleStartBuff?.chance || 0)),
+      attackMultiplier: Math.max(Number(target.fanBattleStartBuff?.attackMultiplier || 0), Number(effect.fanBattleStartBuff?.attackMultiplier || 0)),
+      defenseMultiplier: Math.max(Number(target.fanBattleStartBuff?.defenseMultiplier || 0), Number(effect.fanBattleStartBuff?.defenseMultiplier || 0)),
+      durationSec: Math.max(Number(target.fanBattleStartBuff?.durationSec || 0), Number(effect.fanBattleStartBuff?.durationSec || 0))
+    };
+  }
+  if (effect.fameScalingBonus) {
+    target.fameScalingBonuses = [...(target.fameScalingBonuses || []), { ...effect.fameScalingBonus }];
   }
   if (typeof effect.comboBattleStartRandomBuffCount === "number") {
     target.comboBattleStartRandomBuffCount += effect.comboBattleStartRandomBuffCount;
@@ -12230,6 +12902,7 @@ function buyAuctionItem(auctionId) {
   state.stats.auctionChipSpentTotal = (state.stats.auctionChipSpentTotal || 0) + buyPrice;
   if (buyPrice >= 100000) {
     state.stats.auctionHighValuePurchaseCount = (state.stats.auctionHighValuePurchaseCount || 0) + 1;
+    addFame(320, "高額オークション落札");
   }
   state.stats.totalShopTrades = (state.stats.totalShopTrades || 0) + 1;
   addLog(`オークション落札: ${ITEM_DATA[row.itemId]?.name || row.itemId} x1 (-${buyPrice}チップ)`);
@@ -12346,6 +13019,9 @@ function spinNeverendRoulette(vip = false) {
     addLog(flavor[Math.floor(Math.random() * flavor.length)]);
   }
   addLog(`${vip ? "VIP" : "ルーレット"}: 予想${selected} / 結果${rolled} / ${won ? `的中 +${totalGain}チップ` : `ハズレ -${actualBetLoss}チップ`}`);
+  if (won && totalGain >= 100000) {
+    addFame(vip ? 520 : 320, vip ? "VIPルーレット大勝ち" : "ルーレット大勝ち");
+  }
   checkTitleUnlocks("afterCasinoPlay");
   render();
 }
@@ -12454,6 +13130,8 @@ function renderNeverendVipView() {
 
 function renderGuildView(container) {
   ensureNeverendState();
+  ensureGuildFameState();
+  updateFameRankByProgress({ silent: true, reason: "guildView" });
   const rankInfo = getGuildRankDisplayInfo();
   const nextLine = rankInfo.nextRank
     ? `次ランク ${rankInfo.nextRank}: ${rankInfo.nextRequiredPoints}GP（あと${rankInfo.pointsToNext}GP）`
@@ -12489,7 +13167,7 @@ function renderGuildView(container) {
   }
 
   container.innerHTML = `
-    <div class="main-header"><h2>${isNeverendTownActive() ? "天空都市ネバーエンド" : "ギルド"}</h2><span class="tiny">ランク ${state.guild.rank} / GP ${state.guild.points}</span></div>
+    <div class="main-header"><h2>${isNeverendTownActive() ? "天空都市ネバーエンド" : "ギルド"}</h2><span class="tiny">ランク ${state.guild.rank} / GP ${state.guild.points} / 名声 ${state.guild.fame} / 順位 ${escapeHtml(formatFameRankLabel())}</span></div>
     <div class="card" style="margin-bottom:10px;">
       <p class="tiny">${escapeHtml(nextLine)}</p>
       <p class="tiny">${escapeHtml(capLine)}</p>
@@ -12882,6 +13560,7 @@ function claimQuestReward(questId) {
   state.stats.guildPointsEarned += gp;
   state.stats.guildQuestCompleted += 1;
   addLog(`報酬受取: ${quest.name} / +${quest.reward.gold}G, +${gp}GP`);
+  addFame(Math.max(20, Math.floor(gp * 0.6)), `ギルド依頼達成:${quest.name}`);
   updateGuildRank();
   completeQuestAndRegenerate(questId);
   checkTitleUnlocks("afterQuestClaim");
@@ -13143,7 +13822,44 @@ function getSellPrice(item) {
   return sell;
 }
 
+function renderGuildTempleRankingPanel() {
+  ensureGuildFameState();
+  updateFameRankByProgress({ silent: true, reason: "templeRanking" });
+  const rows = getGuildFameLeaderboardRows(15)
+    .map((row) => {
+      const isPlayer = row.kind === "player";
+      const marker = isPlayer ? "▶ " : "";
+      return `
+        <div class="card ${isPlayer ? "active-title" : ""}" style="margin-bottom:6px;">
+          <p><strong>${marker}${escapeHtml(row.rankLabel)}</strong> ${escapeHtml(row.name)}${row.title ? `【${escapeHtml(row.title)}】` : ""}</p>
+          <p class="tiny">名声: ${Math.max(0, Math.floor(Number(row.fame || 0)))} / ${escapeHtml(row.comment || "")}</p>
+        </div>
+      `;
+    })
+    .join("");
+  return `
+    <div class="card" style="margin-bottom:10px;">
+      <h4>神殿名声ランキング</h4>
+      <p class="tiny">現在名声: ${state.guild.fame}</p>
+      <p class="tiny">現在順位: ${escapeHtml(formatFameRankLabel())}</p>
+      <p class="tiny">異名: ${escapeHtml(getFameAlias())}</p>
+      <p class="tiny">${escapeHtml(getNextFameRankTargetText())}</p>
+      <p class="tiny">${state.guild.hallOfFame ? "殿堂入り状態です。" : "ボス撃破や異界到達で順位保証が発生します。"}</p>
+    </div>
+    <div>${rows}</div>
+  `;
+}
+
 function renderTempleView() {
+  ensureGuildFameState();
+  updateFameRankByProgress({ silent: true, reason: "templeOpen" });
+  const templeTab = state.guild.templeTab === "ranking" ? "ranking" : "jobs";
+  const tabButtons = `
+    <div class="status-tabs" style="margin-bottom:10px;">
+      <button class="btn temple-tab-btn ${templeTab === "jobs" ? "active" : ""}" data-temple-tab="jobs">ジョブ管理</button>
+      <button class="btn temple-tab-btn ${templeTab === "ranking" ? "active" : ""}" data-temple-tab="ranking">名声ランキング</button>
+    </div>
+  `;
   const productionButtons = Object.keys(PRODUCTION_JOB_LABELS)
     .map((job) => `<button class="btn production-select-btn ${state.player.productionJob === job ? "active" : ""}" data-production-job="${job}">${PRODUCTION_JOB_LABELS[job]}</button>`)
     .join("");
@@ -13177,8 +13893,17 @@ function renderTempleView() {
   const subUnlockedSkills = subLineId ? getUnlockedSkillNamesForLine(subLineId).join(" / ") : "なし";
   const productionJobName = prodCurrent?.nameJa || PRODUCTION_JOB_LABELS[state.player.productionJob] || state.player.productionJob;
 
+  if (templeTab === "ranking") {
+    return `
+      <h3>神殿</h3>
+      ${tabButtons}
+      ${renderGuildTempleRankingPanel()}
+    `;
+  }
+
   return `
     <h3>神殿</h3>
+    ${tabButtons}
     <p>メインジョブ: <strong>${state.player.mainJob || "未設定"}</strong> / 段階 <strong>${state.player.mainJobTier || 1}</strong></p>
     <p class="tiny">${mainCurrent?.descriptionJa || ""}</p>
     <p class="tiny">次進化: ${mainInfo.nextJob ? `${mainInfo.nextJob.nameJa} (Lv.${mainInfo.nextJob.requiredLevel})` : "なし"} / 状態: ${mainInfo.canEvolve ? "進化可能" : "未達成"}</p>
@@ -14063,6 +14788,17 @@ function getThreadResponses(threadId, currentState = state) {
   if ((currentState.unlockedTitles || []).includes("production_is_main") && thread.id === "th_main_prod") {
     dynamic.push({ author: "バフ飯研究所", body: "生産が本体を取ると装備と消耗品の価値観が変わる。", tone: "guide", important: true });
   }
+  const displayName = getPlayerDisplayName();
+  if (["th_rumor_early", "th_rumor_mid", "th_rumor_neverend", "th_rumor_otherworld", "th_rumor_fate", "th_protocol3_who", "th_protagonist_confirmed"].includes(thread.id)) {
+    dynamic.push({ author: "名無しの冒険者", body: `${displayName}って人、またログに出てる。`, tone: "legend", important: true });
+  }
+  if (["th_desert_who", "th_sea_who", "th_volcano_who"].includes(thread.id)) {
+    dynamic.push({ author: "検証班A", body: `${displayName}の構成、連撃対策を積んでる可能性が高い。`, tone: "hint", isHint: true });
+  }
+  if (["th_fame_rank_80", "th_fame_rank_50", "th_fame_rank_20", "th_fame_rank_10", "th_fame_rank_5", "th_fame_rank_1", "th_fame_hall"].includes(thread.id)) {
+    dynamic.push({ author: "名無しの冒険者", body: `${displayName}、またボス倒してる。`, tone: "chat" });
+    dynamic.push({ author: "ファンA", body: `${displayName}のビルド真似したい。`, tone: "chat" });
+  }
 
   const merged = [...base, ...(variant.extraResponses || []), ...dynamic];
   return merged.map((res, idx) => ({ ...res, no: idx + 1 }));
@@ -14309,12 +15045,28 @@ function openBoardThread(threadId) {
 
 function renderStatusView(container) {
   ensureTitleSlotState();
+  ensurePlayerProfileState();
+  ensureGuildFameState();
+  updateFameRankByProgress({ silent: true, reason: "statusView" });
   const effective = getEffectivePlayerStats();
   const effectiveWeightInfo = effective.weightInfo || calculateWeightInfo(effective.attack);
   const effectiveWeightMods = effective.weightModifiers || getWeightPenaltyModifiers(effectiveWeightInfo);
   const weightPenaltyReductionRate = clamp(0, 0.9, Number(state.titleEffects.weightPenaltyReduction || 0));
+  const displayTitle = getDisplayTitleData();
+  const profileName = getPlayerDisplayName();
+  const fameRank = getCurrentFameRank();
+  const fameAlias = getFameAlias();
+  const fameRankLabel = formatFameRankLabel(fameRank);
+  const nextRankTargetText = getNextFameRankTargetText();
+  const profileEditOpen = !!state.ui.profileNameEditMode;
+  const pendingName = state.ui.profilePendingName || state.playerProfile.playerName || "";
   const rows = [
-    ["名前", state.player.name],
+    ["名前", profileName],
+    ["表示称号", displayTitle ? displayTitle.name : "なし"],
+    ["名声", `${state.guild.fame}`],
+    ["ランキング", fameRankLabel],
+    ["異名", fameAlias],
+    ["次の順位目安", nextRankTargetText.replace("次目標: ", "")],
     ["レベル", state.player.level],
     ["経験値", `${state.player.exp} / ${expToNextLevel()}`],
     ["所持金", `${state.player.gold}G`],
@@ -14360,6 +15112,35 @@ function renderStatusView(container) {
     ["速度解放", `${state.stats.highestBattleSpeedUnlocked}x`]
   ];
 
+  const profileIdentityCard = `
+    <div class="card" style="margin-bottom:10px;">
+      <h4>プロフィール</h4>
+      <p class="tiny">現在の表示: ${escapeHtml(profileName)}</p>
+      <p class="tiny">名前変更回数: ${state.playerProfile.nameChangedCount || 0}</p>
+      <p class="tiny">名声: ${state.guild.fame} / ランキング: ${escapeHtml(fameRankLabel)}</p>
+      <p class="tiny">異名: ${escapeHtml(fameAlias)} / ${escapeHtml(getFameFanFlavor())}</p>
+      <p class="tiny">状態: ${state.guild.hallOfFame ? "殿堂入り" : "挑戦中"} / ${escapeHtml(nextRankTargetText)}</p>
+      ${
+        profileEditOpen
+          ? `
+            <div class="title-row">
+              <input id="profile-name-input" class="title-search-input" type="text" maxlength="${PLAYER_NAME_MAX_LENGTH}" value="${escapeHtml(pendingName)}" placeholder="${DEFAULT_PLAYER_NAME}" />
+            </div>
+            <div class="title-row">
+              <button id="profile-name-save-btn" class="btn btn-primary">決定</button>
+              <button id="profile-name-cancel-btn" class="btn">キャンセル</button>
+            </div>
+            <p class="tiny">空欄は「${DEFAULT_PLAYER_NAME}」として保存されます。</p>
+          `
+          : `
+            <div class="title-row">
+              <button id="profile-name-edit-btn" class="btn">名前を変更</button>
+            </div>
+          `
+      }
+    </div>
+  `;
+
   container.innerHTML = `
     <div class="main-header"><h2>ステータス</h2><span class="tiny">進行情報と称号</span></div>
     <div class="status-tabs">
@@ -14370,7 +15151,7 @@ function renderStatusView(container) {
     </div>
     ${
       state.statusSubTab === "profile"
-        ? `<div class="info-grid">${rows.map(([label, value]) => `<div class="card"><h4>${escapeHtml(label)}</h4><p>${escapeHtml(value)}</p></div>`).join("")}</div>${renderActiveTitleEffectsSummary()}`
+        ? `${profileIdentityCard}<div class="info-grid">${rows.map(([label, value]) => `<div class="card"><h4>${escapeHtml(label)}</h4><p>${escapeHtml(value)}</p></div>`).join("")}</div>${renderActiveTitleEffectsSummary()}`
         : state.statusSubTab === "titles"
         ? renderTitleCatalogLayout()
         : state.statusSubTab === "equipment"
@@ -14619,6 +15400,7 @@ function sortTitleCatalog(mode, titles) {
 
 function renderTitleCatalog() {
   ensureTitleSlotState();
+  ensurePlayerProfileState();
   const summaryCollapsed = !!state.ui.titleCatalogSummaryCollapsed;
   const filtered = filterTitleCatalog({
     category: state.titleCatalogFilter,
@@ -14629,6 +15411,8 @@ function renderTitleCatalog() {
   const list = sortTitleCatalog(state.titleCatalogSortMode, filtered);
   const equippedIds = getCombinedEquippedTitleIds();
   const pageSize = 60;
+  const currentDisplayTitleId = state.playerProfile.displayTitleId || null;
+  const currentDisplayTitle = getDisplayTitleData(currentDisplayTitleId);
   const buildCards = (titles) =>
     titles
       .map((title) => {
@@ -14637,6 +15421,7 @@ function renderTitleCatalog() {
         const hidden = title.isHidden && !unlocked;
         const progress = renderTitleProgress(title.id);
         const fav = isTitleFavorited(title.id);
+        const displaySelected = currentDisplayTitleId === title.id;
         return `
           <div class="title-card ${unlocked ? "unlocked" : "locked"} ${active ? "active-title" : ""}">
             <div class="title-row">
@@ -14653,6 +15438,7 @@ function renderTitleCatalog() {
               <div style="display:flex;gap:6px;">
                 <button class="btn title-favorite-btn ${fav ? "active" : ""}" data-title-favorite-id="${title.id}" ${hidden ? "disabled" : ""}>${fav ? "★" : "☆"}</button>
                 <button class="btn title-toggle-btn ${active ? "active" : ""}" data-title-id="${title.id}" ${unlocked ? "" : "disabled"}>${active ? "OFF" : "ON"}</button>
+                <button class="btn display-title-set-btn ${displaySelected ? "active" : ""}" data-display-title-id="${title.id}" ${unlocked ? "" : "disabled"}>${displaySelected ? "表示中" : "表示称号に設定"}</button>
               </div>
             </div>
           </div>
@@ -14716,6 +15502,8 @@ function renderTitleCatalog() {
       </div>
       <p>ノーマル称号: <strong>${state.equippedNormalTitleIds.length}/${state.maxNormalTitleSlots}</strong></p>
       <p>チート称号: <strong>${state.equippedCheatTitleIds.length}/${state.maxCheatTitleSlots}</strong></p>
+      <p>表示称号: <strong>${escapeHtml(currentDisplayTitle?.name || "なし")}</strong></p>
+      <p class="tiny">表示名: ${escapeHtml(getPlayerDisplayName())}</p>
       ${
         summaryCollapsed
           ? ""
@@ -14729,6 +15517,7 @@ function renderTitleCatalog() {
       <p class="tiny">解放倍率: ${state.unlockedBattleSpeedOptions.map((s) => `${s}x`).join(" / ")}</p>
       <p class="tiny">ループ ${state.loop.loopCount} / 次解放: ${escapeHtml(getNextTitleLimitCondition())}</p>
       <p class="tiny">お気に入り(☆)を付けた称号は各カテゴリの先頭に固定されます。</p>
+      <div class="title-row"><button id="display-title-clear-btn" class="btn" ${currentDisplayTitle ? "" : "disabled"}>表示称号を外す</button></div>
       ${renderTitleCatalogFilters()}
       `
       }
@@ -15134,6 +15923,7 @@ function deepCopyPlain(value) {
 
 function splitRunAndPersistentState() {
   ensureTitleSlotState();
+  ensurePlayerProfileState();
   const runState = {
     screen: state.screen,
     introIndex: state.introIndex,
@@ -15185,6 +15975,7 @@ function splitRunAndPersistentState() {
     activeTitles: deepCopyPlain(state.activeTitles),
     equippedNormalTitleIds: deepCopyPlain(state.equippedNormalTitleIds),
     equippedCheatTitleIds: deepCopyPlain(state.equippedCheatTitleIds),
+    playerProfile: deepCopyPlain(state.playerProfile),
     baseNormalTitleSlots: state.baseNormalTitleSlots,
     baseCheatTitleSlots: state.baseCheatTitleSlots,
     normalTitleTierBonus: state.normalTitleTierBonus,
@@ -15355,6 +16146,9 @@ function applyLoadedState(payload) {
   state.activeTitles = Array.isArray(run.activeTitles) ? run.activeTitles : [];
   state.equippedNormalTitleIds = Array.isArray(run.equippedNormalTitleIds) ? run.equippedNormalTitleIds : [];
   state.equippedCheatTitleIds = Array.isArray(run.equippedCheatTitleIds) ? run.equippedCheatTitleIds : [];
+  state.playerProfile = run.playerProfile && typeof run.playerProfile === "object"
+    ? { ...state.playerProfile, ...run.playerProfile }
+    : { ...state.playerProfile, playerName: DEFAULT_PLAYER_NAME, displayTitleId: null };
   state.baseNormalTitleSlots = Number(run.baseNormalTitleSlots || state.baseNormalTitleSlots || TITLE_SLOT_RULES.normal.baseDefault);
   state.baseCheatTitleSlots = Number(run.baseCheatTitleSlots || state.baseCheatTitleSlots || TITLE_SLOT_RULES.cheat.baseDefault);
   state.normalTitleTierBonus = Number(run.normalTitleTierBonus || state.normalTitleTierBonus || 0);
@@ -15455,6 +16249,7 @@ function applyLoadedState(payload) {
   state.guild.lastRankCapNoticeKey = typeof state.guild.lastRankCapNoticeKey === "string" ? state.guild.lastRankCapNoticeKey : "";
   state.guild.shopRegionTab = SHOP_REGION_TABS.some((tab) => tab.id === state.guild.shopRegionTab) ? state.guild.shopRegionTab : "grassland";
   state.guild.shopMode = state.guild.shopMode === "sell" ? "sell" : "buy";
+  ensureGuildFameState();
   ensureNeverendState();
   ensureOtherworldState();
   if (state.hasNeverendTicket || state.neverendUnlocked) {
@@ -15528,7 +16323,9 @@ function applyLoadedState(payload) {
   applyLoopUnlocks();
   applyLoopTitleLimitUpgrades();
   updateGuildRank({ silent: true, refreshOnChange: false });
+  updateFameRankByProgress({ silent: true, reason: "load" });
   ensureTitleSlotState();
+  ensurePlayerProfileState();
   normalizeEquippedTitleSlots({ logOnTrim: false });
   syncStoryProgress({ silent: true, skipBoardRefresh: true });
   updateBoardThreadsFromProgress();
@@ -16185,6 +16982,16 @@ function bindGameEvents() {
     document.querySelectorAll(".evolve-main-job-btn").forEach((btn) => btn.addEventListener("click", () => evolveBattleJob("main")));
     document.querySelectorAll(".evolve-sub-job-btn").forEach((btn) => btn.addEventListener("click", () => evolveBattleJob("sub")));
     document.querySelectorAll(".evolve-production-job-btn").forEach((btn) => btn.addEventListener("click", () => evolveProductionJob()));
+    document.querySelectorAll(".temple-tab-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.templeTab;
+        if (!["jobs", "ranking"].includes(tab) || tab === state.guild.templeTab) {
+          return;
+        }
+        state.guild.templeTab = tab;
+        renderPreservingWindowScroll();
+      })
+    );
     document.querySelectorAll(".cheat-slot-offer-buy-btn").forEach((btn) =>
       btn.addEventListener("click", () => purchaseCheatTitleSlotOffer(btn.dataset.cheatSlotOfferId))
     );
@@ -16311,6 +17118,28 @@ function bindGameEvents() {
       });
     });
     document.querySelectorAll(".title-toggle-btn").forEach((btn) => btn.addEventListener("click", () => toggleTitle(btn.dataset.titleId)));
+    document.querySelectorAll(".display-title-set-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const titleId = btn.dataset.displayTitleId;
+        if (!titleId) return;
+        const previous = state.playerProfile?.displayTitleId || null;
+        if (!setDisplayTitleId(titleId)) return;
+        if (previous !== titleId) {
+          const title = getTitleById(titleId);
+          addLog(`表示称号を変更: ${title?.name || titleId}`);
+        }
+        renderPreservingWindowScroll();
+      })
+    );
+    const clearDisplayTitleBtn = document.getElementById("display-title-clear-btn");
+    if (clearDisplayTitleBtn) {
+      clearDisplayTitleBtn.addEventListener("click", () => {
+        if (!state.playerProfile?.displayTitleId) return;
+        setDisplayTitleId(null);
+        addLog("表示称号を外しました。");
+        renderPreservingWindowScroll();
+      });
+    }
     const titleSummaryToggleBtn = document.querySelector(".title-summary-toggle-btn");
     if (titleSummaryToggleBtn) {
       titleSummaryToggleBtn.addEventListener("click", () => {
@@ -16386,6 +17215,48 @@ function bindGameEvents() {
         state.titleCatalogSearch = searchInput.value || "";
         state.titleCatalogPageNormal = 1;
         state.titleCatalogPageCheat = 1;
+        renderPreservingWindowScroll();
+      });
+    }
+    const profileNameEditBtn = document.getElementById("profile-name-edit-btn");
+    if (profileNameEditBtn) {
+      profileNameEditBtn.addEventListener("click", () => {
+        ensurePlayerProfileState();
+        state.ui.profileNameEditMode = true;
+        state.ui.profilePendingName = state.playerProfile.playerName || "";
+        renderPreservingWindowScroll();
+      });
+    }
+    const profileNameSaveBtn = document.getElementById("profile-name-save-btn");
+    if (profileNameSaveBtn) {
+      profileNameSaveBtn.addEventListener("click", () => {
+        const input = document.getElementById("profile-name-input");
+        const result = updatePlayerName(input?.value || state.ui.profilePendingName || "", { incrementCount: true });
+        state.ui.profileNameEditMode = false;
+        state.ui.profilePendingName = "";
+        addLog(result.changed ? `プレイヤー名を変更: ${result.previous} -> ${result.next}` : `プレイヤー名は ${result.next} のままです。`);
+        renderPreservingWindowScroll();
+      });
+    }
+    const profileNameCancelBtn = document.getElementById("profile-name-cancel-btn");
+    if (profileNameCancelBtn) {
+      profileNameCancelBtn.addEventListener("click", () => {
+        state.ui.profileNameEditMode = false;
+        state.ui.profilePendingName = "";
+        renderPreservingWindowScroll();
+      });
+    }
+    const profileNameInput = document.getElementById("profile-name-input");
+    if (profileNameInput) {
+      profileNameInput.addEventListener("input", () => {
+        state.ui.profilePendingName = profileNameInput.value || "";
+      });
+      profileNameInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        const result = updatePlayerName(profileNameInput.value || "", { incrementCount: true });
+        state.ui.profileNameEditMode = false;
+        state.ui.profilePendingName = "";
+        addLog(result.changed ? `プレイヤー名を変更: ${result.previous} -> ${result.next}` : `プレイヤー名は ${result.next} のままです。`);
         renderPreservingWindowScroll();
       });
     }
@@ -16917,12 +17788,14 @@ function renderLoopResultView() {
 }
 
 function renderOtherworldEndingView() {
+  const playerDisplayName = getPlayerDisplayName();
   app.innerHTML = `
     <section class="screen title-screen">
       <h1 class="game-title">異界エンディング</h1>
-      <p class="subtitle">世界は救われた。そう主人公によって</p>
+      <p class="subtitle">${escapeHtml(playerDisplayName)}によって、世界は救われた。</p>
       <div class="panel loop-summary-panel">
         <p>称号: 主人公</p>
+        <p>記録名: ${escapeHtml(playerDisplayName)}</p>
         <p>異界の王敗北回数: ${state.otherworldKingDefeatCount || 0}</p>
         <p>到達レベル: ${state.player.level}</p>
         <p>掲示板は歓喜で埋め尽くされている。</p>
@@ -17216,6 +18089,15 @@ function resetForNewLoop() {
   state.guild.workshopTab = "craft";
   state.guild.shopRegionTab = "grassland";
   state.guild.shopMode = "buy";
+  state.guild.templeTab = "jobs";
+  state.guild.fame = 0;
+  state.guild.fameRank = null;
+  state.guild.hallOfFame = false;
+  state.guild.fameBestRank = null;
+  state.guild.lastRankRewardClaimed = null;
+  state.guild.claimedFameTitleIds = [];
+  state.guild.rankingReactionFlags = {};
+  state.guild.rankingForcedRankFlags = {};
 
   state.stats.totalBattles = 0;
   state.stats.totalWins = 0;
@@ -17543,12 +18425,14 @@ setInterval(handleSecondTick, 1000);
 
 bootstrapStoredPreferences();
 ensureOtherworldState();
+ensurePlayerProfileState();
 ensureAudioSettings();
 bgmManager.initAudio();
 setupAudioUnlockListeners();
 recalculateTitleEffects();
 applyLoopUnlocks();
 applyLoopTitleLimitUpgrades();
+updateFameRankByProgress({ silent: true, reason: "boot" });
 updateUnlockedBattleSpeeds();
 syncOtherworldUnlockState({ silent: true });
 updateBoardThreadsFromProgress();
